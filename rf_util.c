@@ -762,6 +762,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
     num_unknowns += ncp[POR_GAS_PRES];
     num_unknowns += ncp[POR_POROSITY];
     num_unknowns += ncp[POR_SATURATION];
+    num_unknowns += ncp[LUBP_LIQ];
   }
 
   if (use_var_norm[4]) {	/* Pressure, even though there is no dP/dt

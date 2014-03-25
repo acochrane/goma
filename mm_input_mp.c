@@ -2763,7 +2763,7 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 
   strcpy(search_string,"Conductivity");
 
-  model_read = look_for_mat_proptable(imp,search_string , 
+  model_read = look_for_mat_proptable(imp, "Conductivity", 
 				      &(mat_ptr->ConductivityModel), 
 				      &(mat_ptr->thermal_conductivity), 
 				      &(mat_ptr->u_thermal_conductivity),
@@ -2839,6 +2839,7 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 	  SPF(err_msg,"%s card read error.  Card missing or unknown model.", search_string);
 	  EH(-1,err_msg);
 	}
+      
     }
 
   ECHO(es,echo_file);
@@ -7970,7 +7971,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   ECHO("\n---Special Inputs\n", echo_file); /* added by PRS 3/17/2009 */ 
 
-  if(pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2])
+  if(pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2] || pd_glob[mn]->e[R_LUBP_LIQ])
     {
       model_read = look_for_mat_prop(imp, "Upper Height Function Constants", 
 				     &(mat_ptr->HeightUFunctionModel), 
@@ -8986,7 +8987,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   if ( pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2] ||
        pd_glob[mn]->e[R_SHELL_FILMP] ||
-       pd_glob[mn]->e[R_SHELL_SAT_OPEN] || pd_glob[mn]->e[R_SHELL_SAT_OPEN_2]) {
+       pd_glob[mn]->e[R_SHELL_SAT_OPEN] || pd_glob[mn]->e[R_SHELL_SAT_OPEN_2] ||
+       pd_glob[mn]->e[R_LUBP_LIQ]) {
 
     model_read = look_for_mat_prop(imp, "FSI Deformation Model",
 				   &(mat_ptr->FSIModel),

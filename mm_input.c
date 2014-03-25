@@ -9,7 +9,6 @@
 *                                                                         *
 * This software is distributed under the GNU General Public License.      *
 \************************************************************************/
- 
 
 /*
  *$Id: mm_input.c,v 5.36 2010-06-29 22:23:42 prschun Exp $
@@ -8370,7 +8369,7 @@ rd_eq_specs(FILE *ifp,
       ce = set_eqn(R_SHELL_LUBP, pd_ptr);
     } else if (!strcasecmp(ts, "lubp")) {
       ce = set_eqn(R_LUBP, pd_ptr);
-   } else if (!strcasecmp(ts, "lubp_2")) {
+    } else if (!strcasecmp(ts, "lubp_2")) {
       ce = set_eqn(R_LUBP_2, pd_ptr);
     } else if (!strcasecmp(ts, "shell_filmp")) {
       ce = set_eqn(R_SHELL_FILMP, pd_ptr);
@@ -8388,6 +8387,8 @@ rd_eq_specs(FILE *ifp,
       pd_ptr->Num_Porous_Eqn++;
     } else if (!strcasecmp(ts, "shell_energy")) {
       ce = set_eqn(R_SHELL_ENERGY, pd_ptr);
+    } else if (!strcasecmp(ts, "lubp_liq")) {
+      ce = set_eqn(R_LUBP_LIQ, pd_ptr);
     } else if (!strcasecmp(ts, "shell_deltah")) {
       ce = set_eqn(R_SHELL_DELTAH, pd_ptr);
     } else if (!strcasecmp(ts, "shell_lub_curv")) {
@@ -8990,6 +8991,8 @@ rd_eq_specs(FILE *ifp,
       cv = set_var(SHELL_SAT_GASN, pd_ptr);
     } else if (!strcasecmp(ts, "SINK_MASS")) {
       cv = set_var(POR_SINK_MASS, pd_ptr);
+    } else if (!strcasecmp(ts, "LUBP_LIQ")) {
+      cv = set_var(LUBP_LIQ, pd_ptr);
     } else if (!strcasecmp(ts, "SH_SHEAR_TOP")) {
       cv = set_var(SHELL_SHEAR_TOP, pd_ptr);
     } else if (!strcasecmp(ts, "SH_SHEAR_BOT")) {
@@ -9379,6 +9382,7 @@ rd_eq_specs(FILE *ifp,
     case R_SHELL_SHEAR_BOT:
     case R_SHELL_CROSS_SHEAR:
 
+
 	if ( fscanf(ifp, "%lf %lf", 
 		    &(pd_ptr->etm[ce][(LOG2_ADVECTION)]),
 		    &(pd_ptr->etm[ce][(LOG2_SOURCE)]))
@@ -9430,7 +9434,22 @@ rd_eq_specs(FILE *ifp,
       SPF( endofstring(echo_string),"\t %.4g %.4g", pd_ptr->etm[ce][(LOG2_MASS)],
 	   pd_ptr->etm[ce][(LOG2_SOURCE)]);    
       break;
+    case R_LUBP_LIQ:  
+      if ( fscanf(ifp, "%lf %lf", 
+		  &(pd_ptr->etm[ce][(LOG2_MASS)]),
+		  &(pd_ptr->etm[ce][(LOG2_DIFFUSION)]))
+	   != 2 )
+	{
+	  sr = sprintf(err_msg, 
+		       "Provide 2 equation term multipliers (mass,diff) on %s in %s",
+		       EQ_Name[ce].name1, pd_ptr->MaterialName);
+	  EH(-1, err_msg);
+	}
       
+      SPF( endofstring(echo_string),"\t %.4g %.4g", pd_ptr->etm[ce][(LOG2_DIFFUSION)],
+	   pd_ptr->etm[ce][(LOG2_BOUNDARY)]);
+      break;
+
       /* 
        * Three terms.... 
        */
@@ -9442,7 +9461,7 @@ rd_eq_specs(FILE *ifp,
     case R_PHASE5:
     case R_ACOUS_REYN_STRESS:
     case R_SHELL_LUBP:
-	case R_POR_SINK_MASS:
+    case R_POR_SINK_MASS:
 
 	if ( fscanf(ifp, "%lf %lf %lf", 
 		    &(pd_ptr->etm[ce][(LOG2_MASS)]),
@@ -10058,7 +10077,7 @@ look_for_mat_prop(FILE *imp,			/* ptr to input stream (in)*/
 						 * number.
 						 * On output this is equal to
 						 * species ID, read from the
-						 * file.*/ 
+b						 * file.*/ 
 		  char *echo_string  )  /*           This char array will pass back the 
 		                                 * reconstructed input card for output 
                                                  * to the echo file for this mat */
@@ -10378,7 +10397,7 @@ look_for_mat_proptable(FILE *imp,			/* ptr to input stream (in)*/
   fprintf(stderr, "%s: %d=look_forward_optional(imp, \"%s\", ... )\n", yo, got_it,
 	  search_string);
 #endif
-
+  
   if (got_it == 1) {
     if (fscanf(imp, "%s", model_name) != 1)
       {

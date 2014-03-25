@@ -2644,6 +2644,12 @@ set_interaction_masks(Exo_DB *exo)
           /* Need to add the height-var here and velocity var here */
           break;
 
+	case R_LUBP_LIQ:
+	  v = LUBP_LIQ;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+
+	  break;          
+
 	case R_LUBP_2:
           v = LUBP_2;
           if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;

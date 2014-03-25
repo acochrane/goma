@@ -1276,7 +1276,9 @@ assembly_alloc(Exo_DB *exo)
   if(Num_Var_In_Type[CUR_STRAIN]) {
     esp->cur_strain = (dbl **) alloc_ptr_1(MDE);
   }
-
+  if(Num_Var_In_Type[LUBP_LIQ]) {
+    esp->lubp_liq = (dbl **) alloc_ptr_1(MDE);
+  }
 
   /*
    * Action_Flags______________________________________________________________

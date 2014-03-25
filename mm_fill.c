@@ -1836,6 +1836,15 @@ matrix_fill(
           CHECKFINITE("assemble_porous_shell_open_2");
 #endif
         }
+      if( pde[R_LUBP_LIQ] )
+        {
+          err = assemble_porous_shell_two_phase( time_value, theta, delta_t, xi, exo);
+          EH( err, "assemble_porous_shell_two_phase");
+#ifdef CHECK_FINITE
+          CHECKFINITE("assemble_porous_shell_two_phase");
+#endif
+        }
+
       if( pde[R_SHELL_ANGLE1] )
         {
           err = assemble_shell_angle(time_value, theta, delta_t, xi, exo);

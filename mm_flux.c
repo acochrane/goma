@@ -7544,6 +7544,17 @@ load_fv_sens(void)
       }
     }
 
+  v = LUBP_LIQ;
+  fv_sens->lubp_liq = 0.;
+  if ( pd->v[v] )
+    {
+      dofs  = ei->dof[v];
+      for ( i=0; i<dofs; i++)
+      {
+        fv_sens->lubp_liq += *esp_old->lubp_liq[i] * bf[v]->phi[i];
+      }
+    }
+
   v = SHELL_FILMP;
   fv_sens->sh_fp = 0.;
   if ( pd->v[v] )

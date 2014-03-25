@@ -206,6 +206,15 @@ PROTO((double,                   /* theta or tt */
        double xi[DIM],
        const Exo_DB *exo
 ));
+     
+EXTERN int assemble_porous_shell_two_phase
+PROTO((double,                   /*current time*/
+       double,                   /* theta or tt */
+       double,                  /* dt */
+       double xi[DIM],     
+       const Exo_DB *exo
+));
+
 
 EXTERN void shell_diff_kinematic_bc
 PROTO((double [DIM],             /* func */

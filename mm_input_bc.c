@@ -464,6 +464,7 @@ rd_bc_specs(FILE *ifp,
 	  /* Fall through for all cases which require a single floating point
 	   * value as data input and one additional optional parameter
 	   */
+
 	case SURFTANG_SCALAR_BC:
            WH(-1,"Use CAP_ENDFORCE_SCALAR for consistent sign convention");
            /*FALLTHROUGH*/
@@ -519,6 +520,7 @@ rd_bc_specs(FILE *ifp,
         case SHELL_GRAD_FP_BC:
         case SHELL_GRAD_FH_BC:
         case SHELL_GRAD_PC_BC:
+	case SH_LUBP_LIQ_BC:
 
 	  if ( fscanf(ifp, "%lf", &BC_Types[ibc].BC_Data_Float[0]) != 1)
 	    {

@@ -529,6 +529,7 @@ struct Element_Variable_Pointers
   dbl *max_strain[MDE];                       /* Maximum Von Mises strain */
   dbl *cur_strain[MDE];                       /* Von Mises strain */
   dbl *poynt[DIM][MDE];				/* Poynting Vector for light intensity */
+  dbl *lubp_liq[MDE];                         /* liquid phase lubrication pressure - AMC */
 };
 
 /*___________________________________________________________________________*/
@@ -582,7 +583,7 @@ struct Element_Stiffness_Pointers
   dbl **p_liq;	                 /* *p_liq[MDE], liquid-phase pressure in porous media */
   dbl **p_gas;	                 /* *p_gas[MDE], liquid-phase pressure in porous media */
   dbl **porosity;	         /* *porosity[MDE],liquid-phase pressure porous media */
-  dbl ***vd;			 /* *vd[DIM][MDE}, vorticity prinicple flow direction. */
+  dbl ***vd;			 /* *vd[DIM][MDE], vorticity prinicple flow direction. */
   dbl **vlambda;		 /* *vlambda[MDE], eigenvalue associated with vd. */
   dbl **nn;		         /* *nn[MDE], bond evolution */
 
@@ -632,7 +633,7 @@ struct Element_Stiffness_Pointers
   dbl **max_strain;              /* max_strain[MDE], maximum Von Mises strain */
   dbl **cur_strain;              /* cur_strain[MDE], Von Mises strain */
   dbl ***poynt;		      	 /* *v[DIM][MDE], velocity */
-
+  dbl **lubp_liq;                /* *lubp_liq[MDE], liquid phase lubrication pressure - AMC */
 
   /*
    * These are for debugging purposes...
@@ -1574,6 +1575,7 @@ struct Field_Variables
   dbl max_strain;              /* Maximum Von Mises strain */
   dbl cur_strain;              /* Von Mises strain */
   dbl poynt[DIM];			/* Poynting Vector */
+  dbl lubp_liq;                /* liquid phase lubrication pressure */
   /*
    * Grads of scalars...
    */
@@ -1609,6 +1611,7 @@ struct Field_Variables
   dbl grad_sh_l_curv_2[DIM];  /* Gradient of shell curvature_2 */
   dbl grad_sh_p_open[DIM];    /* Gradient of open porous shell pressure */
   dbl grad_sh_p_open_2[DIM];  /* Gradient of open porous shell pressure */
+  dbl grad_lubp_liq[DIM];     /* Gradient of liquid phase lubrication pressure */
 
   /*
    * Grads of vectors...
@@ -1876,6 +1879,8 @@ struct Diet_Field_Variables
   dbl lubp_2;                   /* lub 2 approx. */
   dbl grad_lubp[DIM];          /* lub pressure gradient approx */
   dbl grad_lubp_2[DIM];          /* lub pressure gradient approx */
+  dbl lubp_liq;                 /* liquid pressure - 2 phase lub AMC */
+  dbl grad_lubp_liq[DIM];      /* liquid pressure gradient approx - 2 phase lub AMC */
   dbl sh_fp;                   /* lub pressure approx in the thin film */
   dbl grad_sh_fp[DIM];         /* lub pressure gradient approx in the thin film */
   dbl sh_fh;                   /* film thickness approx */

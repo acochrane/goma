@@ -293,14 +293,18 @@ rd_image_to_mesh2(int N_ext, Exo_DB *exo)
     }
 
   /* Read the data points */
-  for (i = 0; i < pixsize[0]; i++)
-    for (j = 0; j < pixsize[1]; j++)
+  //  printf("pixsize = %d,%d,%d\n",pixsize[0],pixsize[1],pixsize[2]);
+  for (i = 0; i < pixsize[0]; i++) {
+    for (j = 0; j < pixsize[1]; j++) {
       for (k = 0; k < pixsize[2]; k++)
 	{
 	  err = fscanf( pixfid, "%lf ", &(pixdata[i][j][k]));
+	  //	  printf("You read in %d,%d,%d as %f\n", i,j,k,pixdata[i][j][k]);
+	  // printf("%d, %d\n", (i+1)*(j+1)*(k+1), err);
 	  EH(err,"Problem reading file!\n");
 	}
-
+    }
+  }
   fclose(pixfid);
 
 

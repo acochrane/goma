@@ -491,6 +491,7 @@ variable_string_to_int(const char *input, const char *err_string)
   else if (!strcmp(input, "SHELL_SHEAR_TOP"))             var = SHELL_SHEAR_TOP;
   else if (!strcmp(input, "SHELL_SHEAR_BOT"))             var = SHELL_SHEAR_BOT;
   else if (!strcmp(input, "SHELL_CROSS_SHEAR"))           var = SHELL_CROSS_SHEAR;
+  else if (!strcmp(input, "LUBP_LIQ"))                    var = LUBP_LIQ;
   else if (!strcmp(input, "MAX_STRAIN"))                  var = MAX_STRAIN;
   else if (!strcmp(input, "CUR_STRAIN"))                  var = CUR_STRAIN;
   else if (!strcmp(input, "LIGHT_INTP"))                  var = LIGHT_INTP;

@@ -100,7 +100,6 @@ height_function_model (double *H_U,
  if(pd->TimeIntegration == STEADY) time = 0.;
 
  
-
  if(mp->HeightUFunctionModel == CONSTANT_SPEED)
    {
      H_dot = mp->u_heightU_function_constants[0];
