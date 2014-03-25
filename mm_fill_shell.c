@@ -11400,7 +11400,7 @@ assemble_porous_shell_two_phase(
 
   // Variable definitions
   int eqn, peqn, var, pvar;                       // Equation / variables
-  int i, j, a, b;                                 // Counter variables
+  int i, j, k ;                                 // Counter variables
   dbl phi_i, grad_phi_i[DIM], gradII_phi_i[DIM];  // Basis funcitons (i)
   dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
   dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM];  // Basis funcitons (j)
@@ -11444,8 +11444,7 @@ assemble_porous_shell_two_phase(
   dbl mu = mp->viscosity;                         // Viscosity
   dbl rho = mp->density;                          // Density
   dbl gamma = mp->surface_tension;                    // Surface Tension
-  dbl H_final = 75.0e-9;                          // Hard code Hf for now, because the function will need to not depend on it when computing non-uniform final heights.
-  dbl Pc_final = -gamma*2.0/H_final;                 // Final Pressure used in Beta, dSdPc, etc
+
   // Load porous medium parameters
   //  dbl phi = mp->porosity;                         // Porosity=1 - AMC
   
@@ -11453,23 +11452,41 @@ assemble_porous_shell_two_phase(
   // Load field variables
 
   dbl Pc = fv->lubp_liq * -1.0;                          // liquid phase capillary pressure
-  dbl Pc_dot = fv_dot->lubp_liq * -1.0;
-  dbl Pcj_dot = (1+2*tt)/dt * -1.0;
+  dbl Pc_dot = (1+2*tt)/dt * -1.0;
   dbl grad_Pc[DIM];
-
-  for (a = 0; a<DIM; a++) {
-    grad_Pc[a] = fv->grad_lubp_liq[a] * -1.0;
+  for (k = 0; k<DIM; k++) {
+    grad_Pc[k] = fv->grad_lubp_liq[k] * -1.0;
   }
-  
-  dbl Beta, sechBeta, tanhBeta, dSdPc;
 
-  Beta = ( H_final/H - Pc/Pc_final);
-  sechBeta = 1.0/cosh(Beta);
-  tanhBeta = tanh(Beta);
-  dSdPc = -1.0 / 2.0 / Pc_final * sechBeta * sechBeta;
+  dbl Pcenter = -2.0*gamma/H;                       // Roughly Center of tanh pressure drop
+  
+
+  // Build Saturation Function, should be implimented elsewhere, no? -AMC
+  dbl a, b, c, d, r, Sn1, Sn2, Pn1, Pn2, Alpha, Beta, Theta;
+
+  a = 0.5;
+  b = a;
+
+  r = 0.9;
+
+  Sn1 = 0.01;
+  Pn1 = Pcenter*(1+r);
+  Sn2 = 0.99;
+  Pn2 = Pcenter*(1-r);
+  Alpha = atanh((Sn1-a)/b);
+  Beta = atanh((Sn2-a)/b);
+  c = (Pn1*Alpha - Pn2*Beta)/(Pn1 - Pn2);
+  d = (Alpha - c)*Pn1;
+
+  dbl sechTheta, tanhTheta, dS_dPc;
+
+  Theta = c + d/Pc;                               // abscissa of hyperbolic trig functions
+  sechTheta = 1.0/cosh(Theta);
+  tanhTheta = tanh(Theta);
+  dS_dPc = -b*d * pow((sechTheta/Pc),2);
 
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-  dbl k_liq = H*H*H/12.0;
+  dbl k_liq = pow(H,3)/12.0;
 
   /* k_liq instead of kappa  - Use CONSTANT kappa Model but not in calculations */
   // Maybe impliment "Reynolds Lubrication" kappa?
@@ -11490,15 +11507,15 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += dSdPc * phi_i * Pcj_dot;
+	mass += dS_dPc * phi_i * Pc_dot;
       }
       mass *= dA * etm_mass;
       
       // Assemble diffusion term
       diff = 0.0;
       if ( T_DIFFUSION ) {
-	for ( a = 0; a < DIM; a++) {
-	  diff -= grad_Pc[a] * gradII_phi_i[a];
+	for ( k = 0; k < DIM; k++) {
+	  diff += grad_Pc[k] * gradII_phi_i[k];
 	}
       }
       diff *= k_liq/mu * dA * etm_diff;
@@ -11536,7 +11553,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * Pcj_dot *  pow((sechBeta/Pc_final), 2) * tanhBeta;
+	    mass += -phi_i * phi_j * Pc_dot * 2*b*d/Pc*pow((sechTheta/Pc), 2) * (-d/Pc*tanhTheta + 1);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *= dA * etm_mass;
@@ -11544,11 +11561,11 @@ assemble_porous_shell_two_phase(
 	  // Assemble diffusion term
 	  diff = 0.0;
 	  if ( T_DIFFUSION ) {
-	    for ( a = 0; a < DIM ; a++) {
-	      diff += gradII_phi_i[a] * gradII_phi_j[a];
+	    for ( k = 0; k < DIM ; k++) {
+	      diff += gradII_phi_i[k] * gradII_phi_j[k];
 	    }
 	  }
-	  diff *= k_liq/mu * dA * etm_diff;
+	  diff *= -k_liq/mu * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
