@@ -1431,3 +1431,31 @@ void dynamic_contact_angle_model(
   return;
 }
 /*** END OF dynamic_contact_angle_model ***/
+
+/******************************************************************************/
+double two_phase_lubrication_saturation_model(double delta_t,
+					      double time) // why isn't delta_t available globally? or if it is, why did I find it easier as a variable passed down the function chain than as it's available globally.
+
+  /*****************************************************************************
+  * This function computes Saturation for the thin-film two-phase flow model
+  * used in R_LUBP_LIQ. So far only used in post processing.
+  *****************************************************************************/
+{
+  
+  dbl c, d, S;
+  c = mp->lub_sat_const[2];
+  d = mp->lub_sat_const[3];
+
+
+  dbl H, dH_dtime, dt;
+  dt = delta_t;
+  dbl H_U, dH_U_dtime, H_L, dH_L_dtime, dH_U_dp, dH_U_ddh;
+  dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
+  H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
+
+  S = 0.5+0.5*tanh( c + d/(fv->lubp_liq * H));
+
+
+  return S;
+}
+/*** END OF two_phase_lubrication_saturation_model ***/

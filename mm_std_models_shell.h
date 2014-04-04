@@ -80,4 +80,10 @@ PROTO((
        double *
        ));
 
+EXTERN double two_phase_lubrication_saturation_model
+PROTO((
+       double,
+       double
+       ));
+
 #endif /* _MM_STD_MODELS_H */

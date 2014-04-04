@@ -31,6 +31,7 @@
 
 #include <ctype.h>		/* for toupper(), isspace() */
 
+
 #include "std.h"
 #include "rf_fem_const.h"
 #include "rf_fem.h"
@@ -3973,7 +3974,6 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       SPF(err_msg,"Incorrect syntax or model choice for %s\n", search_string);
       EH(-1,err_msg);
     }
-  
   ECHO(es,echo_file);
 
   if ( mat_ptr->PorousMediaType != CONTINUOUS )
@@ -8382,7 +8382,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 			   "EXTERNAL_FIELD");
 	      EH(-1, err_msg);
 	    }
- }
+      }
     
       else  if(model_read == -1)
 	{
@@ -8720,6 +8720,49 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   
     } /* End of shell lub_p cards */
 
+  /* Two-phase Lubrication cards */
+
+  if(pd_glob[mn]->e[R_LUBP_LIQ]) {
+    model_read = look_for_mat_prop(imp, "Lubrication Saturation",
+				   &(mat_ptr->LubSatModel),
+				   mat_ptr->lub_sat_const,
+				   NO_USER,NULL, model_name,
+				   SCALAR_INPUT, &NO_SPECIES,es);
+    if (model_read == -1 && !strcmp(model_name, "TANH_LUBP") ) {
+      model_read = 1;
+      mat_ptr->LubSatModel = TANH_LUBP;
+      dbl  *dummy;
+      num_const = read_constants(imp, &dummy, NO_SPECIES);
+      if (num_const != 2) {
+	sr = sprintf(err_msg, 
+		     "Matl %s needs 2 constants for %s %s model.\n",
+		     pd_glob[mn]->MaterialName,
+		     "Lubrication Saturation", "TANH_LUBP");
+	EH(-1, err_msg);
+      }
+      dbl a, b, c, d, r, o, Sn1, Sn2, Alpha1, Alpha2, gamma;
+      r = dummy[0];
+      o = dummy[1];
+      safe_free (dummy);
+      mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
+
+      a = 0.5;
+      b = a;
+      gamma = mat_ptr->surface_tension;
+
+      Sn1 = 0.0+o;
+      Sn2 = 1.0-o;
+      Alpha1 = atanh((Sn1-a)/b);
+      Alpha2 = atanh((Sn2-a)/b);
+      d = -2*gamma*(Alpha1-Alpha2)/( 1/(1+r) - 1/(1-r) );
+      c = Alpha1 + d/(2*gamma*(1+r)); 
+
+      mat_ptr->lub_sat_const[0] = r;
+      mat_ptr->lub_sat_const[1] = o;
+      mat_ptr->lub_sat_const[2] = c;
+      mat_ptr->lub_sat_const[3] = d;
+    }
+  }
   /* Shell Energy Cards - heat sources, sinks, etc. */
 
   if (pd_glob[mn]->e[R_SHELL_ENERGY])

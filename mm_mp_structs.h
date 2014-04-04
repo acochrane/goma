@@ -671,6 +671,9 @@ struct Material_Properties
   dbl *u_lubmomsource_function_constants;
   int LubMomSourceModel;
 
+  int LubSatModel;
+  dbl *lub_sat_const;
+
   dbl FilmEvap;
   dbl d_FilmEvap[MAX_VARIABLE_TYPES + MAX_CONC];
   int len_u_FilmEvap_function_constants;

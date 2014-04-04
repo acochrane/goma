@@ -11412,6 +11412,7 @@ assemble_porous_shell_two_phase(
   dbl H_U, dH_U_dtime, H_L, dH_L_dtime, dH_U_dp, dH_U_ddh;
   dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
   H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
+  dH_dtime = dH_U_dtime - dH_L_dtime;
 
   // Initialize output status function
   int status = 0;
@@ -11452,38 +11453,44 @@ assemble_porous_shell_two_phase(
   // Load field variables
 
   dbl Pc = fv->lubp_liq * -1.0;                          // liquid phase capillary pressure
-  dbl Pc_dot = (1+2*tt)/dt * -1.0;
+  dbl Pc_dot = 1.0* fv_dot->lubp_liq ;
+  dbl Pcj_dot_over_Pcj = (1+2*tt)/dt;
   dbl grad_Pc[DIM];
   for (k = 0; k<DIM; k++) {
     grad_Pc[k] = fv->grad_lubp_liq[k] * -1.0;
   }
 
-  dbl Pcenter = -2.0*gamma/H;                       // Roughly Center of tanh pressure drop
-  
-
-  // Build Saturation Function, should be implimented elsewhere, no? -AMC
-  dbl a, b, c, d, r, Sn1, Sn2, Pn1, Pn2, Alpha, Beta, Theta;
-
+  dbl a, b, c, d;
   a = 0.5;
-  b = a;
+  b = 0.5;
+  c = mp->lub_sat_const[2];
+  d = mp->lub_sat_const[3];
+  
+  // Build Saturation Function, should be implimented elsewhere, no? -AMC
 
-  r = 0.9;
+  dbl Theta, sechTheta, tanhTheta;
 
-  Sn1 = 0.01;
-  Pn1 = Pcenter*(1+r);
-  Sn2 = 0.99;
-  Pn2 = Pcenter*(1-r);
-  Alpha = atanh((Sn1-a)/b);
-  Beta = atanh((Sn2-a)/b);
-  c = (Pn1*Alpha - Pn2*Beta)/(Pn1 - Pn2);
-  d = (Alpha - c)*Pn1;
-
-  dbl sechTheta, tanhTheta, dS_dPc;
-
-  Theta = c + d/Pc;                               // abscissa of hyperbolic trig functions
+  Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
-  dS_dPc = -b*d * pow((sechTheta/Pc),2);
+
+  dbl cp, xp, yp, dxp_dPc, dyp_dPc, dS_dPc;            //  equations for dependence on pressure. c is constant, xp and yp are simply placeholder variables, not positions. 
+  cp = -b*d;
+  xp = 1/(Pc*Pc*H);
+  dxp_dPc = -2/(pow(Pc,3)*H);
+  yp = sechTheta*sechTheta;
+  dyp_dPc = 2*d/H*pow(sechTheta/Pc,2)*tanhTheta;
+  dS_dPc = cp*xp*yp;
+
+
+  dbl ch, xh, yh, dxh_dPc, dyh_dPc, dS_dH;          //  equations for dependence on height. c is constant, xh and yh are sompmly placeholder variables, not positions.
+
+  ch = cp;
+  xh = 1/(Pc*H*H);
+  dxh_dPc = -1/pow(Pc*H,2);
+  yh = yp;
+  dyh_dPc = dyp_dPc;
+  dS_dH = ch*xh*yh;
 
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
   dbl k_liq = pow(H,3)/12.0;
@@ -11507,7 +11514,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += dS_dPc * phi_i * Pc_dot;
+	mass += (dS_dPc*Pc_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11518,7 +11525,7 @@ assemble_porous_shell_two_phase(
 	  diff += grad_Pc[k] * gradII_phi_i[k];
 	}
       }
-      diff *= k_liq/mu * dA * etm_diff;
+      diff *= -k_liq/mu * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11553,7 +11560,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += -phi_i * phi_j * Pc_dot * 2*b*d/Pc*pow((sechTheta/Pc), 2) * (-d/Pc*tanhTheta + 1);
+	    mass += phi_i * phi_j * ( dS_dPc*Pcj_dot_over_Pcj + Pc_dot*cp*(xp*dyp_dPc + yp*dxp_dPc) + dH_dtime*ch*(xh*dyh_dPc + yh*dxh_dPc));
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *= dA * etm_mass;
@@ -11565,7 +11572,7 @@ assemble_porous_shell_two_phase(
 	      diff += gradII_phi_i[k] * gradII_phi_j[k];
 	    }
 	  }
-	  diff *= -k_liq/mu * dA * etm_diff;
+	  diff *= k_liq/mu * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;

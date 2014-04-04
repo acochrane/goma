@@ -255,6 +255,7 @@ int PP_LAME_LAMBDA = -1;
 int VON_MISES_STRESS = -1;
 int VON_MISES_STRAIN = -1;
 int NON_VOLFRAC = -1;
+int LUBP_SAT = -1;              /* Saturation from LUBP_LIQ variable AMC 04/03/2014*/
 
 int len_u_post_proc = 0;	/* size of dynamically allocated u_post_proc
 				 * actually is */
@@ -1466,6 +1467,25 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
       local_lumped[NON_VOLFRAC] = 1.0;
   } /* end of NON_VOLFRAC*/
 
+  /* lubrication saturation AMC */
+  if (LUBP_SAT != -1 && pd->e[R_LUBP_LIQ]) {
+    /*
+    int *n_dof = NULL;
+    int dof_map[MDE];
+    dbl wt = fv->wt;
+    n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+    lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+    */
+
+    local_post[LUBP_SAT] = two_phase_lubrication_saturation_model(delta_t, time);
+    local_lumped[LUBP_SAT] = 1.0;
+    /*
+    fv->wt = wt;
+    safe_free((void *) n_dof);
+    */
+
+  } /* end of LUBP_SAT */
+
 
 /*  EXTERNAL tables	*/
    if (efv->ev) {
@@ -1753,7 +1773,7 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
         local_lumped[PRINCIPAL_REAL_STRESS+2] = 1.;
     } /* end of PRINCIPAL_REAL_STRESS */
 
-  if ( LUB_HEIGHT != -1 && (pd->e[R_LUBP] || pd->e[R_SHELL_FILMP] ) ) {
+  if ( LUB_HEIGHT != -1 && (pd->e[R_LUBP] || pd->e[R_SHELL_FILMP] || pd->e[R_LUBP_LIQ]) ) {
     double H_U, dH_U_dtime, H_L, dH_L_dtime;
     double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
     
@@ -1764,7 +1784,7 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
     n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
     lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
     
-    if (pd->e[R_LUBP])
+    if (pd->e[R_LUBP] || pd->e[R_LUBP_LIQ])
       {	 
 	local_post[LUB_HEIGHT] = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
 						       dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
@@ -6204,6 +6224,8 @@ rd_post_process_specs(FILE *ifp,
 			     &POROUS_SUPGVELOCITY);
  
   iread = look_for_post_proc(ifp, "Vorticity Vector", &CURL_V);
+  iread = look_for_post_proc(ifp, "Lubrication Saturation", &LUBP_SAT); /* AMC */
+  
 
   /* Report count of post-proc vars to be exported */
   /*
@@ -8774,6 +8796,23 @@ index_post, index_post_export);
     POROUS_SATURATION = -1;
   } 
 
+  /* implimenting new post proc for lubp_liq -> saturation AMC */
+
+  if (LUBP_SAT != -1 && Num_Var_In_Type[LUBP_LIQ]) {
+    set_nv_tkud(rd, index, 0, 0, -2, "LUBP_SAT", "[1]", "Saturation", FALSE);
+    index++;
+    if (LUBP_SAT == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    LUBP_SAT = index_post;
+    index_post++;
+  } else {
+    LUBP_SAT = -1;
+  } 
+
+
   if (POROUS_RHO_TOTAL_SOLVENTS != -1 && 
       Num_Var_In_Type[R_POR_LIQ_PRES] &&  check) {
     if (POROUS_RHO_TOTAL_SOLVENTS == 2)
@@ -9194,7 +9233,7 @@ index_post, index_post_export);
       PRINCIPAL_REAL_STRESS = -1;
     }
 
-  if (LUB_HEIGHT != -1  && (Num_Var_In_Type[R_LUBP] || Num_Var_In_Type[R_SHELL_FILMP]) )
+  if (LUB_HEIGHT != -1  && (Num_Var_In_Type[R_LUBP] || Num_Var_In_Type[R_SHELL_FILMP] || Num_Var_In_Type[R_LUBP_LIQ]) )
     {
       if (LUB_HEIGHT == 2)
         {
