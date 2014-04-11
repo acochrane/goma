@@ -5280,7 +5280,19 @@ compute_volume_integrand(const int quantity, const int elem,
 	    safe_free((void *) n_dof);
 	  }
 
-	*sum += weight*det*pmv->bulk_density[0];
+	if(pd->e[R_LUBP_LIQ]) { /*amc 08/04/2014 */
+	  dbl saturation, height;
+	  double H_U, dH_U_dtime, H_L, dH_L_dtime;
+	  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+	  height = height_function_model(
+					 &H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+					 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
+	  saturation = two_phase_lubrication_saturation_model(delta_t, time);
+	  *sum += weight*det*saturation*height; // just liquid volume, because liquid is assumed incompressible
+	}
+	else {
+	  *sum += weight*det*pmv->bulk_density[0];
+	}
 
 	if ( J_AC != NULL)
 	  {
