@@ -11468,11 +11468,12 @@ assemble_porous_shell_two_phase(
   
   // Build Saturation Function, should be implimented elsewhere, no? -AMC
 
-  dbl Theta, sechTheta, tanhTheta;
+  dbl Theta, sechTheta, tanhTheta, saturation;
 
   Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
+  saturation = a + b*tanhTheta;
 
   dbl cp, xp, yp, dxp_dPc, dyp_dPc, dS_dPc;            //  equations for dependence on pressure. c is constant, xp and yp are simply placeholder variables, not positions. 
   cp = -b*d;
@@ -11493,7 +11494,7 @@ assemble_porous_shell_two_phase(
   dS_dH = ch*xh*yh;
 
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-  dbl k_liq = pow(H,3)/12.0;
+  dbl k_liq = pow(H,2)/12.0;
 
   /* k_liq instead of kappa  - Use CONSTANT kappa Model but not in calculations */
   // Maybe impliment "Reynolds Lubrication" kappa?
@@ -11525,7 +11526,7 @@ assemble_porous_shell_two_phase(
 	  diff += grad_Pc[k] * gradII_phi_i[k];
 	}
       }
-      diff *= -k_liq/mu * dA * etm_diff;
+      diff *= -k_liq/mu*saturation * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11569,7 +11570,7 @@ assemble_porous_shell_two_phase(
 	  diff = 0.0;
 	  if ( T_DIFFUSION ) {
 	    for ( k = 0; k < DIM ; k++) {
-	      diff += gradII_phi_i[k] * gradII_phi_j[k];
+	      diff +=  saturation * (gradII_phi_i[k]*gradII_phi_j[k]) + (grad_Pc[k]*gradII_phi_i[k]) * phi_j * dS_dPc;
 	    }
 	  }
 	  diff *= k_liq/mu * dA * etm_diff;
