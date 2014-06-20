@@ -618,7 +618,6 @@ modify_fv_mesh_derivs_for_LSA_3D_of_2D(void)
  v = LUBP_LIQ;
   if (pd->v[v])
     {
-      vdof = ei->dof[v];
       for (b=0; b<dim; b++)
       {
         for (j=0; j<mdof; j++)

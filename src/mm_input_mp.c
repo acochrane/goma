@@ -8756,7 +8756,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       Alpha1 = atanh((Sn1-a)/b);
       Alpha2 = atanh((Sn2-a)/b);
       d = -2*gamma*(Alpha1-Alpha2)/( 1/(1+r) - 1/(1-r) );
-      c = Alpha1 + d/(2*gamma*(1+r)); 
+      c = Alpha1 + d/(2*gamma*(1-r)); 
 
       mat_ptr->lub_sat_const[0] = r;
       mat_ptr->lub_sat_const[1] = o;

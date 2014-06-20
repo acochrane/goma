@@ -762,7 +762,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
     num_unknowns += ncp[POR_GAS_PRES];
     num_unknowns += ncp[POR_POROSITY];
     num_unknowns += ncp[POR_SATURATION];
-    num_unknowns += ncp[LUBP_LIQ];
+    //    num_unknowns += ncp[LUBP_LIQ];   //Wouldn't you want to include this in the Err_norm if you add it to the num_unknowns? Wait, Did I put this in? It's my variable name, but I don't remember getting in here... AMC
   }
 
   if (use_var_norm[4]) {	/* Pressure, even though there is no dP/dt
@@ -822,6 +822,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
       }
     }
 /** add in shell element components  */
+/* seems like these should be attached to an input deck flag somehow AMC Jun 2014 */
  
     Err_norm      += ecp[SURF_CHARGE];
     Err_norm      += ecp[SHELL_CURVATURE];
@@ -843,7 +844,6 @@ time_step_control(const double delta_t,  const double delta_t_old,
     Err_norm      += ecp[LIGHT_INTM];
     Err_norm      += ecp[LIGHT_INTD];
 /*    Err_norm      += ecp[EXT_VELOCITY];  */
- 
     num_unknowns += ncp[SURF_CHARGE];
     num_unknowns += ncp[SHELL_CURVATURE];
     num_unknowns += ncp[SHELL_TENSION];
@@ -876,6 +876,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
   if (use_var_norm[9]) {
     Err_norm      += ecp[LUBP];
     Err_norm      += ecp[LUBP_2];
+    Err_norm      += ecp[LUBP_LIQ];
     Err_norm      += ecp[SHELL_SAT_CLOSED];
     Err_norm      += ecp[SHELL_PRESS_OPEN];
     Err_norm      += ecp[SHELL_PRESS_OPEN_2];
@@ -884,6 +885,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
     Err_norm      += ecp[SHELL_LUB_CURV_2];
     num_unknowns += ncp[LUBP];
     num_unknowns += ncp[LUBP_2];
+    num_unknowns += ncp[LUBP_LIQ];
     num_unknowns += ncp[SHELL_SAT_CLOSED];
     num_unknowns += ncp[SHELL_PRESS_OPEN];
     num_unknowns += ncp[SHELL_PRESS_OPEN_2];
@@ -954,7 +956,7 @@ time_step_control(const double delta_t,  const double delta_t_old,
   e_shd = ecp[SHELL_X] + ecp[SHELL_Y];
   e_shu = ecp[SHELL_USER];
   e_sh_lub = ecp[LUBP] + ecp[LUBP_2] + ecp[SHELL_FILMP]  + 
-             ecp[SHELL_FILMH] + ecp[SHELL_PARTC] + ecp[SHELL_SAT_CLOSED] + ecp[SHELL_SAT_GASN] + ecp[SHELL_TEMPERATURE] + ecp[SHELL_DELTAH] + ecp[SHELL_LUB_CURV] + ecp[SHELL_LUB_CURV_2] + ecp[SHELL_PRESS_OPEN] + ecp[SHELL_PRESS_OPEN_2];
+    ecp[SHELL_FILMH] + ecp[SHELL_PARTC] + ecp[SHELL_SAT_CLOSED] + ecp[SHELL_SAT_GASN] + ecp[SHELL_TEMPERATURE] + ecp[SHELL_DELTAH] + ecp[SHELL_LUB_CURV] + ecp[SHELL_LUB_CURV_2] + ecp[SHELL_PRESS_OPEN] + ecp[SHELL_PRESS_OPEN_2] + ecp[LUBP_LIQ];
   e_F = ecp[FILL] + ecp[PHASE1];
   e_ap = ecp[ACOUS_PREAL] + ecp[ACOUS_PIMAG] + ecp[ACOUS_REYN_STRESS];
   e_extv = ecp[EXT_VELOCITY];
