@@ -11359,7 +11359,7 @@ assemble_porous_shell_two_phase(
   // Load field variables
 
   dbl Pl = fv->lubp_liq;                          // liquid phase capillary pressure
-  dbl Pl_dot = 1.0* fv_dot->lubp_liq ;
+  dbl Pl_dot = fv_dot->lubp_liq ;
   dbl Plj_dot_over_Plj = (1+2*tt)/dt;
   dbl grad_Pl[DIM], gradII_Pl[DIM];
   
@@ -11425,7 +11425,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (dS_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (-dS_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11471,7 +11471,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * ( dS_dPl*Plj_dot_over_Plj + Pl_dot*d2S_dPl2 + dH_dtime*d2S_dPldH);
+	    mass += phi_i * phi_j * (- dS_dPl*Plj_dot_over_Plj - Pl_dot*d2S_dPl2 + 1.0*dH_dtime*d2S_dPldH);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *= dA * etm_mass;
