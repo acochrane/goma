@@ -1274,6 +1274,9 @@ assembly_alloc(Exo_DB *exo)
   if(Num_Var_In_Type[LUBP_LIQ]) {
     esp->lubp_liq = (dbl **) alloc_ptr_1(MDE);
   }
+  if(Num_Var_In_Type[LUBP_GAS]) {
+    esp->lubp_gas = (dbl **) alloc_ptr_1(MDE);
+  }
 
   /*
    * Action_Flags______________________________________________________________

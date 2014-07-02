@@ -777,6 +777,7 @@
 #define SH_LUBP_SOLID_BC    970000014
 #define SH_LUBP_SOLID_RS_BC    970000015
 #define SH_LUBP_LIQ_BC      970000021
+#define SH_LUBP_GAS_BC      970000022
 
 /* Shell variables that are not structural shells */
 #define SH_GAMMA1_BC            980000001

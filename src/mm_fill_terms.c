@@ -7833,6 +7833,13 @@ load_fv(void)
     stateVector[LUBP_LIQ] = fv->lubp_liq;
   } 
 
+  if (pdv[LUBP_GAS]) {
+    v = LUBP_GAS;
+    scalar_fv_fill(esp->lubp_gas, esp_dot->lubp_gas, esp_old->lubp_gas, bf[v]->phi, ei->dof[v],
+                   &(fv->lubp_gas), &(fv_dot->lubp_gas), &(fv_old->lubp_gas));
+    stateVector[LUBP_GAS] = fv->lubp_gas;
+  } 
+
 
  if (pdv[SHELL_FILMP]) {
     v = SHELL_FILMP;
@@ -10257,6 +10264,25 @@ load_fv_grads(void)
   else if ( zero_unused_grads && upd->vp[LUBP_LIQ] == -1 ) 
     {
       for (p=0; p<VIM; p++) fv->grad_lubp_liq[p] = 0.0;
+    }
+
+  if ( pd->v[LUBP_GAS] )
+    {
+      v = LUBP_GAS;
+      dofs  = ei->dof[v];
+      for ( p=0; p<VIM; p++)
+	{
+	  fv->grad_lubp_gas[p] = 0.0;
+	  for ( i=0; i<dofs; i++)
+	    {
+	      fv->grad_lubp_gas[p] += *esp->lubp_gas[i] * bf[v]->grad_phi[i] [p];
+	      fv_old->grad_lubp_gas[p] += *esp_old->lubp_gas[i] * bf[v]->grad_phi[i] [p];
+	    }
+	}
+    }
+  else if ( zero_unused_grads && upd->vp[LUBP_GAS] == -1 ) 
+    {
+      for (p=0; p<VIM; p++) fv->grad_lubp_gas[p] = 0.0;
     }
 
   

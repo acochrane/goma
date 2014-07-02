@@ -11318,16 +11318,16 @@ assemble_porous_shell_two_phase(
   dbl H_U, dH_U_dtime, H_L, dH_L_dtime, dH_U_dp, dH_U_ddh;
   dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
   H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
-  dH_dtime = dH_U_dtime - dH_L_dtime;
+  dH_dtime = (dH_U_dtime - dH_L_dtime);
 
   // Initialize output status function
   int status = 0;
 
   // Bail out of function if there is nothing to do
-  eqn = R_LUBP_LIQ;
-
-  if (!pd->e[eqn]) return(status);
-
+  //eqn = R_LUBP_LIQ;
+  if (!pd->e[R_LUBP_LIQ] || !pd->e[R_LUBP_GAS]) return(status);
+  
+  
   // Setup lubrication 
   /* Do I Need dependence on mesh and displacemtns to use lubrication_shell_initialize? - AMC 
      It looks like not if FSI_MODEL = FSI_MESH_UNDEF 
@@ -11348,8 +11348,12 @@ assemble_porous_shell_two_phase(
 
   
   // Load liquid material properties
-  dbl mu = mp->viscosity;                         // Viscosity
-  dbl rho = mp->density;                          // Density
+  dbl mu_l = mp->viscosity;                         // Liquid Viscosity
+  /************************************************************************************************************************/
+  dbl mu_g = 1;                                     // Must incorperate this into material file
+  /************************************************************************************************************************/
+
+  //  dbl rho = mp->density;                          // Density unused, remove?
   dbl gamma = mp->surface_tension;                    // Surface Tension
 
   // Load porous medium parameters
@@ -11358,15 +11362,25 @@ assemble_porous_shell_two_phase(
 
   // Load field variables
 
-  dbl Pl = fv->lubp_liq;                          // liquid phase capillary pressure
-  dbl Pl_dot = fv_dot->lubp_liq ;
-  dbl Plj_dot_over_Plj = (1+2*tt)/dt;
+  dbl Pl = fv->lubp_liq;                          // liquid phase pressure
+  dbl Pl_dot = fv_dot->lubp_liq;
+  dbl Plj_dot_over_Plj = (1.0+2.0*tt)/dt;
   dbl grad_Pl[DIM], gradII_Pl[DIM];
-  
+
+  dbl Pg = fv->lubp_gas;
+  dbl Pg_dot = fv_dot->lubp_gas;
+  dbl Pgj_dot_over_Pgj = (1.0+2.0*tt)/dt;
+  dbl grad_Pg[DIM], gradII_Pg[DIM];
+
+  dbl Pc = Pg-Pl;
+
+
   for (k = 0; k<DIM; k++) {
     grad_Pl[k] = fv->grad_lubp_liq[k];
+    grad_Pg[k] = fv->grad_lubp_gas[k];
   }
   Inn(grad_Pl, gradII_Pl);
+  Inn(grad_Pg, gradII_Pg);
 
   dbl a, b, c, d;
   a = 0.5;
@@ -11374,38 +11388,42 @@ assemble_porous_shell_two_phase(
   c = mp->lub_sat_const[2];
   d = mp->lub_sat_const[3];
   
-  // Build Saturation Function, should be implimented elsewhere, no? -AMC
+  // Build Saturation Function, should be implimented elsewhere, no?  yes. -AMC
 
   dbl Theta, sechTheta, tanhTheta, saturation;
-
-  Theta = c + d/(Pl*H);                               // abscissa of hyperbolic trig functions
+  // still need to get signs right here...
+  Theta = c + d/(-Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;
 
-  dbl cp, xp, yp, dxp_dPl, dyp_dPl, dS_dPl, d2S_dPl2;            //  equations for dependence on pressure. c is constant, xp and yp are simply placeholder variables, not positions. 
-  cp = -b*d;
-  xp = 1./(Pl*Pl*H);
-  dxp_dPl = -2./(pow(Pl,3.)*H);
-  yp = sechTheta*sechTheta;
-  dyp_dPl = 2.*d/H*pow(sechTheta/Pl,2.)*tanhTheta;
-  dS_dPl = cp*xp*yp;
-  d2S_dPl2 = cp*(xp*dyp_dPl + yp*dxp_dPl);
+  dbl x1, x2, x3, x4, dx2_dH, dx3_dH, dx2_dPc, dx3_dPc, dS_dPc, dS_dH, d2S_dPc2, d2S_dPcdH;            //  equations for dependence on pressure. c is constant, xp and yp are simply placeholder variables, not positions. 
+  x1 = -b*d;
+  x2 = 1./(Pc*Pc*H);
+  x4 = 1./(Pc*H*H);
+  x3 = sechTheta*sechTheta;  
+  dS_dPc = x1*x2*x3;
+  dS_dH = x1*x4*x3;
 
+  dx2_dH = -x2/H;
+  dx3_dH = 2*x3*tanhTheta*d*x4;
+  dx2_dPc = -2./(pow(Pc,3.)*H);
+  dx3_dPc = 2.*d/H*pow(sechTheta/Pc,2.)*tanhTheta;
+  d2S_dPc2 = x1*(x2*dx3_dPc + x3*dx2_dPc);
+  d2S_dPcdH = x1*(x2*dx3_dH + x3*dx2_dH);
 
-    dbl ch, xh, yh, dxh_dPl, dyh_dPl, dS_dH, d2S_dPldH;          //  equations for dependence on height. c is constant, xh and yh are simply placeholder variables, not positions.
-
-  ch = cp;
-  xh = 1./(Pl*H*H);
-  dxh_dPl = -1./pow(Pl*H,2.);
-  yh = yp;
-  dyh_dPl = dyp_dPl;
-  dS_dH = ch*xh*yh;
-  d2S_dPldH = ch*(xh*dyh_dPl + yh*dxh_dPl);
+  // derivatives of pressure relationships
+  dbl dPc_dPl = -1.0;
+  dbl dPc_dPg = 1.0;
+  dbl dPl_dPg = 1.0;
+  dbl dPg_dPl = 1.0;
 
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-  dbl k_liq = saturation;
-
+  dbl n = 1; // for now
+  dbl k_liq = pow(saturation, n);
+  dbl dk_liq_dS = n*pow(saturation, n-1);
+  dbl k_gas = 1-k_liq;
+  dbl dk_gas_dS = -n*pow(saturation, n-1);
   /* k_liq instead of kappa  - Use CONSTANT kappa Model but not in calculations */
   // Maybe impliment "Reynolds Lubrication" kappa?
  
@@ -11425,7 +11443,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (-dS_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11436,7 +11454,7 @@ assemble_porous_shell_two_phase(
 	  diff += gradII_Pl[k] * gradII_phi_i[k];
 	}
       }
-      diff *= -k_liq*pow(H,2.)/12.0/mu * dA * etm_diff;
+      diff *= -k_liq*pow(H,2.)/12.0/mu_l * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11445,13 +11463,47 @@ assemble_porous_shell_two_phase(
 
   } // End of residual assembly of R_LUBP_LIQ
 
+ // Assemble residual contribution to this equation
+  eqn = R_LUBP_GAS;
+  if (af->Assemble_Residual) {
+    peqn = upd->ep[eqn];
+    
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) {      
+      
+      // Load basis functions
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      
+      // Assemble mass term
+      mass = 0.0;
+      if ( T_MASS ) {
+	mass += (dS_dPc*dPc_dPg*Pg_dot + dS_dH*dH_dtime) * phi_i;
+      }
+      mass *= -dA * etm_mass;
+      
+      // Assemble diffusion term
+      diff = 0.0;
+      if ( T_DIFFUSION ) {
+	for ( k = 0; k < DIM; k++) {
+	  diff += gradII_Pg[k] * gradII_phi_i[k];
+	}
+      }
+      diff *= -k_gas*pow(H,2.)/12.0/mu_g * dA * etm_diff;
+      
+      // Assemble full residual
+      lec->R[peqn][i] += mass + diff;
+      
+    }  // End of loop over DOF (i)
+
+  } // End of residual assembly of R_LUBP_GAS
+
 
   /* --- Assemble Jacobian --------------------------------------------------*/
   eqn = R_LUBP_LIQ;
   if (af->Assemble_Jacobian) {
     peqn = upd->ep[eqn];    
     // Loop over DOF (i)
-    for ( i = 0; i < ei->dof[eqn]; i++) {
+    for ( i = 0; i < ei->dof[eqn]; i++) /* The sensitivites of R_LUBP_LIQ to LUBP_LIQ and LUBP_GAS */ {
       
       // Load basis functions
       ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
@@ -11466,15 +11518,16 @@ assemble_porous_shell_two_phase(
 
 	  // Load basis functions
 	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-      
+	  dbl dPl_dPlj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (- dS_dPl*Plj_dot_over_Plj - Pl_dot*d2S_dPl2 + 1.0*dH_dtime*d2S_dPldH);
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
+	    //	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
-	  mass *= dA * etm_mass;
+	  mass *=  dA * etm_mass;
 	  
 	  // Assemble diffusion term
 	  diff = 0.0;
@@ -11486,15 +11539,149 @@ assemble_porous_shell_two_phase(
 	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
 	  }
-	  diff = diff1*phi_j*dS_dPl + diff2*saturation;
-	  diff *= -pow(H,2.)/12./mu * dA * etm_diff;
+	  diff = diff1*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
+	  diff *= -pow(H,2.)/12.0/mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
 	  
 	} // End of loop over DOF (j)
 	
-      } // End of LUBP_LIQ sensitivities
+      } // End of R_LUBP_LIQ sensitivities to LUBP_LIQ
+
+      // Assemble sensitivities of R_LUBP_LIQ to LUBP_GAS
+      var = LUBP_GAS;
+      if (pd->v[var]) {
+  	pvar = upd->vp[var];
+
+  	// Loop over DOF (j)
+  	for ( j = 0; j < ei->dof[var]; j++) {
+
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  dbl dPg_dPgj = phi_j;      
+	  // Assemble mass term
+	  mass = 0.0;
+
+	  if ( T_MASS ) {
+	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH + dPc_dPl*Pl_dot*dPc_dPg*d2S_dPc2);
+	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
+	  }
+	  mass *=  dA * etm_mass;
+	  
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  diff1 = 0.0;
+	  diff2 = 0.0;
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff1 += gradII_Pl[k]*gradII_phi_i[k];
+	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
+	    }
+	  }
+	  diff = diff1*dPg_dPgj*dPc_dPg*dS_dPc + saturation*dPl_dPg*diff2;
+	  diff *= -pow(H,2.)/12./mu_l * dA * etm_diff;
+	  
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+	  
+	} // End of loop over DOF (j)
+	
+      } // End of R_LUBP_LIQ sensitivities to LUBP_GAS
+
+    } // End of loop over DOF (i)
+  }
+  eqn = R_LUBP_GAS;
+  if (af->Assemble_Jacobian) {
+    peqn = upd->ep[eqn];    
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) /* sensitivities of R_LUBP_GAS to LUBP_LIQ and LUBP_GAS */ {
+      
+      // Load basis functions
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      
+      // Assemble sensitivities for LUBP_LIQ
+      var = LUBP_LIQ;
+      if (pd->v[var]) {
+  	pvar = upd->vp[var];
+
+  	// Loop over DOF (j)
+  	for ( j = 0; j < ei->dof[var]; j++) {
+
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  dbl dPl_dPlj = phi_j;
+	  // Assemble mass term
+	  mass = 0.0;
+
+	  if ( T_MASS ) {
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPg*(Pg_dot*dPc_dPl*d2S_dPc2));
+	    //	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
+	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
+	  }
+	  mass *= -dA * etm_mass;
+	  
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  diff1 = 0.0;
+	  diff2 = 0.0;
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff1 += gradII_Pg[k]*gradII_phi_i[k];
+	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
+	    }
+	  }
+	  diff = diff1*dPl_dPlj*dPc_dPl*dk_gas_dS*dS_dPc + k_gas*dPg_dPl*diff2;
+	  diff *= -pow(H,2.)/12.0/mu_g * dA * etm_diff;
+	  
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+	  
+	} // End of loop over DOF (j)
+	
+      } // End of R_LUBP_GAS sensitivities to LUBP_LIQ
+
+      // Assemble sensitivities of R_LUBP_GAS to LUBP_GAS
+      var = LUBP_GAS;
+      if (pd->v[var]) {
+  	pvar = upd->vp[var];
+
+  	// Loop over DOF (j)
+  	for ( j = 0; j < ei->dof[var]; j++) {
+
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  dbl dPg_dPgj = phi_j;      
+	  // Assemble mass term
+	  mass = 0.0;
+
+	  if ( T_MASS ) {
+	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH + dPc_dPg*(dS_dPc*Pgj_dot_over_Pgj + Pg_dot*dPc_dPg*d2S_dPc2));
+	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
+	  }
+	  mass *=  -dA * etm_mass;
+	  
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  diff1 = 0.0;
+	  diff2 = 0.0;
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff1 += gradII_Pg[k]*gradII_phi_i[k];
+	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
+	    }
+	  }
+	  diff = diff1*dPg_dPgj*dPc_dPg*dk_gas_dS*dS_dPc + k_gas*diff2;
+	  diff *= -pow(H,2.)/12./mu_g * dA * etm_diff;
+	  
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+	  
+	} // End of loop over DOF (j)
+	
+      } // End of R_LUBP_GAS sensitivities to LUBP_GAS
 
     } // End of loop over DOF (i)      
   }

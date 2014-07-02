@@ -109,6 +109,7 @@ change the zeros to 1 under the appropriate var value. */
 
 /*0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,*/
 
+
  
 struct BC_descriptions  BC_Desc[] = 
 {
@@ -277,7 +278,8 @@ struct BC_descriptions  BC_Desc[] =
  { "SH_SLOPE_Y",  "SH_SLOPE_Y_BC", SPECIAL, SH_SLOPE_Y_BC, R_MESH2, SCALAR, NO_ROT, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB } ,
   { "SH_USER", "SH_USER_BC", DIRICHLET, SH_USER_BC, R_SHELL_USER, SCALAR, NO_ROT, {0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
   { "SH_LUBP", "SH_LUBP_BC", DIRICHLET, SH_LUBP_BC, R_SHELL_LUBP, SCALAR, NO_ROT, {0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
-{ "SH_LUBP_LIQ", "SH_LUBP_LIQ_BC", DIRICHLET, SH_LUBP_LIQ_BC, R_LUBP_LIQ, SCALAR, NO_ROT, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
+  { "SH_LUBP_LIQ", "SH_LUBP_LIQ_BC", DIRICHLET, SH_LUBP_LIQ_BC, R_LUBP_LIQ, SCALAR, NO_ROT, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
+  { "SH_LUBP_GAS", "SH_LUBP_GAS_BC", DIRICHLET, SH_LUBP_GAS_BC, R_LUBP_GAS, SCALAR, NO_ROT, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
   { "LUBP_SH_FP_MATCH", "LUBP_SH_FP_MATCH_BC", STRONG_INT_SURF , LUBP_SH_FP_MATCH_BC, R_LUBP, SCALAR, NO_ROT, { 0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1}, CROSS_PHASE, DVI_SIDTIE},
   { "LUBP_SH_FP_FLUX", "LUBP_SH_FP_FLUX_BC", COLLOCATE_SURF, LUBP_SH_FP_FLUX_BC, R_SHELL_FILMP, SCALAR, NO_ROT, { 0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1} , CROSS_PHASE, DVI_SINGLE_PHASE_DB } ,
   { "SH_LUBP_SOLID", "SH_LUBP_SOLID_BC", WEAK_INT_SURF, SH_LUBP_SOLID_BC, R_MESH1, VECTOR, NO_ROT, {0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
@@ -977,6 +979,7 @@ struct Equation_Names EQ_Name[] = {
     { "R_LIGHT_INTM", "LIGHT_INTM", R_LIGHT_INTM},
     { "R_LIGHT_INTD", "LIGHT_INTD", R_LIGHT_INTD},  /*   182  */
     { "R_LUBP_LIQ", "LUBP_LIQ", R_LUBP_LIQ},  /* 183 - AMC */
+    { "R_LUBP_GAS", "LUBP_GAS", R_LUBP_GAS},  /* 184 - AMC */
     /*
      *  Note -> these entries must remain until we get rid
      *          of putting the species unknowns after V_LAST
@@ -984,7 +987,7 @@ struct Equation_Names EQ_Name[] = {
      *          are species in the problem
      */
 
-    { "R_Y0", "Y0", V_LAST + 0} ,                    /* 183 */
+    { "R_Y0", "Y0", V_LAST + 0} ,                    /* 183 AMC June 01, 2014 note how does numbering work with these "extra" variables? */
     { "R_Y1", "Y1", V_LAST + 1} ,
     { "R_Y2", "Y2", V_LAST + 2} ,
     { "R_Y3", "Y3", V_LAST + 3} ,
@@ -1247,9 +1250,10 @@ struct Equation_Names Var_Name[] =  {
     { "LIGHT_INTM", "INTM", LIGHT_INTM},
     { "LIGHT_INTD", "INTD", LIGHT_INTD},                     /* 182 */
     { "LUBP_LIQ", "LUBP_LIQ", LUBP_LIQ},                          /* 183 - AMC */
-
+    { "LUBP_GAS", "LUBP_GAS", LUBP_GAS},
+    
     { "MESH_POSITION1", "X",  MESH_POSITION1 } ,
-    { "MESH_POSITION2", "Y",  MESH_POSITION2 } ,	/* 184 */
+    { "MESH_POSITION2", "Y",  MESH_POSITION2 } ,	/* 186 */
     { "MESH_POSITION3", "Z",  MESH_POSITION3 } ,
 
     { "VEL_NORM",       "VN", VEL_NORM } ,
@@ -1262,14 +1266,14 @@ struct Equation_Names Var_Name[] =  {
 
     { "D_X1_DT",   "XDOT", D_X1_DT } ,
     { "D_X2_DT",   "YDOT", D_X2_DT } ,
-    { "D_X3_DT",   "ZDOT", D_X3_DT } ,			/* 194 */
+    { "D_X3_DT",   "ZDOT", D_X3_DT } ,			/* 196 */
     { "D_S_DT",    "SDOT", D_S_DT } ,
 
     { "D_P_DT",    "PDOT", D_P_DT } ,
 
     { "SOLID_POSITION1", "X_RS",  SOLID_POSITION1 } ,  
     { "SOLID_POSITION2", "Y_RS",  SOLID_POSITION2 } ,
-    { "SOLID_POSITION3", "Z_RS",  SOLID_POSITION3 } 	/* 199 */
+    { "SOLID_POSITION3", "Z_RS",  SOLID_POSITION3 } 	/* 201 */
 };
 
 int Num_Var_Names = sizeof(Var_Name) / sizeof(struct Equation_Names);  
@@ -1487,6 +1491,7 @@ struct Equation_Names Exo_Var_Names[] =
   { "Minus Propagating Intensity", "INTM", LIGHT_INTM },
   { "Dispersive Scattering Intensity", "INTD", LIGHT_INTD },
   { "Liquid Phase Capillary Pressure", "LPL", LUBP_LIQ }, /* 183 - AMC */
+  { "Gas Phase Capillary Pressure", "LPG", LUBP_GAS }, /* 184 - AMC */
 };
 
 int Num_Exo_Var_Names = sizeof(Exo_Var_Names) / sizeof(struct Equation_Names);  
@@ -1750,6 +1755,7 @@ struct Equation_Names Var_Units[] =
   { "Minus Intensity", "[1]", LIGHT_INTM},
   { "Dispersive Intensity", "[1]", LIGHT_INTD},
   { "Liquid Phase Lubrication Pressure", "[1]", LUBP_LIQ},
+  { "Gas Phase Lubrication Pressure", "[1]", LUBP_GAS},
 };
 
 int Num_Var_Units = sizeof(Var_Units) / sizeof(struct Equation_Names);  

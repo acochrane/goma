@@ -8741,9 +8741,9 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 		     "Lubrication Saturation", "TANH_LUBP");
 	EH(-1, err_msg);
       }
-      dbl a, b, c, d, r, o, Sn1, Sn2, Alpha1, Alpha2, gamma;
+      dbl a, b, c, d, r, u, Sn1, Sn2, Alpha1, Alpha2, gamma;
       r = dummy[0];
-      o = dummy[1];
+      u = dummy[1];
       safe_free (dummy);
       mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
 
@@ -8751,15 +8751,15 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       b = a;
       gamma = mat_ptr->surface_tension;
 
-      Sn1 = 0.0+o;
-      Sn2 = 1.0-o;
+      Sn1 = 0.0+u;
+      Sn2 = 1.0-u;
       Alpha1 = atanh((Sn1-a)/b);
       Alpha2 = atanh((Sn2-a)/b);
-      d = -2*gamma*(Alpha1-Alpha2)/( 1/(1+r) - 1/(1-r) );
+      d = 2*gamma*(-Alpha1+Alpha2)/( 1/(1+r) - 1/(1-r) );
       c = Alpha1 + d/(2*gamma*(1-r)); 
 
       mat_ptr->lub_sat_const[0] = r;
-      mat_ptr->lub_sat_const[1] = o;
+      mat_ptr->lub_sat_const[1] = u;
       mat_ptr->lub_sat_const[2] = c;
       mat_ptr->lub_sat_const[3] = d;
     }

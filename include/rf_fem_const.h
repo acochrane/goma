@@ -437,6 +437,7 @@
 #define LIGHT_INTM            181 /*  Light Intensity - Minus direction propagation-RBS*/
 #define LIGHT_INTD            182 /*  Light Intensity - Scattering Dispersion-RBS*/
 #define LUBP_LIQ              183 /*  Liquid phase pressure in porous lubrication flow - AMC*/
+#define LUBP_GAS              184 /*  Gas phase pressure in porous lubrication flow - AMC*/
 /*
  * define a variable to hold an external field which will be 
  * held fixed in the problem but parametered by the basis functions
@@ -793,7 +794,8 @@
 #define R_LIGHT_INTM            181 /*  Light Intensity - Minus direction propagation*/
 #define R_LIGHT_INTD            182 /*  Light Intensity - Scattering Dispersion*/
 #define R_LUBP_LIQ              183 /*  Liquid phase pressure in porous lubrication flow - AMC*/
-#define V_LAST		        184
+#define R_LUBP_GAS              184 /*  Gas phase pressure in porous lubrication flow - AMC*/
+#define V_LAST		        185
 
 
 /* MMH

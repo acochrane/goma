@@ -371,7 +371,8 @@ setup_pd()
 		  pd_glob[mn]->e[ce] |= T_SOURCE;
 		}
 	    }
-	  else if((ce == R_LUBP_LIQ ))
+	  else if((ce == R_LUBP_LIQ) ||
+		  (ce == R_LUBP_GAS))
 	    {
 	      if ( pd_glob[mn]->etm[ce][(LOG2_MASS)] != 0. )
 		{
