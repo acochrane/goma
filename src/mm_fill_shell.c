@@ -11383,8 +11383,8 @@ assemble_porous_shell_two_phase(
   Inn(grad_Pg, gradII_Pg);
 
   dbl a, b, c, d;
-  a = 0.5;
-  b = 0.5;
+  a = mp->lub_sat_const[0];
+  b = mp->lub_sat_const[1];
   c = mp->lub_sat_const[2];
   d = mp->lub_sat_const[3];
   
@@ -11392,7 +11392,7 @@ assemble_porous_shell_two_phase(
 
   dbl Theta, sechTheta, tanhTheta, saturation;
   // still need to get signs right here...
-  Theta = c + d/(-Pc*H);                               // abscissa of hyperbolic trig functions
+  Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;
