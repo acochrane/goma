@@ -11362,15 +11362,17 @@ assemble_porous_shell_two_phase(
   dbl Pl_dot = fv_dot->lubp_liq ;
   dbl Plj_dot_over_Plj = (1+2*tt)/dt;
   dbl grad_Pl[DIM], gradII_Pl[DIM];
-  
+
   for (k = 0; k<DIM; k++) {
     grad_Pl[k] = fv->grad_lubp_liq[k];
   }
   Inn(grad_Pl, gradII_Pl);
 
+  dbl Pc = -Pl;
+
   dbl a, b, c, d;
-  a = 0.5;
-  b = 0.5;
+  a = mp->lub_sat_const[0];
+  b = mp->lub_sat_const[1];
   c = mp->lub_sat_const[2];
   d = mp->lub_sat_const[3];
   
@@ -11378,7 +11380,7 @@ assemble_porous_shell_two_phase(
 
   dbl Theta, sechTheta, tanhTheta, saturation;
 
-  Theta = c + d/(Pl*H);                               // abscissa of hyperbolic trig functions
+  Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;

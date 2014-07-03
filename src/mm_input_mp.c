@@ -8734,32 +8734,36 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       mat_ptr->LubSatModel = TANH_LUBP;
       dbl  *dummy;
       num_const = read_constants(imp, &dummy, NO_SPECIES);
-      if (num_const != 2) {
+      if (num_const != 4) {
 	sr = sprintf(err_msg, 
-		     "Matl %s needs 2 constants for %s %s model.\n",
+		     "Matl %s needs 4 constants for %s %s model.\n",
 		     pd_glob[mn]->MaterialName,
 		     "Lubrication Saturation", "TANH_LUBP");
 	EH(-1, err_msg);
       }
-      dbl a, b, c, d, r, o, Sn1, Sn2, Alpha1, Alpha2, gamma;
-      r = dummy[0];
-      o = dummy[1];
+      dbl a, b, c, d, beta1x, beta1y, beta2x, beta2y, S1, S2, alpha1, alpha2, gamma, delta1, delta2;
+      beta1x = dummy[0];
+      beta1y = dummy[1];
+      beta2x = dummy[2];
+      beta2y = dummy[3];
       safe_free (dummy);
       mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
 
       a = 0.5;
-      b = a;
+      b = -a;
       gamma = mat_ptr->surface_tension;
 
-      Sn1 = 0.0+o;
-      Sn2 = 1.0-o;
-      Alpha1 = atanh((Sn1-a)/b);
-      Alpha2 = atanh((Sn2-a)/b);
-      d = -2*gamma*(Alpha1-Alpha2)/( 1/(1+r) - 1/(1-r) );
-      c = Alpha1 + d/(2*gamma*(1-r)); 
+      S1 = 1.0 - beta1y;
+      S2 = beta2y;
+      alpha1 = atanh((S1-a)/b);
+      alpha2 = atanh((S2-a)/b);
+      delta1 = 1.0/(1.0-beta1x);
+      delta2 = 1.0/(1.0+beta2x);
+      d = 2*gamma*(alpha1-alpha2)/(delta1 - delta2);
+      c = alpha1 - d/(2*gamma)*delta1; 
 
-      mat_ptr->lub_sat_const[0] = r;
-      mat_ptr->lub_sat_const[1] = o;
+      mat_ptr->lub_sat_const[0] = a;
+      mat_ptr->lub_sat_const[1] = b;
       mat_ptr->lub_sat_const[2] = c;
       mat_ptr->lub_sat_const[3] = d;
     }
