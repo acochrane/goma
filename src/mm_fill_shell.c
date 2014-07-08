@@ -11348,7 +11348,7 @@ assemble_porous_shell_two_phase(
 
   
   // Load liquid material properties
-  dbl mu = mp->viscosity;                         // Viscosity
+  dbl mu_l = mp->viscosity;                         // Viscosity
   dbl rho = mp->density;                          // Density
   dbl gamma = mp->surface_tension;                    // Surface Tension
 
@@ -11385,28 +11385,33 @@ assemble_porous_shell_two_phase(
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;
 
-  dbl cp, xp, yp, dxp_dPl, dyp_dPl, dS_dPl, d2S_dPl2;            //  equations for dependence on pressure. c is constant, xp and yp are simply placeholder variables, not positions. 
-  cp = -b*d;
-  xp = 1./(Pl*Pl*H);
-  dxp_dPl = -2./(pow(Pl,3.)*H);
-  yp = sechTheta*sechTheta;
-  dyp_dPl = 2.*d/H*pow(sechTheta/Pl,2.)*tanhTheta;
-  dS_dPl = cp*xp*yp;
-  d2S_dPl2 = cp*(xp*dyp_dPl + yp*dxp_dPl);
+  dbl x1, x2, x3, x4, dx2_dH, dx3_dH, dx2,dPc, dx3_dPc, dS_dPc, d2S_dPc2, d2S_dPcdH;            //  equations for sensitivity of saturation function.
+  x1 = -b*d;
+  x2 = 1./(Pc*Pc*H);
+  x4 = 1./(Pc*H*H);
+  x3 = sechTheta*sechTheta;
+  dS_dPc = x1*x2*x3;
+  dS_dH = x1*x4*x3;
+  dx2_dH = -x2/H;
+  dx3_dH = 2*x3*tanhTheta*d*x4;
+  dx2_dPc = -2./(pow(Pc,3.)*H);
+  dx3_dPc = 2.*d/H*pow(sechTheta/Pc,2.)*tanhTheta;
+  d2S_dPc2 = x1*(x2*dx3_dPc + x3*dx2_dPc);
+  d2S_dPcdH = x1*(x2*dx3_dH + x3*dx2_dH);
 
-
-    dbl ch, xh, yh, dxh_dPl, dyh_dPl, dS_dH, d2S_dPldH;          //  equations for dependence on height. c is constant, xh and yh are simply placeholder variables, not positions.
-
-  ch = cp;
-  xh = 1./(Pl*H*H);
-  dxh_dPl = -1./pow(Pl*H,2.);
-  yh = yp;
-  dyh_dPl = dyp_dPl;
-  dS_dH = ch*xh*yh;
-  d2S_dPldH = ch*(xh*dyh_dPl + yh*dxh_dPl);
+  // Easier values
+  dbl dPc_dPl = -1.0;
+  dbl dPc_dPg = 1.0;
+  dbl dPl_dPg = 1.0;
+  dbl dPg_dPl = 1.0;
 
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-  dbl k_liq = saturation;
+
+ dbl n = 1; // for now 
+ dbl k_liq = pow(saturation, n);
+ dbl dk_liq_dS = n*pow(saturation, n-1); 
+ dbl k_gas = 1-k_liq;  
+ dbl dk_gas_dS = -n*pow(saturation, n-1);
 
   /* k_liq instead of kappa  - Use CONSTANT kappa Model but not in calculations */
   // Maybe impliment "Reynolds Lubrication" kappa?
@@ -11427,7 +11432,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (-dS_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11438,7 +11443,7 @@ assemble_porous_shell_two_phase(
 	  diff += gradII_Pl[k] * gradII_phi_i[k];
 	}
       }
-      diff *= -k_liq*pow(H,2.)/12.0/mu * dA * etm_diff;
+      diff *= -k_liq*pow(H,2.)/12.0/mu_l * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11473,8 +11478,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (- dS_dPl*Plj_dot_over_Plj - Pl_dot*d2S_dPl2 + 1.0*dH_dtime*d2S_dPldH);
-	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
+	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*dPlj_dot_over_Plj +Pl_dot*dPc_dPl*d2S_dPc2));
 	  }
 	  mass *= dA * etm_mass;
 	  
@@ -11488,8 +11492,8 @@ assemble_porous_shell_two_phase(
 	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
 	  }
-	  diff = diff1*phi_j*dS_dPl + diff2*saturation;
-	  diff *= -pow(H,2.)/12./mu * dA * etm_diff;
+	  diff = diff1*dPl_dPlj*dPc_dPl*Ds_dPc + diff2*k_liq;
+	  diff *= -pow(H,2.)/12./mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
