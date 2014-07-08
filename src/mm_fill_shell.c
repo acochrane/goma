@@ -11385,7 +11385,7 @@ assemble_porous_shell_two_phase(
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;
 
-  dbl x1, x2, x3, x4, dx2_dH, dx3_dH, dx2,dPc, dx3_dPc, dS_dPc, d2S_dPc2, d2S_dPcdH;            //  equations for sensitivity of saturation function.
+  dbl x1, x2, x3, x4, dx2_dH, dx3_dH, dx2_dPc, dx3_dPc, dS_dH, dS_dPc, d2S_dPc2, d2S_dPcdH;            //  equations for sensitivity of saturation function.
   x1 = -b*d;
   x2 = 1./(Pc*Pc*H);
   x4 = 1./(Pc*H*H);
@@ -11473,12 +11473,12 @@ assemble_porous_shell_two_phase(
 
 	  // Load basis functions
 	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-      
+	  dbl dPl_dPlj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*dPlj_dot_over_Plj +Pl_dot*dPc_dPl*d2S_dPc2));
+	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*Plj_dot_over_Plj +Pl_dot*dPc_dPl*d2S_dPc2));
 	  }
 	  mass *= dA * etm_mass;
 	  
@@ -11492,7 +11492,7 @@ assemble_porous_shell_two_phase(
 	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
 	  }
-	  diff = diff1*dPl_dPlj*dPc_dPl*Ds_dPc + diff2*k_liq;
+	  diff = diff1*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
 	  diff *= -pow(H,2.)/12./mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
