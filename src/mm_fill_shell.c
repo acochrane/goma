@@ -11318,7 +11318,7 @@ assemble_porous_shell_two_phase(
   dbl H_U, dH_U_dtime, H_L, dH_L_dtime, dH_U_dp, dH_U_ddh;
   dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
   H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
-  dH_dtime = dH_U_dtime - dH_L_dtime;
+  dH_dtime = (dH_U_dtime - dH_L_dtime);
 
   // Initialize output status function
   int status = 0;
@@ -11395,9 +11395,12 @@ assemble_porous_shell_two_phase(
   dx2_dH = -x2/H;
   dx3_dH = 2*x3*tanhTheta*d*x4;
   dx2_dPc = -2./(pow(Pc,3.)*H);
-  dx3_dPc = 2.*d/H*pow(sechTheta/Pc,2.)*tanhTheta;
+  //  dx3_dPc = 2.*d/H*pow(sechTheta/Pc,2.)*tanhTheta;
+  dx3_dPc = 2.0*x3*tanhTheta*d*x2;
+  dbl dx4_dPc = -x4/Pc;
   d2S_dPc2 = x1*(x2*dx3_dPc + x3*dx2_dPc);
-  d2S_dPcdH = x1*(x2*dx3_dH + x3*dx2_dH);
+  d2S_dPcdH = x1*(x2*dx3_dH + x3*dx2_dH); // Suspect error here!
+  dbl d2S_dPcdH2 = x1*(x4*dx3_dPc + x3*dx4_dPc); // compare these!
 
   // Easier values
   dbl dPc_dPl = -1.0;
@@ -11478,7 +11481,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*Plj_dot_over_Plj +Pl_dot*dPc_dPl*d2S_dPc2));
+	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*-d2S_dPc2));
 	  }
 	  mass *= dA * etm_mass;
 	  
@@ -11492,7 +11495,7 @@ assemble_porous_shell_two_phase(
 	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
 	  }
-	  diff = diff1*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
+	  diff =diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
 	  diff *= -pow(H,2.)/12./mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
