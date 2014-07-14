@@ -11435,7 +11435,8 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	//	mass += (dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (dS_dPc*Pl_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11481,7 +11482,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*-d2S_dPc2));
+	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH - Pl_dot*dPc_dPl*dPc_dPl*d2S_dPc2 - dPc_dPl*dS_dPc*Plj_dot_over_Plj);
 	  }
 	  mass *= dA * etm_mass;
 	  
