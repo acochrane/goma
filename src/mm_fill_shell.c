@@ -11408,6 +11408,8 @@ assemble_porous_shell_two_phase(
   dbl dPl_dPg = 1.0;
   dbl dPg_dPl = 1.0;
 
+  // Scale dS_dH wrt dS_dPc
+  dbl dS_dPc_scale = 1.0;
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
 
  dbl n = 1; // for now 
@@ -11436,7 +11438,7 @@ assemble_porous_shell_two_phase(
       mass = 0.0;
       if ( T_MASS ) {
 	//	mass += (dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
-	mass += (dS_dPc*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (-(dS_dPc*H)*dPc_dPl*Pl_dot + (H*dS_dH + saturation)*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass;
       
@@ -11447,7 +11449,7 @@ assemble_porous_shell_two_phase(
 	  diff += gradII_Pl[k] * gradII_phi_i[k];
 	}
       }
-      diff *= -k_liq*pow(H,2.)/12.0/mu_l * dA * etm_diff;
+      diff *= -k_liq*pow(H,3.)/12.0/mu_l * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11482,7 +11484,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i * phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH - Pl_dot*dPc_dPl*dPc_dPl*d2S_dPc2 - dPc_dPl*dS_dPc*Plj_dot_over_Plj);
+	    mass += phi_i * phi_j * (dH_dtime*(H*dPc_dPl*d2S_dPcdH + dS_dPc*dPc_dPl) - Pl_dot*dPc_dPl*(H*dPc_dPl*d2S_dPc2) - H*dPc_dPl*dS_dPc*Plj_dot_over_Plj);
 	  }
 	  mass *= dA * etm_mass;
 	  
@@ -11497,7 +11499,7 @@ assemble_porous_shell_two_phase(
 	    }
 	  }
 	  diff =diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
-	  diff *= -pow(H,2.)/12./mu_l * dA * etm_diff;
+	  diff *= -pow(H,3.)/12./mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
