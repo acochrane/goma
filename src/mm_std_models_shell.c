@@ -1449,10 +1449,10 @@ double two_phase_lubrication_saturation_model(double delta_t,
 {
   
   dbl *a, *b, *c, *d, S, Pc;
-  a = &mp->lub_sat_const[0];
-  b = &mp->lub_sat_const[1];
-  c = &mp->lub_sat_const[2];
-  d = &mp->lub_sat_const[3];
+  a = &mp->u_lub_sat_const[0];
+  b = &mp->u_lub_sat_const[1];
+  c = &mp->u_lub_sat_const[2];
+  d = &mp->u_lub_sat_const[3];
   Pc = -fv->lubp_liq;
 
   dbl H, dH_dtime, dt;

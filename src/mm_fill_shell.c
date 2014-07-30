@@ -11376,10 +11376,10 @@ assemble_porous_shell_two_phase(
   dbl Pc = -Pl;
 
   dbl a, b, c, d;
-  a = mp->lub_sat_const[0];
-  b = mp->lub_sat_const[1];
-  c = mp->lub_sat_const[2];
-  d = mp->lub_sat_const[3];
+  a = mp->u_lub_sat_const[0];
+  b = mp->u_lub_sat_const[1];
+  c = mp->u_lub_sat_const[2];
+  d = mp->u_lub_sat_const[3];
   
   // Build Saturation Function, should be implimented elsewhere, no? -AMC
 

@@ -1590,7 +1590,6 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->DiffCoeff, 1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->lubsource, 1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->lubmomsource[0], DIM, MPI_DOUBLE);
-
       ddd_add_member(n, &mp_glob[i]->CapStress, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->ConductivityModel, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->Ewt_funcModel, 1, MPI_INT);
@@ -1809,6 +1808,7 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_solution_temperature, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_thermodynamic_potential, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_interfacial_area, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_lub_sat_const, 1, MPI_INT);
 
       /*
        * Material property constants that are vectors over the concentration
@@ -1947,6 +1947,8 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_PorousShellDiffusivity_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_PorousShellRT_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_PorousShellHenry_function_constants, 1 , MPI_INT); 
+
+      
 
       /* Thin film */ 
       ddd_add_member(n, &mp_glob[i]->len_u_FilmEvap_function_constants, 1 , MPI_INT); 
@@ -2801,6 +2803,9 @@ ark_landing()
       dalloc( m->len_u_interfacial_area,
               m->    u_interfacial_area);
 
+      dalloc( m->len_u_lub_sat_const,
+              m->    u_lub_sat_const);
+
       /*
        * User defined material property lists for each species...
        *     HKM -> Changed this to number of species, not
@@ -3271,6 +3276,8 @@ noahs_dove()
 	  m->    u_PorousShellRT_function_constants);
     crdv( m->len_u_PorousShellHenry_function_constants, 
 	  m->    u_PorousShellHenry_function_constants);
+
+
     /* 
      * some more specialized constants (thin film)
      */
@@ -3280,6 +3287,14 @@ noahs_dove()
 	  m->    u_DisjPress_function_constants);
     crdv( m->len_u_DiffCoeff_function_constants, 
 	  m->    u_DiffCoeff_function_constants);
+
+    /* 
+     * some more specialized constants (multiphase lubrication)
+     */
+    crdv( m->len_u_lub_sat_const, 
+	  m->    u_lub_sat_const);
+
+
 
 
 #ifdef DEBUG

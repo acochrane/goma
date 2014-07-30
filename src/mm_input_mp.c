@@ -8726,14 +8726,14 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   if(pd_glob[mn]->e[R_LUBP_LIQ]) {
     model_read = look_for_mat_prop(imp, "Lubrication Saturation",
 				   &(mat_ptr->LubSatModel),
-				   mat_ptr->lub_sat_const,
+				   mat_ptr->u_lub_sat_const,
 				   NO_USER,NULL, model_name,
 				   SCALAR_INPUT, &NO_SPECIES,es);
     if (model_read == -1 && !strcmp(model_name, "TANH_LUBP") ) {
       model_read = 1;
       mat_ptr->LubSatModel = TANH_LUBP;
-      dbl  *dummy;
-      num_const = read_constants(imp, &dummy, NO_SPECIES);
+      //      mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
+      num_const = read_constants(imp, &(mat_ptr->u_lub_sat_const) , NO_SPECIES);
       if (num_const != 4) {
 	sr = sprintf(err_msg, 
 		     "Matl %s needs 4 constants for %s %s model.\n",
@@ -8741,13 +8741,15 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 		     "Lubrication Saturation", "TANH_LUBP");
 	EH(-1, err_msg);
       }
-      dbl a, b, c, d, beta1x, beta1y, beta2x, beta2y, S1, S2, alpha1, alpha2, gamma, delta1, delta2;
-      beta1x = dummy[0];
-      beta1y = dummy[1];
-      beta2x = dummy[2];
-      beta2y = dummy[3];
-      safe_free (dummy);
-      mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
+      mat_ptr->len_u_lub_sat_const = num_const;
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_lub_sat_const);
+
+      double a, b, c, d, beta1x, beta1y, beta2x, beta2y, S1, S2, alpha1, alpha2, gamma, delta1, delta2;
+      beta1x = mat_ptr->u_lub_sat_const[0];
+      beta1y = mat_ptr->u_lub_sat_const[1];
+      beta2x = mat_ptr->u_lub_sat_const[2];
+      beta2y = mat_ptr->u_lub_sat_const[3];
+      //      mat_ptr->lub_sat_const = calloc(4, sizeof(double));
 
       a = 0.5;
       b = -a;
@@ -8762,10 +8764,10 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       d = 2*gamma*(alpha1-alpha2)/(delta1 - delta2);
       c = alpha1 - d/(2*gamma)*delta1; 
 
-      mat_ptr->lub_sat_const[0] = a;
-      mat_ptr->lub_sat_const[1] = b;
-      mat_ptr->lub_sat_const[2] = c;
-      mat_ptr->lub_sat_const[3] = d;
+      mat_ptr->u_lub_sat_const[0] = a;
+      mat_ptr->u_lub_sat_const[1] = b;
+      mat_ptr->u_lub_sat_const[2] = c;
+      mat_ptr->u_lub_sat_const[3] = d;
     }
   }
   /* Shell Energy Cards - heat sources, sinks, etc. */
