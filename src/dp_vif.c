@@ -2399,6 +2399,7 @@ noahs_ark()
   ddd_add_member(n, &VON_MISES_STRAIN, 1, MPI_INT);
   ddd_add_member(n, &VON_MISES_STRESS, 1, MPI_INT);
   ddd_add_member(n, &NON_VOLFRAC, 1, MPI_INT);
+  ddd_add_member(n, &LUBP_SAT, 1, MPI_INT);
 
   if ( len_u_post_proc > 0 )
     {

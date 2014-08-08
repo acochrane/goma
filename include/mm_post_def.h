@@ -524,7 +524,7 @@ extern int PP_LAME_LAMBDA;     /* Lame LAMBDA coefficient for solid/mesh */
 extern int VON_MISES_STRAIN;
 extern int VON_MISES_STRESS;
 extern int NON_VOLFRAC;		/*Nonvolatile species Volume Fraction */
-
+extern int LUBP_SAT;
 
 /*
  *  Post-processing Step 1: add a new variable flag to end of mm_post_proc.h
