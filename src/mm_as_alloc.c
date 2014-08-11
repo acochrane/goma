@@ -196,6 +196,8 @@ efv_alloc()
       EH( status, "Problem getting memory for External_Field_Variables");
     }
 
+  memset(efv,0,sz);
+
   return(status);
 }
 
@@ -314,11 +316,23 @@ int gn_alloc(void)
   sz = sizeof(struct Generalized_Newtonian *);
   gn_glob = (struct Generalized_Newtonian **) array_alloc(1, MAX_NUMBER_MATLS, sz);
 
+  if ( gn_glob == NULL)
+    {
+      status = -1;
+      EH( status, "Problem getting memory for Generalized_Newtonian");
+    }
+
   sz = sizeof(struct Generalized_Newtonian);
 
   for(mn = 0; mn < MAX_NUMBER_MATLS; mn++)
     {
       gn_glob[mn] = (struct Generalized_Newtonian *) array_alloc(1, 1, sz);
+
+      if (gn_glob[mn] == NULL) {
+        status = -1;
+        EH( status, "Problem getting memory for Generalized_Newtonian material");
+      }
+      memset(gn_glob[mn], 0, sz);
 
     }
   
@@ -326,12 +340,6 @@ int gn_alloc(void)
     {
       DPRINTF(stdout, "%s: Generalized_Newtonian @ %p has %d bytes", 
 	      yo, gn, sz);
-    }
-
-  if ( gn_glob == NULL)
-    {
-      status = -1;
-      EH( status, "Problem getting memory for Generalized_Newtonian");
     }
 
   return(status);
@@ -1891,6 +1899,26 @@ init_Elastic_Constitutive(struct Elastic_Constitutive *e)
   for ( i=0; i<MAX_VARIABLE_TYPES + MAX_CONC; i++)
     {
       e->d_lame_lambda[i] = (double)0;
+    }
+
+  e->lame_TempShift          = 0;
+  e->lameTempShiftModel      = 0;
+  e->len_u_lame_TempShift    = 0;
+  e->u_lame_TempShift        = NULL;
+  for ( i=0; i<MAX_VARIABLE_TYPES + MAX_CONC; i++)
+    {
+      e->d_lame_TempShift[i] = 0;
+    }
+  e->lame_TempShift_tableid  = 0;
+
+  e->bend_stiffness          = 0;
+  e->bend_stiffness_model    = 0;
+  e->len_u_bend_stiffness    = 0;
+  e->u_bend_stiffness        = NULL;
+  
+  for ( i=0; i<MAX_VARIABLE_TYPES + MAX_CONC; i++)
+    {
+      e->d_bend_stiffness[i] = 0;
     }
 
   e->poisson              = (double)0;
