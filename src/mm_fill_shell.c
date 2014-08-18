@@ -11348,8 +11348,8 @@ assemble_porous_shell_two_phase(
   dbl h3 = fv->h3;                                // Differential volume element (What is this? - AMC)
   dbl det_J = fv->sdet;                           // Jacobian of transformation
   dbl dA = det_J * wt * h3;
-  dbl etm_mass = pd->etm[eqn][(LOG2_MASS)];
-  dbl etm_diff = pd->etm[eqn][(LOG2_DIFFUSION)];
+  dbl etm_mass;
+  dbl etm_diff;
 
   
   // Load liquid material properties
@@ -11438,7 +11438,9 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_LIQ;
   if (af->Assemble_Residual) {
     peqn = upd->ep[eqn];
-    
+    etm_mass = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff = pd->etm[eqn][(LOG2_DIFFUSION)];
+
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) {         
       
@@ -11472,6 +11474,8 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_GAS;
   if (af->Assemble_Residual) {
     peqn = upd->ep[eqn];
+    etm_mass = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff = pd->etm[eqn][(LOG2_DIFFUSION)];
     
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) {      
@@ -11507,6 +11511,9 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_LIQ;
   if (af->Assemble_Jacobian) {
     peqn = upd->ep[eqn];    
+    etm_mass = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff = pd->etm[eqn][(LOG2_DIFFUSION)];
+
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) /* The sensitivites of R_LUBP_LIQ to LUBP_LIQ and LUBP_GAS */ {
       
@@ -11600,6 +11607,8 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_GAS;
   if (af->Assemble_Jacobian) {
     peqn = upd->ep[eqn];    
+    etm_mass = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff = pd->etm[eqn][(LOG2_DIFFUSION)];
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) /* sensitivities of R_LUBP_GAS to LUBP_LIQ and LUBP_GAS */ {
       
