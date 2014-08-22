@@ -11340,8 +11340,8 @@ assemble_porous_shell_two_phase(
   int *n_dof = NULL;
   int dof_map[MDE];
   dbl wt_old = fv->wt;
-  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+  //  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+  //  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
   // Unpack FEM variables from global structures
   dbl wt = fv->wt;                                // Gauss point weight
@@ -11370,9 +11370,10 @@ assemble_porous_shell_two_phase(
 
   for (k = 0; k<DIM; k++) {
     grad_Pl[k] = fv->grad_lubp_liq[k];
+    gradII_Pl[k] = fv->grad_lubp_liq[k];
   }
-  Inn(grad_Pl, gradII_Pl);
-
+  //Inn(grad_Pl, gradII_Pl);
+  
   dbl Pc = -Pl;
 
   dbl a, b, c, d;
@@ -11399,7 +11400,7 @@ assemble_porous_shell_two_phase(
   dS_dH = x1*x4*x3;
   dx2_dH = -x2/H;
   dx3_dH = 2*x3*tanhTheta*d*x4;
-  dx2_dPc = -2./(pow(Pc,3.)*H);
+  dx2_dPc = -2./((Pc*Pc*Pc)*H);
   //  dx3_dPc = 2.*d/H*pow(sechTheta/Pc,2.)*tanhTheta;
   dx3_dPc = 2.0*x3*tanhTheta*d*x2;
   dbl dx4_dPc = -x4/Pc;
@@ -11416,12 +11417,19 @@ assemble_porous_shell_two_phase(
   // Scale dS_dH wrt dS_dPc
   dbl dS_dPc_scale = 1.0;
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-
- dbl n = 1; // for now 
- dbl k_liq = pow(saturation, n);
- dbl dk_liq_dS = n*pow(saturation, n-1); 
- dbl k_gas = 1-k_liq;  
- dbl dk_gas_dS = -n*pow(saturation, n-1);
+  dbl k_liq,dk_liq_dS,k_gas,dk_gas_dS;
+  dbl n = 1; // for now 
+  if (n == 1) {
+    k_liq = saturation;
+    dk_liq_dS = 1.0; 
+    k_gas = 1-k_liq;  
+    dk_gas_dS = -1.0;
+  } else {
+    k_liq = pow(saturation, n);
+    dk_liq_dS = n*pow(saturation, n-1); 
+    k_gas = 1-k_liq;  
+    dk_gas_dS = -n*pow(saturation, n-1);
+  }
 
   /* k_liq instead of kappa  - Use CONSTANT kappa Model but not in calculations */
   // Maybe impliment "Reynolds Lubrication" kappa?
@@ -11432,13 +11440,19 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_LIQ;
   if (af->Assemble_Residual) {
     peqn = upd->ep[eqn];
+
+
     
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) {         
       
       // Load basis functions
-      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-      
+      /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
+      phi_i = bf[eqn]->phi[i];      
+      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      for (k = 0; k<DIM; k++) {      
+	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+	}
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
@@ -11454,7 +11468,7 @@ assemble_porous_shell_two_phase(
 	  diff += gradII_Pl[k] * gradII_phi_i[k];
 	}
       }
-      diff *= -k_liq*pow(H,3.)/12.0/mu_l * dA * etm_diff;
+      diff *= -k_liq*H*H*H/12.0/mu_l * dA * etm_diff;
       
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
@@ -11468,12 +11482,17 @@ assemble_porous_shell_two_phase(
   eqn = R_LUBP_LIQ;
   if (af->Assemble_Jacobian) {
     peqn = upd->ep[eqn];    
+
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) {
-      
+
       // Load basis functions
-      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-      
+      /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
+      phi_i = bf[eqn]->phi[i];
+      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
+      for (k = 0; k<DIM; k++) {      
+	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+	}
       // Assemble sensitivities for LUBP_LIQ
       var = LUBP_LIQ;
       if (pd->v[var]) {
@@ -11483,7 +11502,12 @@ assemble_porous_shell_two_phase(
   	for ( j = 0; j < ei->dof[var]; j++) {
 
 	  // Load basis functions
-	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
+	  phi_j = bf[var]->phi[j];
+	  //Inn(bf[var]->grad_phi[j], gradII_phi_j);
+	  for (k = 0; k<DIM; k++) {      
+	    gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+	    } 
 	  dbl dPl_dPlj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
@@ -11504,7 +11528,7 @@ assemble_porous_shell_two_phase(
 	    }
 	  }
 	  diff =diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq;
-	  diff *= -pow(H,3.)/12./mu_l * dA * etm_diff;
+	  diff *= -H*H*H/12./mu_l * dA * etm_diff;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
