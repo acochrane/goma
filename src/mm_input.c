@@ -8381,6 +8381,8 @@ rd_eq_specs(FILE *ifp,
       ce = set_eqn(R_SHELL_ENERGY, pd_ptr);
     } else if (!strcasecmp(ts, "lubp_liq")) {
       ce = set_eqn(R_LUBP_LIQ, pd_ptr);
+    } else if (!strcasecmp(ts, "lubp_gas")) {
+      ce = set_eqn(R_LUBP_GAS, pd_ptr);
     } else if (!strcasecmp(ts, "shell_deltah")) {
       ce = set_eqn(R_SHELL_DELTAH, pd_ptr);
     } else if (!strcasecmp(ts, "shell_lub_curv")) {
@@ -8985,6 +8987,8 @@ rd_eq_specs(FILE *ifp,
       cv = set_var(POR_SINK_MASS, pd_ptr);
     } else if (!strcasecmp(ts, "LUBP_LIQ")) {
       cv = set_var(LUBP_LIQ, pd_ptr);
+    } else if (!strcasecmp(ts, "LUBP_GAS")) {
+      cv = set_var(LUBP_GAS, pd_ptr);
     } else if (!strcasecmp(ts, "SH_SHEAR_TOP")) {
       cv = set_var(SHELL_SHEAR_TOP, pd_ptr);
     } else if (!strcasecmp(ts, "SH_SHEAR_BOT")) {
@@ -9427,6 +9431,7 @@ rd_eq_specs(FILE *ifp,
 	   pd_ptr->etm[ce][(LOG2_SOURCE)]);    
       break;
     case R_LUBP_LIQ:  
+    case R_LUBP_GAS:
       if ( fscanf(ifp, "%lf %lf", 
 		  &(pd_ptr->etm[ce][(LOG2_MASS)]),
 		  &(pd_ptr->etm[ce][(LOG2_DIFFUSION)]))

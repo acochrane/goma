@@ -1817,7 +1817,7 @@ matrix_fill(
           CHECKFINITE("assemble_porous_shell_open_2");
 #endif
         }
-      if( pde[R_LUBP_LIQ] )
+      if( pde[R_LUBP_LIQ] || pde[R_LUBP_GAS] )
         {
           err = assemble_porous_shell_two_phase( time_value, theta, delta_t, xi, exo);
           EH( err, "assemble_porous_shell_two_phase");

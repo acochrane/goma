@@ -7972,7 +7972,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   ECHO("\n---Special Inputs\n", echo_file); /* added by PRS 3/17/2009 */ 
 
-  if(pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2] || pd_glob[mn]->e[R_LUBP_LIQ])
+  if(pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2] || pd_glob[mn]->e[R_LUBP_LIQ] || pd_glob[mn]->e[R_LUBP_GAS])
     {
       model_read = look_for_mat_prop(imp, "Upper Height Function Constants", 
 				     &(mat_ptr->HeightUFunctionModel), 
@@ -8723,7 +8723,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   /* Two-phase Lubrication cards */
 
-  if(pd_glob[mn]->e[R_LUBP_LIQ]) {
+  if(pd_glob[mn]->e[R_LUBP_LIQ] ||
+     pd_glob[mn]->e[R_LUBP_GAS]) {
     model_read = look_for_mat_prop(imp, "Lubrication Saturation",
 				   &(mat_ptr->LubSatModel),
 				   mat_ptr->u_lub_sat_const,
@@ -8734,6 +8735,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       mat_ptr->LubSatModel = TANH_LUBP;
       //      mat_ptr->lub_sat_const = alloc_dbl_1(4,0.0);
       num_const = read_constants(imp, &(mat_ptr->u_lub_sat_const) , NO_SPECIES);
+
       if (num_const != 4) {
 	sr = sprintf(err_msg, 
 		     "Matl %s needs 4 constants for %s %s model.\n",
@@ -9038,7 +9040,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   if ( pd_glob[mn]->e[R_LUBP] || pd_glob[mn]->e[R_LUBP_2] ||
        pd_glob[mn]->e[R_SHELL_FILMP] ||
        pd_glob[mn]->e[R_SHELL_SAT_OPEN] || pd_glob[mn]->e[R_SHELL_SAT_OPEN_2] ||
-       pd_glob[mn]->e[R_LUBP_LIQ]) {
+       pd_glob[mn]->e[R_LUBP_LIQ] || pd_glob[mn]->e[R_LUBP_GAS] ) {
 
     model_read = look_for_mat_prop(imp, "FSI Deformation Model",
 				   &(mat_ptr->FSIModel),

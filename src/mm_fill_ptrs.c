@@ -2034,6 +2034,10 @@ load_elem_dofptr(const int ielem,
       load_varType_Interpolation_ptrs(eqn, esp->lubp_liq, esp_old->lubp_liq, esp_dot->lubp_liq);
   }
 
+  eqn = R_LUBP_GAS;
+  if ( pd->e[eqn] >= 0 ) {
+      load_varType_Interpolation_ptrs(eqn, esp->lubp_gas, esp_old->lubp_gas, esp_dot->lubp_gas);
+  }
   /*
    * External field variables
    * Warning - here the distinction between nodes and dof's gets

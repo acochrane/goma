@@ -1588,6 +1588,11 @@ load_variable (double *x_var,        /* variable value */
       var = LUBP_LIQ;
       *d_x_var = 1.;
       break;
+    case LUBP_GAS:
+      *x_var = fv->lubp_gas;
+      var = LUBP_GAS;
+      *d_x_var = 1.;
+      break;
     case SHELL_SHEAR_TOP:
       *x_var = fv->sh_shear_top;
       var = SHELL_SHEAR_TOP;

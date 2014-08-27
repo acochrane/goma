@@ -5292,6 +5292,11 @@ compute_volume_integrand(const int quantity, const int elem,
 	  }
 
 	if(pd->e[R_LUBP_LIQ]) { /*amc 08/04/2014 */
+
+	  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+	  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+	  det = fv->sdet;
+
 	  dbl saturation, height;
 	  double H_U, dH_U_dtime, H_L, dH_L_dtime;
 	  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
@@ -5299,7 +5304,8 @@ compute_volume_integrand(const int quantity, const int elem,
 					 &H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
 					 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
 	  saturation = two_phase_lubrication_saturation_model(delta_t, time);
-	  *sum += weight*det*saturation*height; // just liquid volume, because liquid is assumed incompressible
+	  
+	  *sum += saturation * height * weight*det; //*saturation*height; // just liquid volume, because liquid is assumed incompressible
 	}
 	else {
 	  *sum += weight*det*pmv->bulk_density[0];
@@ -7544,6 +7550,16 @@ load_fv_sens(void)
       for ( i=0; i<dofs; i++)
       {
         fv_sens->lubp_liq += *esp_old->lubp_liq[i] * bf[v]->phi[i];
+      }
+    }
+  v = LUBP_GAS;
+  fv_sens->lubp_gas = 0.;
+  if ( pd->v[v] )
+    {
+      dofs  = ei->dof[v];
+      for ( i=0; i<dofs; i++)
+      {
+        fv_sens->lubp_gas += *esp_old->lubp_gas[i] * bf[v]->phi[i];
       }
     }
 

@@ -1214,9 +1214,9 @@ setup_matilda(Exo_DB *e,  int *matilda)
      *
      *  Set up element block index to material index connectivity.
      *
-     * Setup the connectivity between local element block indeces and
+     * Setup the connectivity between local element block indices and
      * the material index. The matilda array pointed to by the last
-     * argument will be filled  with the appropriate indeces to permit
+     * argument will be filled  with the appropriate indices to permit
      * easy determination of the material index from the element block
      * index.
      *

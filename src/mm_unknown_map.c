@@ -2647,7 +2647,15 @@ set_interaction_masks(Exo_DB *exo)
 	case R_LUBP_LIQ:
 	  v = LUBP_LIQ;
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = LUBP_GAS;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  break;          
 
+	case R_LUBP_GAS:
+	  v = LUBP_LIQ;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = LUBP_GAS;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
 	  break;          
 
 	case R_LUBP_2:
