@@ -11525,7 +11525,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (dS_dPc*dPc_dPg*Pg_dot - dS_dH*dH_dtime) * phi_i;
+	mass += (-dS_dPc*dPc_dPg*Pg_dot + dS_dH*dH_dtime) * phi_i;
       }
       mass *= -dA * etm_mass_eqn;
       
@@ -11633,7 +11633,7 @@ assemble_porous_shell_two_phase(
 
 	  if ( T_MASS ) {
 	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
-	    mass += phi_i*phi_j * (-dH_dtime*dPc_dPg*d2S_dPcdH + dPc_dPl*Pl_dot*dPc_dPg*d2S_dPc2);
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH - dPc_dPl*Pl_dot*dPc_dPg*d2S_dPc2);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *=  dA * etm_mass_eqn;// * etm_mass_var;
@@ -11697,7 +11697,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i*phi_j * (-dH_dtime*dPc_dPl*d2S_dPcdH + dPc_dPg*(Pg_dot*dPc_dPl*d2S_dPc2));
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH - dPc_dPg*(Pg_dot*dPc_dPl*d2S_dPc2));
 	    //	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
@@ -11746,7 +11746,7 @@ assemble_porous_shell_two_phase(
 
 	  if ( T_MASS ) {
 	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
-	    mass += phi_i*phi_j * (-dH_dtime*dPc_dPg*d2S_dPcdH + dPc_dPg*(dS_dPc*Pgj_dot_over_Pgj + Pg_dot*dPc_dPg*d2S_dPc2));
+	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH - dPc_dPg*(dS_dPc*Pgj_dot_over_Pgj + Pg_dot*dPc_dPg*d2S_dPc2));
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *=  -dA * etm_mass_eqn;// * etm_mass_var;
