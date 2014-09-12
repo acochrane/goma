@@ -5293,8 +5293,8 @@ compute_volume_integrand(const int quantity, const int elem,
 
 	if(pd->e[R_LUBP_LIQ]) { /*amc 08/04/2014 */
 
-	  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-	  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+	  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+	  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 	  det = fv->sdet;
 
 	  dbl saturation, height;
@@ -5306,6 +5306,7 @@ compute_volume_integrand(const int quantity, const int elem,
 	  saturation = two_phase_lubrication_saturation_model(delta_t, time);
 	  
 	  *sum += saturation * height * weight*det; //*saturation*height; // just liquid volume, because liquid is assumed incompressible
+	  //safe_free((void *) n_dof);
 	}
 	else {
 	  *sum += weight*det*pmv->bulk_density[0];

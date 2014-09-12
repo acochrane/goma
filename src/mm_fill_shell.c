@@ -11402,8 +11402,8 @@ assemble_porous_shell_two_phase(
   }
   dbl Pc = Pg-Pl;
 
-  //  Inn(grad_Pl, gradII_Pl);   /* commented for performance issues for now */
-  //  Inn(grad_Pg, gradII_Pg);
+  Inn(grad_Pl, gradII_Pl);   /* commented for performance issues for now */
+  Inn(grad_Pg, gradII_Pg);
 
   dbl a, b, c, d;
   a = mp->u_lub_sat_const[0];
@@ -11477,10 +11477,11 @@ assemble_porous_shell_two_phase(
       // Load basis functions
       /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
       phi_i = bf[eqn]->phi[i];      
-      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      /* i think not using Inn makes elliptic drops
       for (k = 0; k<DIM; k++) {      
 	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
-      }
+	} */
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
@@ -11517,10 +11518,10 @@ assemble_porous_shell_two_phase(
       // Load basis functions
       /*ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );*/
       phi_i = bf[eqn]->phi[i];      
-      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
-      for (k = 0; k<DIM; k++) {      
-	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
-      }
+      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      //for (k = 0; k<DIM; k++) {      
+      //	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      //}
       
       // Assemble mass term
       mass = 0.0;
@@ -11558,10 +11559,10 @@ assemble_porous_shell_two_phase(
       // Load i basis functions
       /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
       phi_i = bf[eqn]->phi[i];
-      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
-      for (k = 0; k<DIM; k++) {      
-	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
-      }
+      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
+      //for (k = 0; k<DIM; k++) {      
+      //gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      //}
       // Assemble sensitivities of R_LUBP_LIQ to LUBP_LIQ ********************************************************************
       var = LUBP_LIQ;
       if (pd->v[var]) {
@@ -11575,10 +11576,10 @@ assemble_porous_shell_two_phase(
 	  // Load j basis functions
 	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
 	  phi_j = bf[var]->phi[j];
-	  //Inn(bf[var]->grad_phi[j], gradII_phi_j);
-	  for (k = 0; k<DIM; k++) {      
-	    gradII_phi_j[k] = bf[var]->grad_phi[j][k];
-	    } 
+	  Inn(bf[var]->grad_phi[j], gradII_phi_j);
+	  //for (k = 0; k<DIM; k++) {      
+	  //gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+	  //} 
 	  dbl dPl_dPlj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
@@ -11623,10 +11624,10 @@ assemble_porous_shell_two_phase(
 	  // Load basis functions
 	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
 	  phi_j = bf[var]->phi[j];
-	  //Inn(bf[var]->grad_phi[j], gradII_phi_j);
-	  for (k = 0; k<DIM; k++) {      
-	    gradII_phi_j[k] = bf[var]->grad_phi[j][k];
-	  }
+	  Inn(bf[var]->grad_phi[j], gradII_phi_j);
+	  //for (k = 0; k<DIM; k++) {      
+	  //gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+	  //}
 	  dbl dPg_dPgj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
@@ -11671,10 +11672,10 @@ assemble_porous_shell_two_phase(
       // Load basis functions
       /*ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );*/
       phi_i = bf[eqn]->phi[i];
-      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
-      for (k = 0; k<DIM; k++) {      
-	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
-      }
+      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      //for (k = 0; k<DIM; k++) {      
+      //gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      //}
       // Assemble sensitivities of R_LUBP_GAS to  LUBP_LIQ *******************************************************************
       var = LUBP_LIQ;
       if (pd->v[var]) {
@@ -11688,10 +11689,10 @@ assemble_porous_shell_two_phase(
 	  // Load basis functions
 	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );*/
 	  phi_j = bf[var]->phi[j];
-	  //Inn(bf[var]->grad_phi[j], gradII_phi_j);
-	  for (k = 0; k<DIM; k++) {      
-	    gradII_phi_j[k] = bf[var]->grad_phi[j][k];
-	  }
+	  Inn(bf[var]->grad_phi[j], gradII_phi_j);
+	  //for (k = 0; k<DIM; k++) {      
+	  //  gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+	  //}
 	  dbl dPl_dPlj = phi_j;
 	  // Assemble mass term
 	  mass = 0.0;
@@ -11736,10 +11737,10 @@ assemble_porous_shell_two_phase(
 	  // Load basis functions
 	  /*ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );*/
 	  phi_j = bf[var]->phi[j];
-	  //Inn(bf[var]->grad_phi[j], gradII_phi_j);
-	  for (k = 0; k<DIM; k++) {      
-	    gradII_phi_j[k] = bf[var]->grad_phi[j][k];
-	  }
+	  Inn(bf[var]->grad_phi[j], gradII_phi_j);
+	  //for (k = 0; k<DIM; k++) {      
+	  //gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+	  //}
 	  dbl dPg_dPgj = phi_j;      
 	  // Assemble mass term
 	  mass = 0.0;
