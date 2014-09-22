@@ -85,5 +85,11 @@ PROTO((
        double,
        double
        ));
+EXTERN double two_phase_lubrication_Pc_f_of_S
+PROTO((
+       double,
+       double,
+       double
+       ));
 
 #endif /* _MM_STD_MODELS_H */

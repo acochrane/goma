@@ -561,6 +561,15 @@ apply_point_colloc_bc (
               doFullJac = 1;
               break;
 
+	    case SH_LUBP_SAT_BC:
+	      //memset(func, 0, DIM*sizeof(double));
+	      //memset(d_func, 0, DIM*(MAX_VARIABLE_TYPES + MAX_CONC)*MDE*sizeof(double));
+	      
+	      lubp_liq_sat(&func, d_func, BC_Types[bc_input_id].BC_Data_Float, delta_t, time_intermediate);
+	      doFullJac = 0;
+
+	      break;
+
 	    } /* end of SWITCH statement */
 
 	    /************************************************************************/

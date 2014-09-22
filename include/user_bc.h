@@ -140,6 +140,14 @@ PROTO((double *,	          	/* func                                      */
        const double [],		/* u_bc - parameterize u velocity model      */
        const dbl ));		/* time  */       
 
+EXTERN void lubp_liq_sat
+PROTO((double *,	          	/* func                                      */
+       double [],               /* d_func           */
+       const double [],		/* u_bc - parameterize u velocity model      */
+       const dbl,               /* delta_t needed by height function model */
+       const dbl ));		/* time  */       
+
+
 EXTERN void shell_p_open_user_surf 
 PROTO((double *func, 
        double d_func[],

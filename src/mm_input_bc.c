@@ -521,6 +521,8 @@ rd_bc_specs(FILE *ifp,
         case SHELL_GRAD_FH_BC:
         case SHELL_GRAD_PC_BC:
 	case SH_LUBP_LIQ_BC:
+	case SH_LUBP_GAS_BC:
+	case SH_LUBP_SAT_BC:
 
 	  if ( fscanf(ifp, "%lf", &BC_Types[ibc].BC_Data_Float[0]) != 1)
 	    {

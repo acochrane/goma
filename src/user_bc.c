@@ -49,6 +49,7 @@ static char rcsid[] =
 #include "mm_mp_structs.h"
 #include "mm_mp.h"
 
+#include "mm_std_models_shell.h"
 #include "mm_eh.h"
 
 #include "goma.h"
@@ -915,6 +916,60 @@ p_liq_user_surf (double *func,
 } /* END of routine p_liq_user_surf */
 
 /****************************************************************************/
+
+/****************************************************************************/
+
+void 
+lubp_liq_sat (double *func, 
+	      double d_func[],
+	      const double u_bc[],
+	      const double delta_t,
+	      const double time)
+/******************************************************************************
+*
+*  Function which sets liquid phase pressure over a sideset
+*
+******************************************************************************/
+{
+  double Pc, Pg, set_saturation;
+  int var;
+ /*
+  int j_id;
+ 
+  double phi_j;
+  */
+  
+/* Comment this out FIRST!!!!! */
+//   EH(-1,"No SH_LUBP_SAT_BC model implemented"); 
+
+/*  Example.....
+  if(time < u_bc[2])
+    {
+      *func = fv->p_liq  - u_bc[0] + (u_bc[0] - u_bc[1])*time/u_bc[2];
+     d_func[POR_LIQ_PRES] = 1.;
+    }
+  else
+    {
+      *func = fv->p_liq  - u_bc[1];
+      d_func[POR_LIQ_PRES] = 1.;
+    }
+*/
+
+/* Add your function and sensitivities here */
+  set_saturation = u_bc[0];
+  Pg = fv->lubp_gas ;
+
+  Pc = two_phase_lubrication_Pc_f_of_S( set_saturation, delta_t, time);
+  *func = Pg  - fv->lubp_liq - Pc;
+  //for (var = 0; var < MAX_VARIABLE_TYPES + MAX_CONC; var++) {
+  d_func[0] = 1.;
+  d_func[1] = 1.;
+    //}
+  return;
+} /* END of routine lubp_liq_sat */
+
+/****************************************************************************/
+
 
 void 
 shell_p_open_user_surf (double *func, 

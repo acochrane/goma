@@ -11354,7 +11354,7 @@ assemble_porous_shell_two_phase(
   // Load liquid material properties
   dbl mu_l = mp->viscosity;                         // Viscosity
   /************************************************************************************************************************/
-  dbl mu_g = 1;                                     // Must incorperate this into material file
+  dbl mu_g = 0.0186;                                     // Must incorperate this into material file
   /************************************************************************************************************************/
 
   //  dbl rho = mp->density;                          // Density unused, remove?
