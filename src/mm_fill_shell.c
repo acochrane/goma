@@ -14182,4 +14182,487 @@ assemble_lubrication_power_law( double time,    /* present time value */
   return(status);
 } /* end of assemble_lubrication_power_law */
 
+/******************************************************************************
+ * assemble_shell_tfmp - Assembles the residual and Jacobian equations for a
+ *                      thin-film multi-phase (read: two-phase) flow
+ *                      
+ *
+ * Currently, the following equations are solved.  This is likely to change as
+ * different things are tested.  "Use the source, Luke".
+ *
+ *    0 = d/dt(rho*h) - div(h^3/12*rho/mu*grad(P))
+ *    0 = d/dt(Sh) + h*div(S*v)
+ *
+ * where rho = S*rho_l + (1-S)*rho_g
+ *        mu = S*mu_l + (1-S)*mu_g
+ *         h = height from height function model (to be coupled with mesh deflection later..)
+ *         P = fluid pressure
+ *         v = velocity = -(h^2/12/mu)*grad(P)
+ * Input
+ * =====
+ * time_value = The current time.
+ * theta      = The implicit-explicit time stepping parameter.
+ * delta_t    = The current step size.
+ * 
+ * Output
+ * ======
+ * (none)
+ * 
+ * Returns
+ * ======
+ * 0  = Success
+ * -1 = Failure
+ *
+ * Revision History
+ * ================
+ * 7 May 2002 - Patrick Notz - Creation.
+ * 5 November 2014 - Andrew Cochrane - worked into thin-film multiphase flow model
+
+ ******************************************************************************/
+/*
+ * This test function was set up by PKN. It is being retained
+ * for use as an example for creating new shell equations.
+ */
+
+int
+assemble_shell_tfmp(double time,   /* Time */
+		 double tt,        /* Time stepping parameter */
+		 double delta_t,      /* Time step size */
+		 double xi[DIM],      /* Local stu coordinates */
+                 const Exo_DB *exo)
+{
+  int i, j, k, peqn, var, pvar;
+  dbl phi_i, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
+  dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
+  dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
+  dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
+  dbl mass, diff, diff1, diff2; // Residual terms
+
+  int eqn = R_TFMP_MASS;
+
+  /* Material Properties (need to be merged into input mp sometime) */
+  double rho_l = 0.998;
+  double rho_g = 0.00118;
+  //double rho_g = 0.997;
+  double mu_l = 1;
+  double mu_g = 0.0186;
+  //double mu_g = 1/2;
+
+  //Artificial diffusion constant
+  double D;
+  D = .00001;
+
+/* Declare some neighbor structures */
+/*Sa  int el1 = ei->ielem;
+  int el2, nf, err;
+  int *n_dof = NULL;  Sa*/
+
+/* Unpack variables from structures for local convenience. */
+  double wt    = fv->wt;
+  double h3    = fv->h3;
+  double det_J = bf[eqn]->detJ; 
+  double dA = det_J * wt * h3;
+  dbl etm_mass_eqn, etm_diff_eqn;
+
+/* See if there is a friend for this element */
+/*Sa  nf = num_elem_friends[el1];
+  if (nf == 0) return 0; Sa*/
+
+/*
+ * Get neighbor element number.
+ * NOTE: For now, only one friend can be handled. If there is
+ *       more than one, the first one will be used. This 
+ *       will be fixed at a later date.
+ */
+/*Sa  el2 = elem_friends[el1][0];
+  if (nf != 1) WH(-1, "WARNING: Not set up for more than one element friend!");  Sa*/
+
+/*
+ * DOF counts will be needed to construct sensitivities of
+ * local shell equations to neighbor bulk element variables.
+ * Allocate this array to save them in.
+ */
+/*Sa  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int)); Sa*/
+
+/*
+ * This call will collect all field variable and basis function data
+ * for the neighbor element "el2" and populate the fv structure,
+ * then repopulate the local element structure. Thus, as long as
+ * no variable is defined on both blocks, all data from both
+ * elements will be available in the fv structure.
+ * For example, pressure in the neighbor element is accessed with fv->P.
+ * This is done to simplify the job of writing shell equations.
+ */
+/*Sa  err = load_neighbor_var_data(el1, el2, n_dof, dof_map, -1, xi, exo); Sa*/
+
+/* Setup Lubrication */
+  int *n_dof = NULL;
+  int dof_map[MDE];
+  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+
+  dbl grad_P[DIM], gradII_P[DIM], grad_S[DIM], gradII_S[DIM];
+  for (k = 0; k<DIM; k++) {
+    grad_P[k] = fv->grad_tfmp_pres[k];
+    grad_S[k] = fv->grad_tfmp_sat[k];
+  }
+  Inn(grad_P, gradII_P);
+  Inn(grad_S, gradII_S);
+
+  double S = fv->tfmp_sat;
+
+  double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu, beta_rho, beta_mu;
+
+  a_rho = (rho_l+rho_g)/2;
+  b_rho = (rho_l-rho_g);
+  beta_rho =  b_rho/100;
+  c_rho = atanh((rho_g + beta_rho - a_rho)/b_rho);
+  d_rho = atanh((rho_l - beta_rho - a_rho)/b_rho) - c_rho;
+
+  a_mu = (mu_l+mu_g)/2;
+  b_mu = (mu_l-mu_g);
+  beta_mu =  b_mu/100;
+  c_mu = atanh((mu_g + beta_rho - a_mu)/b_mu);
+  d_mu = atanh((mu_l - beta_rho - a_mu)/b_mu) - c_mu;
+
+  double rho = a_rho + b_rho*tanh(c_rho+d_rho*S);
+  double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
+  //double S_cap = fv->tfmp_sat;
+  double drho_dS, dmu_dS;
+  drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+  dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+  /* if (S_cap < 0 ) {
+    S_cap = 0;
+    drho_dS = 0;
+    dmu_dS = 0;
+  } else {
+    drho_dS = rho_l - rho_g;
+    dmu_dS = mu_l - mu_g;
+  }
+  if (S_cap > 1 ) {
+    S_cap = 1;
+    drho_dS = 0;
+    dmu_dS = 0;
+  } else {
+    drho_dS = rho_l - rho_g;
+    dmu_dS = mu_l - mu_g;
+    }*/
+  //  double rho = S_cap*rho_l + (1-S_cap)*rho_g;
+  //  double mu = S_cap*mu_l + (1-S_cap)*mu_g;
+
+
+/* Use the height_function_model */
+  double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+  h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
+
+  double dh_dtime = dH_U_dtime - dH_L_dtime;
+  /* Need gradII_(Sh) */
+  double gradII_Sh[DIM], gradII_h[DIM];
+  for (k=0; k<DIM; k++) {
+    gradII_h[k] = dH_U_dX[k] - dH_L_dX[k];
+    gradII_Sh[k] = S*gradII_h[k] + h*gradII_S[k];
+  }
+  
+  /* Old grad_P, h, and mu 
+  // old h need old time and old delta_t
+  double time_old = fv_old->time;
+  double delta_t_old = fv_old->delta_t;
+  double h_old = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time_old, delta_t_old);
+  // old grad_P
+  double grad_P_old[DIM], gradII_P_old[DIM];
+  for (k = 0; k<DIM; k++) {
+    grad_P_old[k] = fv_old->grad_tfmp_pres[k];
+  }
+  Inn(grad_P_old, gradII_P_old);
+  // old S
+  double S_old = fv_old->tfmp_sat;
+  if (S_old < 0) S_old = 0;
+  if (S_old > 1) S_old = 1;
+  // old mu
+  double mu_old = S_old*mu_l + (1-S_old)*mu_g;
+  // old v
+  double v_old[DIM];
+  for (k = 0; k<DIM; k++) {
+    v_old[k] = - h_old*h_old/12/mu_old*gradII_P_old[k];
+  }*/
+  /*
+  if (ei->ielem == 1151 || ei->ielem == 1150 || ei->ielem == 1168 || ei->ielem == 1167) {
+    dbl arg = 0;
+  }
+  */
+  if ( af->Assemble_Residual ) {
+    /* Assemble the residual mass equation */
+    eqn = R_TFMP_MASS;
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    /* Loop over DOF (i) */   
+    for(i = 0; i < ei->dof[eqn]; i++) {
+      ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+      /* Assemble mass term */
+      mass = 0;
+      if( T_MASS ) {
+	mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	mass *= dA * etm_mass_eqn;
+      }
+      /* Assemble diffussion term */
+      diff = 0;
+      if( T_DIFFUSION ) {
+	for ( k = 0; k<DIM; k++) {
+	  diff += gradII_P[k]*gradII_phi_i[k];
+	}
+	diff *= h*h*h/12*rho/mu;
+	diff *= dA * etm_diff_eqn;
+      }      
+      lec->R[peqn][i] += mass + diff;
+    }
+
+    /* Assemble the residual boundary equation */
+    eqn = R_TFMP_BOUND;
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    /* Loop over DOF (i) */
+    for(i = 0; i < ei->dof[eqn]; i++) {
+      ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+      /* Assemble mass term */
+      mass = 0;
+      if( T_MASS ) {
+	mass += phi_i*(h*fv_dot->tfmp_sat + S*dh_dtime);
+	mass *= dA * etm_mass_eqn;
+      }
+      /* Assemble diffussion term */
+      diff = 0;
+      double diff1 = 0;
+      if( T_DIFFUSION ) {
+	for ( k = 0; k<DIM; k++) {
+	  diff += gradII_P[k]*gradII_S[k];
+	  diff1 += gradII_S[k]*gradII_phi_i[k];
+	}
+	diff1 *= D;
+
+	diff *= -phi_i*h*h*h/12/mu;
+	
+	diff += diff1;
+
+	diff *= dA * etm_diff_eqn;
+
+      }      
+      lec->R[peqn][i] += mass + diff;
+    }
+  }
+
+
+  /* Assemble sensitivities of R_TFMP_MASS */
+  eqn = R_TFMP_MASS;
+  if (af->Assemble_Jacobian) {
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) { /* The sensitivites of R_TFMP_MASS to TFMP_PRES and TFMP_SAT */
+      // Load basis functions
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      // Assemble sensitivities for TFMP_PRES
+      var = TFMP_PRES;
+      if (pd->v[var]) {
+	pvar = upd->vp[var];
+	// Loop over DOF (j)
+	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+
+	  mass *= dA * etm_mass_eqn;
+	  // Assemble diffusion term
+	  diff = 0.0;
+
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff += gradII_phi_j[k]*gradII_phi_i[k];
+	    }
+	  }
+	  diff *= h*h*h/12*rho/mu;
+	  diff *= dA * etm_diff_eqn;
+
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+
+	} // End of loop over DOF (j)
+
+      }// End of R_TFMP_MASS sensitivities to TFMP_PRES
+      // Assemble sensitivities for TFMP_SAT
+      var = TFMP_SAT;
+      if (pd->v[var]) {
+	pvar = upd->vp[var];
+	// Loop over DOF (j)
+	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+	  
+	  if( T_MASS ) {
+	    mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+	  }
+	  mass *= dA * etm_mass_eqn;
+	  // Assemble diffusion term
+	  diff = 0.0;
+
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff += gradII_P[k]*gradII_phi_i[k];
+	    }
+	  }
+	  diff *= h*h*h/12;
+	  diff *= phi_j/mu*((drho_dS)-rho/mu*(dmu_dS));
+	  diff *= dA * etm_diff_eqn;
+
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+
+	} // End of loop over DOF (j)
+      }// End of R_TFMP_MASS sensitivities to TFMP_SAT
+    } // End of loop over DOF (i)
+  } // End of Sensitivites of R_TFMP_MASS
+  /* Assemble sensitivities of R_TFMP_BOUND */
+  eqn = R_TFMP_BOUND;
+  if (af->Assemble_Jacobian) {
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) { /* The sensitivites of R_TFMP_BOUND to TFMP_PRES and TFMP_SAT */
+      // Load basis functions
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      // Assemble sensitivities for TFMP_PRES
+      var = TFMP_PRES;
+      if (pd->v[var]) {
+	pvar = upd->vp[var];
+	// Loop over DOF (j)
+	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+
+	  mass *= dA * etm_mass_eqn;
+	  // Assemble diffusion term
+	  diff = 0.0;
+
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff += gradII_phi_j[k]*gradII_S[k];
+	      //if (k == 2) diff += gradII_phi_j[k];
+	    }
+	  }
+	  //diff *= -h*h*h*phi_i/12/mu;
+	  diff *= -phi_i*h*h*h/12/mu;
+	  //diff = 0;
+	  diff *= dA * etm_diff_eqn;
+
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+
+	} // End of loop over DOF (j)
+      
+      }// End of R_TFMP_BOUND sensitivities to TFMP_PRES
+      // Assemble sensitivities for TFMP_SAT
+      var = TFMP_SAT;
+      if (pd->v[var]) {
+	pvar = upd->vp[var];
+	// Loop over DOF (j)
+	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+	  if( T_MASS ) {
+	    mass = phi_i*phi_j*(h*(1+2*tt)/delta_t + dh_dtime);
+	  }
+	  mass *= dA * etm_mass_eqn;
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  diff1 = 0.0;
+	  diff2 = 0.0;
+	  double diff3 = 0.0;
+
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff1 += gradII_P[k]*gradII_phi_j[k];
+	      diff2 += gradII_P[k]*gradII_S[k];
+	      diff3 += gradII_phi_i[k]*gradII_phi_j[k];
+	    }
+	  }
+	  diff += -(phi_i * h*h*h)/(12 * mu)*(diff1 - phi_j/mu*(dmu_dS)*diff2);
+	  diff3 *= D;
+	  diff += diff3;
+	  diff *= dA * etm_diff_eqn;
+
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += mass + diff;
+
+	} // End of loop over DOF (j)
+      }// End of R_TFMP_BOUND sensitivities to TFMP_SAT
+    } // End of loop over DOF (i)
+  } // End of Sensitivites of R_TFMP_BOUND
+
+  safe_free((void *) n_dof);
+  return(0);
+
+/* Assemble the sensitivity equations */
+/*Sa  if ( af->Assemble_Jacobian )
+  {
+  peqn = upd->ep[eqn];
+  for(i = 0; i < ei->dof[eqn]; i++)
+  {
+	  
+  phi_i = bf[eqn]->phi[i];  Sa*/
+
+/* d_(SHELL_A)_d_A:  LOCAL sensitivity */
+/*Sa	  var = SHELL_A;
+  if ( pd->v[var] )
+  {
+  pvar = upd->vp[var];   Sa*/
+
+/* Here, the unknown is defined on the local element.
+ * So get the DOF count from ei->dof. */
+/*Sa	      for(j = 0; j < ei->dof[var]; j++) 
+  {
+  phi_j = bf[var]->phi[j];
+  jac = phi_j * phi_i * wt * det_J * h3;
+  lec->J[peqn][pvar][i][j] += jac;
+  }
+  }  Sa*/
+
+/* d_(SHELL_A)_d_V:  REMOTE senstivity */
+/* Here, the unknown is defined on the neighbor element. */
+/*Sa	  var = VOLTAGE;
+  if ( n_dof[var] > 0)  Sa*/ /* NOTE: Cannot use pd->v here! */
+/*Sa	    {
+  pvar = upd->vp[var];   Sa*/
+
+/* Here, the unknown is defined on the remote element.
+ * So get the DOF count from n_dof. */
+/*Sa	      for(j = 0; j < n_dof[var]; j++) 
+  {
+  phi_j = bf[var]->phi[j];
+  jac = -2.0 * phi_j * phi_i * wt * det_J * h3;
+  lec->J[peqn][pvar][i][j] += jac;
+  }
+  }
+  }
+  } Sa*/
+
+/* Clean up */
+/*Sa  safe_free((void *) n_dof);
+
+  return(0);Sa*/
+} 
+/* End of assemble_shell_tfmp() */
+
 /* End of mm_fill_shell.c */

@@ -529,6 +529,8 @@ struct Element_Variable_Pointers
   dbl *max_strain[MDE];                       /* Maximum Von Mises strain */
   dbl *cur_strain[MDE];                       /* Von Mises strain */
   dbl *poynt[DIM][MDE];				/* Poynting Vector for light intensity */
+  dbl *tfmp_pres[MDE];                    /* thin-film multi-phase lubrication pressure */
+  dbl *tfmp_sat[MDE];                  /* thin-film multi-phase saturation */
 };
 
 /*___________________________________________________________________________*/
@@ -632,7 +634,8 @@ struct Element_Stiffness_Pointers
   dbl **max_strain;              /* max_strain[MDE], maximum Von Mises strain */
   dbl **cur_strain;              /* cur_strain[MDE], Von Mises strain */
   dbl ***poynt;		      	 /* *v[DIM][MDE], velocity */
-
+  dbl **tfmp_pres;                    /* thin-film multi-phase lubrication pressure */
+  dbl **tfmp_sat;                  /* thin-film multi-phase saturation */
 
   /*
    * These are for debugging purposes...
@@ -1575,6 +1578,10 @@ struct Field_Variables
   dbl max_strain;              /* Maximum Von Mises strain */
   dbl cur_strain;              /* Von Mises strain */
   dbl poynt[DIM];			/* Poynting Vector */
+  dbl tfmp_pres;                    /* thin-film multi-phase lubrication pressure */
+  dbl tfmp_sat;                  /* thin-film multi-phase saturation */
+
+
   /*
    * Grads of scalars...
    */
@@ -1610,6 +1617,8 @@ struct Field_Variables
   dbl grad_sh_l_curv_2[DIM];  /* Gradient of shell curvature_2 */
   dbl grad_sh_p_open[DIM];    /* Gradient of open porous shell pressure */
   dbl grad_sh_p_open_2[DIM];  /* Gradient of open porous shell pressure */
+  dbl grad_tfmp_pres[DIM];   /* Gradient of the thin-film multi-phase lubrication pressure */
+  dbl grad_tfmp_sat[DIM];   /* Gradient of the thin-film multi-phase lubrication saturation */
 
   /*
    * Grads of vectors...
@@ -1898,7 +1907,8 @@ struct Diet_Field_Variables
   dbl max_strain;              /* Maximum Von Mises strain */
   dbl cur_strain;              /* Von Mises strain */
   dbl poynt[DIM];			/* Poynting Vector */
-
+  dbl tfmp_pres;           /* thin-film multi-phase lubrication pressure */
+  dbl tfmp_sat;         /* thin-film multi-phase saturation */
   /*  
    * Grads of scalars... concentration is the only one we need in the
    * old form for VOF/Taylor-Galerkin stuff.
@@ -1913,6 +1923,9 @@ struct Diet_Field_Variables
   dbl grad_d[DIM][DIM];	        /* Gradient of mesh displacement. */
   dbl grad_d_rs[DIM][DIM];	/* Gradient of solid displacement. */
   
+  dbl grad_tfmp_pres[DIM];       /* Gradient of the thin-film multi-phase lubrication pressure */
+  dbl grad_tfmp_sat[DIM];       /* Gradient of the thin-film multi-phase lubrication saturation */
+
   /* Material tensors used at old time values */
   dbl strain[DIM][DIM];         /* Strain tensor */
   dbl volume_change;            /* Volume change */

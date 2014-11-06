@@ -1934,6 +1934,15 @@ matrix_fill(
 #endif
         }
 
+      if(pde[R_TFMP_MASS] ||pde[R_TFMP_BOUND])
+	{
+	  err = assemble_shell_tfmp( time_value, theta, delta_t, xi, exo );
+	  EH( err, "assemble_shell_tfmp");
+#ifdef CHECK_FINITE
+	  CHECKFINITE("assemble_shell_tfmp");
+#endif
+	}
+
       if( pde[R_MOMENTUM1] )
 	{
           err = assemble_momentum(time_value, theta, delta_t, h_elem_avg, &pg_data, xi, exo);
@@ -2095,7 +2104,7 @@ matrix_fill(
 	  CHECKFINITE("assemble_volume_lagrange_multiplier");
 #endif
 	}
-      
+
       /******************************************************************************/
     }
   /* END  for (ip = 0; ip < ip_total; ip++)                               */  

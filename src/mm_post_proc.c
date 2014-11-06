@@ -255,6 +255,9 @@ int PP_LAME_LAMBDA = -1;
 int VON_MISES_STRESS = -1;
 int VON_MISES_STRAIN = -1;
 int NON_VOLFRAC = -1;
+int TFMP_RHO = -1;
+int TFMP_MU = -1;
+int TFMP_RHO_MU = -1;
 
 int len_u_post_proc = 0;	/* size of dynamically allocated u_post_proc
 				 * actually is */
@@ -1470,7 +1473,46 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
       }
       local_lumped[NON_VOLFRAC] = 1.0;
   } /* end of NON_VOLFRAC*/
-
+  if ((TFMP_RHO != -1 || TFMP_MU != -1 || TFMP_RHO_MU != -1) && (pd->e[R_TFMP_MASS] || pd->e[R_TFMP_BOUND]) ) {
+    double rho_l = 0.998;
+    double rho_g = 0.00118;
+    //double rho_g = 0.998;
+    double mu_l = 1;
+    double mu_g = 0.0186;
+    //double mu_g = 0.01;
+    double S_cap = fv->tfmp_sat;
+    double drho_dS, dmu_dS;
+    if (S_cap < 0 ) {
+      S_cap = 0;
+      drho_dS = 0;
+      dmu_dS = 0;
+    } else {
+      drho_dS = rho_l - rho_g;
+      dmu_dS = mu_l - mu_g;
+    }
+    if (S_cap > 1 ) {
+      S_cap = 1;
+      drho_dS = 0;
+      dmu_dS = 0;
+    } else {
+      drho_dS = rho_l - rho_g;
+      dmu_dS = mu_l - mu_g;
+    }
+    double rho = S_cap*rho_l + (1-S_cap)*rho_g;
+    double mu = S_cap*mu_l + (1-S_cap)*mu_g;
+    if (TFMP_RHO != -1) {
+      local_post[TFMP_RHO] = rho;
+      local_lumped[TFMP_RHO] = 1;
+    }
+    if (TFMP_MU != -1) {
+      local_post[TFMP_MU] = mu;
+      local_lumped[TFMP_MU] = 1;
+    }
+    if (TFMP_RHO_MU != -1) {
+      local_post[TFMP_RHO_MU] = rho/mu;
+      local_lumped[TFMP_RHO_MU] = 1;
+    }
+  }
 
 /*  EXTERNAL tables	*/
    if (efv->ev) {
@@ -6196,6 +6238,10 @@ rd_post_process_specs(FILE *ifp,
  
   iread = look_for_post_proc(ifp, "Vorticity Vector", &CURL_V);
 
+  iread = look_for_post_proc(ifp, "TFMP_rho", &TFMP_RHO);
+  iread = look_for_post_proc(ifp, "TFMP_mu", &TFMP_MU);
+  iread = look_for_post_proc(ifp, "TFMP_rho_mu", &TFMP_RHO_MU);
+
   /* Report count of post-proc vars to be exported */
   /*
     fprintf(stderr, "Goma will export %d post-processing variables.\n", Num_Export_XP);
@@ -9443,6 +9489,49 @@ index_post, index_post_export);
     {
       VON_MISES_STRESS = -1;
     }
+
+  if (TFMP_RHO != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "RHO", "[1]", "Levered Density", FALSE);
+    index++;
+    if (TFMP_RHO == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_RHO = index_post;
+    index_post++;
+  } else {
+    TFMP_RHO = -1;
+  } 
+
+  if (TFMP_MU != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "MU", "[1]", "Levered Viscosity", FALSE);
+    index++;
+    if (TFMP_MU == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_MU = index_post;
+    index_post++;
+  } else {
+    TFMP_MU = -1;
+  } 
+
+  if (TFMP_RHO_MU != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "RHO_MU", "[1]", "Levered Density", FALSE);
+    index++;
+    if (TFMP_RHO_MU == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_RHO_MU = index_post;
+    index_post++;
+  } else {
+    TFMP_RHO_MU = -1;
+  } 
+
   
 /* Add external variables if they are present */
 

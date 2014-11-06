@@ -3629,6 +3629,14 @@ set_interaction_masks(Exo_DB *exo)
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
 	  break;
 
+	case R_TFMP_MASS:
+	case R_TFMP_BOUND:
+	  v = TFMP_PRES;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = TFMP_SAT;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  break;
+
 	case R_SPECIES_UNK_0:
 	case R_SPECIES_UNK_1:
 	case R_SPECIES_UNK_2:
