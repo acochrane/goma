@@ -8566,6 +8566,10 @@ rd_eq_specs(FILE *ifp,
       ce = set_eqn(R_PHASE5, pd_ptr);
    } else if (!strcasecmp(ts, "Enorm"))  {
       ce = set_eqn(R_ENORM, pd_ptr);
+   } else if (!strcasecmp(ts, "tfmp_mass"))  {
+      ce = set_eqn(R_TFMP_MASS, pd_ptr);
+   } else if (!strcasecmp(ts, "tfmp_bound"))  {
+      ce = set_eqn(R_TFMP_BOUND, pd_ptr);
 
     } else if (!strcasecmp(ts, "porous_sat"))  {
       ce = set_eqn(R_POR_LIQ_PRES, pd_ptr);
@@ -9160,6 +9164,11 @@ rd_eq_specs(FILE *ifp,
     } else if (!strcasecmp(ts, "ENORM")) {
       cv = set_var(ENORM, pd_ptr);
 
+    } else if (!strcasecmp(ts, "TFMP_PRES")) {
+      cv = set_var(TFMP_PRES, pd_ptr);
+    } else if (!strcasecmp(ts, "TFMP_SAT")) {
+      cv = set_var(TFMP_SAT, pd_ptr);
+
     } else if (!strncasecmp(ts, "Sp", 2)) {
       if (!strcasecmp(ts, "Sp")) {
 	cv = SPECIES_UNK_0;
@@ -9555,7 +9564,7 @@ rd_eq_specs(FILE *ifp,
       SPF( endofstring(echo_string),"\t %.4g %.4g", pd_ptr->etm[ce][(LOG2_MASS)],
 	   pd_ptr->etm[ce][(LOG2_SOURCE)]);    
       break;
-      
+
       /* 
        * Three terms.... 
        */
@@ -9656,7 +9665,24 @@ rd_eq_specs(FILE *ifp,
                                                          pd_ptr->etm[ce][(LOG2_DIFFUSION)],
 	                                                 pd_ptr->etm[ce][(LOG2_SOURCE)]);
         break;
-	  
+
+    case R_TFMP_MASS:
+    case R_TFMP_BOUND:
+    	if ( fscanf(ifp, "%lf %lf %lf",
+		  &(pd_ptr->etm[ce][(LOG2_MASS)]),
+		  &(pd_ptr->etm[ce][(LOG2_ADVECTION)]),
+		  &(pd_ptr->etm[ce][(LOG2_DIFFUSION)]))
+	      != 3 )
+    	{
+    	  sr = sprintf(err_msg,
+                       "Provide 3 equation term multipliers (mass,adv,dif) on %s in %s",
+					   EQ_Name[ce].name1, pd_ptr->MaterialName);
+    	  EH(-1, err_msg);
+    	}
+    	SPF( endofstring(echo_string),"\t %.4g %.4g %.4g", pd_ptr->etm[ce][(LOG2_MASS)],
+    		  	  	  	  	   	   	   	   	   	   	   	   pd_ptr->etm[ce][(LOG2_ADVECTION)],
+														   pd_ptr->etm[ce][(LOG2_DIFFUSION)]);
+      break;
       /* 
        * Four terms.... 
        */

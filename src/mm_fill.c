@@ -105,7 +105,7 @@ static void zero_lec(void);
  *
  *
  *  Construct the Jacobian and Residual. This is a wrapper around the
- *  element level fill routine, matrix_fill().
+*  element level fill routine, matrix_fill().
  *
  * Return:
  *  -1 : A negative element volume was encountered somewhere in the
@@ -722,6 +722,9 @@ matrix_fill(
   memset( pg_data.dhv_dxnode, 0, sizeof(double)*MDE*DIM);
   memset( pg_data.v_avg,      0, sizeof(double)*DIM);
   memset( pg_data.dv_dnode,   0, sizeof(double)*MDE*DIM);
+  memset( pg_data.vII,        0, sizeof(double)*DIM);
+  memset( pg_data.dwt_func_dvarj,   0, sizeof(double)*5);
+
   pg_data.mu_avg = 0.;
   pg_data.rho_avg = 0.;
 
@@ -798,8 +801,13 @@ matrix_fill(
        (pde[R_MOMENTUM1] || pde[R_MESH1])) ||
       (mp->Ewt_funcModel == SUPG && pde[R_SHELL_ENERGY] &&
        (pde[R_LUBP] ))) {
-    h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
-    element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
+	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+  }
+  if (mp->tfmp_wt_model != GALERKIN) {
+	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
+	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+	tfmp_PG_elem(&pg_data);
   }
   
   if (cr->MassFluxModel == HYDRODYNAMIC)
@@ -2053,6 +2061,15 @@ matrix_fill(
 
       	}
 
+      if(pde[R_TFMP_MASS] ||pde[R_TFMP_BOUND])
+	{
+	  err = assemble_shell_tfmp( time_value, theta, delta_t, xi, &pg_data, exo );
+	  EH( err, "assemble_shell_tfmp");
+#ifdef CHECK_FINITE
+	  CHECKFINITE("assemble_shell_tfmp");
+#endif
+	}
+
       if( pde[R_MOMENTUM1] )
 	{
           err = assemble_momentum(time_value, theta, delta_t, h_elem_avg, &pg_data, xi, exo);
@@ -2227,7 +2244,7 @@ matrix_fill(
 	  if (err) return -1;
 #endif
 	}
-      
+
       /******************************************************************************/
     }
   /* END  for (ip = 0; ip < ip_total; ip++)                               */  

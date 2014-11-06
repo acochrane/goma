@@ -1534,6 +1534,11 @@ set_interaction_masks(Exo_DB *exo)
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
 	  v = SHELL_FILMH;
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+
+	  v = TFMP_PRES;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = TFMP_SAT;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           break;
 	  
 	case R_PMOMENTUM1:
@@ -2915,6 +2920,8 @@ set_interaction_masks(Exo_DB *exo)
           if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           v = FILL;
           if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+          v = TFMP_SAT;
+          if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           break;
 
 	case R_SHELL_LUB_CURV_2:
@@ -3697,6 +3704,20 @@ set_interaction_masks(Exo_DB *exo)
           v = POR_SINK_MASS;
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           v = LS;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  break;
+
+	case R_TFMP_MASS:
+	case R_TFMP_BOUND:
+	  v = TFMP_PRES;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = TFMP_SAT;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = VELOCITY1;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = VELOCITY2;
+	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+	  v = VELOCITY3;
 	  if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
 	  break;
 

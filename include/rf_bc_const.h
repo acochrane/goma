@@ -791,6 +791,7 @@
 #define SH_S11_WEAK_BC      970000016
 #define SH_S22_WEAK_BC      970000017
 
+
 /* Shell variables that are not structural shells */
 #define SH_GAMMA1_BC            980000001
 #define SH_GAMMA1_DERIV_SYMM_BC 980000002
@@ -981,6 +982,9 @@
 #define LUB_PRESS_2_BC  777000022
 #define SHELL_OPEN_PRESS_2_BC 777000023
 #define LUB_STATIC_BC 777000024
+
+#define SHELL_TFMP_PRES_BC    777000030
+#define SHELL_TFMP_SAT_BC    777000031
 
 
 /* Vectors used for rotations */

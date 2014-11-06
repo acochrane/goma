@@ -179,6 +179,41 @@ PROTO((
        int *dof_map         // Map of DOFs
        ));
 
+EXTERN void tfmp_PG_elem // compute pg_data once per element
+PROTO((
+       PG_DATA *pg_data
+       ));
+EXTERN void tfmp_PG_gausspt // compute pg_data once per gausspt (per element)
+PROTO((
+       PG_DATA *pg_data
+       ));
+EXTERN void tfmp_PG_dof // compute pg_data needed at each dof (wt_func)
+PROTO((
+       double *phi_i,
+       double gradII_phi_i[DIM],
+       PG_DATA *pg_data
+       ));
+EXTERN void tfmp_PG_dvarj // compute sensitivities of wt_func
+PROTO((
+       double *phi_i,
+       double gradII_phi_i[DIM],
+       double *phi_j,
+       PG_DATA *pg_data,
+       int var
+       ));
+EXTERN void tfmp_rho
+PROTO((
+       const double S,
+       double *rho,
+       double *drho_dS
+       ));
+EXTERN void tfmp_mu
+PROTO((
+       const double S,
+       double *mu,
+       double *dmu_dS
+       ));
+
 EXTERN double shell_saturation_pressure_curve
 PROTO((
        double P,

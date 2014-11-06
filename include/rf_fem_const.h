@@ -62,6 +62,7 @@
 /* Viscoelastic Constitutive equation weight functions */
 #define GALERKIN        1
 #define SUPG            2
+#define SUPG_SCHUNK     3 
 
 /* Viscoelastic Constitutive equation formulation */
 #define EVSS_G          1  /* Rajagopalan's formulation */
@@ -439,6 +440,8 @@
 #define LIGHT_INTP            182 /*  Light Intensity - Plus direction propagation-RBS*/
 #define LIGHT_INTM            183 /*  Light Intensity - Minus direction propagation-RBS*/
 #define LIGHT_INTD            184 /*  Light Intensity - Scattering Dispersion-RBS*/
+#define TFMP_PRES             185 /*  Thin-Film Multi-Phase Lubrication Pressure */
+#define TFMP_SAT              186 /*  Thin-Film Multi-Phase Saturation */
 /*
  * define a variable to hold an external field which will be 
  * held fixed in the problem but parametered by the basis functions
@@ -796,7 +799,9 @@
 #define R_LIGHT_INTP            182 /*  Light Intensity - Plus direction propagation*/
 #define R_LIGHT_INTM            183 /*  Light Intensity - Minus direction propagation*/
 #define R_LIGHT_INTD            184 /*  Light Intensity - Scattering Dispersion*/
-#define V_LAST		        185
+#define R_TFMP_MASS             185 /*  Thin-Film Multi-Phase Mass Equation */
+#define R_TFMP_BOUND            186 /*  Thin-Film Multi-Phase Boundary Motion Equation */
+#define V_LAST		        187
 
 
 /* MMH

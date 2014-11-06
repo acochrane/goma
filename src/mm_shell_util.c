@@ -4330,8 +4330,7 @@ calculate_lub_q_v (
       fv->wt = wt_old;
       safe_free((void *) n_dof);
       
-    }
-  
+    }   /* End of Film flow - Newtonian   */
   
   /* Film flow - Newtonian */
   else if (EQN == R_SHELL_FILMP)
@@ -4601,6 +4600,125 @@ calculate_lub_q_v (
       
     }
   
+  /* thin film multiphase flow - Reynolds [R_TFMP_BOUND] */
+  else if (pd->e[EQN] && EQN == R_TFMP_BOUND ) {
+      
+    /******* PRECALCULATE ALL NECESSARY COMPONENTS ***********/
+
+    /* Load the pressure gradient */
+
+    dbl grad_P[DIM], gradII_P[DIM];
+    for (k = 0; k<DIM; k++) {
+      grad_P[k] = fv->grad_tfmp_pres[k];
+    }
+    Inn(grad_P, gradII_P);
+
+    /* Load Saturation and gradient*/
+    double S = fv->tfmp_sat;
+    double grad_S[DIM], gradII_S[DIM];
+    for (k = 0; k<DIM; k++) {
+    	grad_S[k] = fv->grad_tfmp_sat[k];
+    }
+    Inn(grad_S, gradII_S);
+
+    /* Load viscosity */
+    double mu, dmu_dS;
+    tfmp_mu(S, &mu, &dmu_dS); 
+    // Load Surface Tension
+    double surface_tension;
+    surface_tension = mp->surface_tension;
+      
+    /***** CALCULATE HEIGHT, SLOPES, AND SENSITIVITIES *****/
+    
+    dbl GRADH[DIM];
+    dbl D_GRADH_DH[DIM][MDE];
+    memset(GRADH,       0.0, sizeof(double)*DIM);
+    memset(D_GRADH_DH,  0.0, sizeof(double)*DIM);
+    
+    /* Extract film thickness */
+    //H = fv->sh_fh;
+
+    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+    h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, dt);
+
+    double dh_dtime = dH_U_dtime - dH_L_dtime;
+    /* Need gradII_(Sh) */
+    /*
+    double grad_h[DIM], gradII_h[DIM];
+    for (k=0; k<DIM; k++) {
+      grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+    }
+      */
+
+
+    /* Perfrom I - nn gradient */
+    //Inn(grad_h, gradII_h);
+
+    // Load kappaII and create curvature variable, kappa
+    dbl kappaII, kappa;
+    kappaII = fv->sh_l_curv;
+    kappa = 2.0/h + kappaII;
+
+      /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
+      
+    memset(v_avg, 0.0, sizeof(double)*DIM);
+    for (i = 0; i< DIM; i++) {
+      v_avg[i] += -(h*h/12./mu)*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa);
+    }
+      
+    /*Evaluate average velocity sensitivity w.r.t. pressure */
+    dbl dv_dP[DIM][MDE];
+    memset(dv_dP, 0.0, sizeof(double)*DIM*MDE);
+      
+    for (i = 0; i < DIM; i++) {
+      for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
+      	dv_dP[i][j] += (-h*h/12./mu);
+      }
+    }
+
+    /*Evaluate average velocity sensitivity w.r.t. saturation */
+    dbl dv_dS1[DIM][MDE], dv_dS2[DIM][MDE];
+    memset(dv_dS1, 0.0, sizeof(double)*DIM*MDE);
+    memset(dv_dS2, 0.0, sizeof(double)*DIM*MDE);
+    for (i = 0; i < DIM; i++) {
+      for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
+      	dv_dS1[i][j] += (h*h/12./mu)*(-dmu_dS/mu*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa) + 2.*surface_tension*gradII_S[i]*kappa);
+      	dv_dS2[i][j] += (h*h/12./mu)*(2.*surface_tension*S*kappa);
+      }
+    }
+
+    /*Evaluate average velocity sensitivity w.r.t. curvature */
+    dbl dv_dk[DIM][MDE];
+    memset(dv_dk, 0.0, sizeof(double)*DIM*MDE);
+    if (pd->e[R_SHELL_LUB_CURV]) {
+    	for (i = 0; i < DIM; i++) {
+    		for (j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
+    			dv_dk[i][j] += -(h*h/12./mu)*(1.*surface_tension*S*gradII_S[i]);
+    		}
+    	}
+    }
+    /******* STORE THE INFORMATION TO LUBRICATION AUXILIARIES STRUCTURE ***********/
+      
+    for (i = 0; i < DIM; i++) {
+      LubAux->v_avg[i] = v_avg[i];
+      
+      for ( j = 0; j < ei->dof[TFMP_PRES]; j++) {
+      	LubAux->dv_avg_dp1[i][j] = dv_dP[i][j];
+      }
+      
+      for ( j = 0; j < ei->dof[TFMP_SAT]; j++) {
+      	LubAux->dv_avg_dS1[i][j] = dv_dS1[i][j];
+      	LubAux->dv_avg_dS2[i][j] = dv_dS2[i][j];
+      }
+      for ( j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
+      	LubAux->dv_avg_dk[i][j] = dv_dk[i][j];
+      }
+    }
+  }
+  
+
   
   return;
   
@@ -5101,6 +5219,174 @@ ShellBF (
 
   return;
 }  /*** END OF ShellBF ***/
+
+void
+tfmp_PG_elem(PG_DATA *pg_data) {
+  int k;
+  // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
+  pg_data->k = 0.0;
+  for (k=0; k<DIM; k++) {
+    pg_data->h[k] = sqrt(pg_data->hsquared[k]);
+    pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
+  }
+  pg_data->k *= 0.5;
+  return;
+}
+
+void
+tfmp_PG_gausspt(PG_DATA *pg_data) {
+  int k;
+  // every gauss point we need vII, v_mag_sq
+  // Inn is expensive so perform once in assemble then set pg_data->vII in assemble
+  // before calling this function in 
+  pg_data->v_mag_squared = 0.0;
+  for (k=0; k<DIM; k++) {
+    pg_data->v_mag_squared += pg_data->vII[k]*pg_data->vII[k];
+  }
+  return;
+}
+
+void
+tfmp_PG_dof (double *phi_i,
+	     double gradII_phi_i[DIM],
+	     PG_DATA *pg_data) {
+  // compute Petrov-Galerkin weighting functions
+  int k;
+  switch (mp->tfmp_wt_model) {
+  case GALERKIN:
+    pg_data->wt_func = *phi_i;
+    break;
+ 
+  case SUPG: // 1982 Alexander Brooks and Thomas Hughes
+    pg_data->vII_dot_gradII_phi_i = 0.0; 
+
+    for (k=0; k<DIM; k++) {
+      pg_data->vII_dot_gradII_phi_i += pg_data->vII[k]*gradII_phi_i[k];
+    }
+    
+    pg_data->wt_func = *phi_i;
+    if (pg_data->v_mag_squared != 0.0) pg_data->wt_func += (mp->tfmp_wt_const
+							     *(pg_data->k)
+							     *(pg_data->vII_dot_gradII_phi_i)
+							     /(pg_data->v_mag_squared));
+  
+    break;
+  case SUPG_SCHUNK: // Randy's SUPG from shell energy eqn
+    
+    break;
+  }
+  return;
+}
+
+void
+tfmp_PG_dvarj(double *phi_i,
+	      double gradII_phi_i[DIM],
+	      double *phi_j,
+	      PG_DATA *pg_data,
+	      int var){
+  // var indicates which variable to set dvarj to: 0:vx, 1:vy, 2:vz, 3:tfmp_pres, 4:temp_sat
+  double dv_cent_dv;
+    if (pd->i[VELOCITY1]==I_Q1) {
+      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+    } else if (pd->i[VELOCITY1]==I_Q2) {
+      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+    }
+    else {
+      EH(-1, "We only know how to use Q1 weighting functions so far");
+      dv_cent_dv = 1.0/4.0;
+    }
+
+  switch (mp->tfmp_wt_model) {
+  case GALERKIN:
+    pg_data->dwt_func_dvarj[var] = 0.0;
+    break;
+  case SUPG:
+    // velocities
+    if (var < 3 && pg_data->v_mag_squared != 0.0) {
+      pg_data->dwt_func_dvarj[var] = (pg_data->k
+				      *( pg_data->vII_dot_gradII_phi_i
+					 *(-2.0*pg_data->vII[var]*(*phi_j)
+					   /pg_data->v_mag_squared
+					   /pg_data->v_mag_squared) 
+					 + (gradII_phi_i[var]
+					    *(*phi_j)
+					    /pg_data->v_mag_squared)));
+      pg_data->dwt_func_dvarj[var] += (pg_data->vII_dot_gradII_phi_i
+				       /pg_data->v_mag_squared
+				       /2.0
+				       *dv_cent_dv
+				       *pg_data->h[var]);
+      pg_data->dwt_func_dvarj[var] *= mp->tfmp_wt_const;
+    }
+    else if (var > 2) {
+      pg_data->dwt_func_dvarj[var] = 0.0;
+    }
+    break;
+  }
+  return;
+}
+
+void
+tfmp_rho( const double S,
+	  double *rho,
+	  double *drho_dS) {
+  double a_rho, b_rho, c_rho, d_rho;
+  switch (mp->tfmp_density_model) {
+  case LEVER:
+    if (S < 0) {
+      (*rho) = mp->tfmp_density_const[0]; // rho_g
+      (*drho_dS) = 0.0;
+    } else if ( S > 1 ) {
+      (*rho) = mp->tfmp_density_const[1]; // rho_l
+      (*drho_dS) = 0.0;
+    } else {
+      (*rho) = mp->tfmp_density_const[0] + S*(mp->tfmp_density_const[1] - mp->tfmp_density_const[0]);
+      (*drho_dS) = mp->tfmp_density_const[1] - mp->tfmp_density_const[0];
+    }
+    break;
+  case TANH:
+
+    a_rho = mp->tfmp_density_const[0];
+    b_rho = mp->tfmp_density_const[1];
+    c_rho = mp->tfmp_density_const[2];
+    d_rho = mp->tfmp_density_const[3];
+
+    (*rho)     = a_rho + b_rho*tanh(c_rho+d_rho*S);
+    (*drho_dS) = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+    break;
+  }
+  return;
+}
+void
+tfmp_mu( const double S,
+	  double *mu,
+	  double *dmu_dS) {
+  double a_mu, b_mu, c_mu, d_mu;
+  switch (mp->tfmp_viscosity_model) {
+  case LEVER:
+    if (S < 0) {
+      (*mu) = mp->tfmp_viscosity_const[0]; // mu_g
+      (*dmu_dS) = 0.0;
+    } else if ( S > 1 ) {
+      (*mu) = mp->tfmp_viscosity_const[1]; // mu_l
+      (*dmu_dS) = 0.0;
+    } else {
+      (*mu) = mp->tfmp_viscosity_const[0] + S*(mp->tfmp_viscosity_const[1] - mp->tfmp_viscosity_const[0]);
+      (*dmu_dS) = mp->tfmp_viscosity_const[1] - mp->tfmp_viscosity_const[0];
+    }
+    break;
+  case TANH:
+    a_mu = mp->tfmp_viscosity_const[0];
+    b_mu = mp->tfmp_viscosity_const[1];
+    c_mu = mp->tfmp_viscosity_const[2];
+    d_mu = mp->tfmp_viscosity_const[3];
+
+    (*mu)     = a_mu + b_mu*tanh(c_mu+d_mu*S);
+    (*dmu_dS) = b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+    break;
+  }
+  return;
+}
 
 void
 calculate_lub_q_v_nonnewtonian (
