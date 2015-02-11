@@ -1849,6 +1849,8 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->heat_capacity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->diffusivity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->saturation_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
+
       /*
        * Material property constants that are vectors over the concentration
        * index.
@@ -2885,6 +2887,11 @@ ark_landing()
       dalloc( m->len_u_light_absorption,
               m->    u_light_absorption);
 
+      dalloc( m->len_u_tfmp_const,
+              m->    u_tfmp_const);
+
+
+
       /*
        * User defined material property lists for each species...
        *     HKM -> Changed this to number of species, not
@@ -3244,6 +3251,9 @@ noahs_dove()
 
     crdv( m->len_u_light_absorption,
 	  m->    u_light_absorption);
+
+    crdv( m->len_u_tfmp_const,
+	  m->    u_tfmp_const);
 
     /*
      *  Add species names

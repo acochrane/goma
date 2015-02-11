@@ -975,6 +975,7 @@
 #define LUB_PRESS_2_BC  777000022
 #define SHELL_OPEN_PRESS_2_BC 777000023
 #define SHELL_TFMP_PRES_BC    777000030
+#define SHELL_TFMP_SAT_BC    777000031
 
 
 /* Vectors used for rotations */

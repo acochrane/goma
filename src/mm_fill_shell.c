@@ -14229,17 +14229,18 @@ assemble_shell_tfmp(double time,   /* Time */
 		 double tt,        /* Time stepping parameter */
 		 double delta_t,      /* Time step size */
 		 double xi[DIM],      /* Local stu coordinates */
+		 const PG_DATA *pg_data, /* Upwinding data struct */
                  const Exo_DB *exo)
 {
   int i, j, k, peqn, var, pvar;
-  dbl phi_i, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
+  dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
   dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
   dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
   dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
   dbl mass, diff, diff1, diff2; // Residual terms
 
   int eqn = R_TFMP_MASS;
-
+  dbl supg = 0;
   /* Material Properties (need to be merged into input mp sometime) */
   double rho_l = 0.998;
   double rho_g = 0.00118;
@@ -14248,10 +14249,15 @@ assemble_shell_tfmp(double time,   /* Time */
   double mu_g = 0.0186;
   //double mu_g = 1/2;
 
+  //debugging stuff
+  /*  if (ei->ielem == 287) {
+    dbl derp = 12;
+    }*/
+
   //Artificial diffusion constant
   double D;
-  D = .00001;
-
+  //D = .00001;
+  D = 0.0;
 /* Declare some neighbor structures */
 /*Sa  int el1 = ei->ielem;
   int el2, nf, err;
@@ -14311,19 +14317,16 @@ assemble_shell_tfmp(double time,   /* Time */
 
   double S = fv->tfmp_sat;
 
-  double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu, beta_rho, beta_mu;
+  double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
 
-  a_rho = (rho_l+rho_g)/2;
-  b_rho = (rho_l-rho_g);
-  beta_rho =  b_rho/100;
-  c_rho = atanh((rho_g + beta_rho - a_rho)/b_rho);
-  d_rho = atanh((rho_l - beta_rho - a_rho)/b_rho) - c_rho;
-
-  a_mu = (mu_l+mu_g)/2;
-  b_mu = (mu_l-mu_g);
-  beta_mu =  b_mu/100;
-  c_mu = atanh((mu_g + beta_rho - a_mu)/b_mu);
-  d_mu = atanh((mu_l - beta_rho - a_mu)/b_mu) - c_mu;
+  a_rho = mp->u_tfmp_const[0];
+  b_rho = mp->u_tfmp_const[1];
+  c_rho = mp->u_tfmp_const[2];
+  d_rho = mp->u_tfmp_const[3];
+  a_mu = mp->u_tfmp_const[4];
+  b_mu = mp->u_tfmp_const[5];
+  c_mu = mp->u_tfmp_const[6];
+  d_mu = mp->u_tfmp_const[7];
 
   double rho = a_rho + b_rho*tanh(c_rho+d_rho*S);
   double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
@@ -14365,34 +14368,36 @@ assemble_shell_tfmp(double time,   /* Time */
     gradII_Sh[k] = S*gradII_h[k] + h*gradII_S[k];
   }
   
-  /* Old grad_P, h, and mu 
-  // old h need old time and old delta_t
-  double time_old = fv_old->time;
-  double delta_t_old = fv_old->delta_t;
-  double h_old = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
-				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time_old, delta_t_old);
-  // old grad_P
-  double grad_P_old[DIM], gradII_P_old[DIM];
-  for (k = 0; k<DIM; k++) {
-    grad_P_old[k] = fv_old->grad_tfmp_pres[k];
+  double h_elem;
+  double h_elem_inv;
+  if (mp->Ewt_funcModel == GALERKIN) {
+    supg = 0;
+    h_elem = h_elem_inv = 0;
   }
-  Inn(grad_P_old, gradII_P_old);
-  // old S
-  double S_old = fv_old->tfmp_sat;
-  if (S_old < 0) S_old = 0;
-  if (S_old > 1) S_old = 1;
-  // old mu
-  double mu_old = S_old*mu_l + (1-S_old)*mu_g;
-  // old v
-  double v_old[DIM];
-  for (k = 0; k<DIM; k++) {
-    v_old[k] = - h_old*h_old/12/mu_old*gradII_P_old[k];
-  }*/
-  /*
-  if (ei->ielem == 1151 || ei->ielem == 1150 || ei->ielem == 1168 || ei->ielem == 1167) {
-    dbl arg = 0;
+  else if(mp->Ewt_funcModel == SUPG) {
+    if( !pd->e[R_MOMENTUM1]) 
+	EH(-1, " must have momentum equation velocity field for shell_tfmp upwinding");
+    
+    const double *v_cent = pg_data->v_avg;
+    const double *hsquared = pg_data->hsquared;
+    double hsq[DIM];
+    
+    h_elem = 0;
+    for ( k=0; k<DIM; k++ ) {
+      hsq[k] = hsquared[k];
+      if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
+    }
+    h_elem = sqrt(h_elem)/2;
+    supg = mp->Ewt_func;
+    if(h_elem == 0.) {
+      h_elem_inv=0.;
+    }
+    else {
+      h_elem_inv=1./h_elem;
+    }
   }
-  */
+  
+
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
     eqn = R_TFMP_MASS;
@@ -14408,7 +14413,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
 	mass *= dA * etm_mass_eqn;
       }
-      /* Assemble diffussion term */
+      /* Assemble diffusion term */
       diff = 0;
       if( T_DIFFUSION ) {
 	for ( k = 0; k<DIM; k++) {
@@ -14434,21 +14439,30 @@ assemble_shell_tfmp(double time,   /* Time */
 	mass += phi_i*(h*fv_dot->tfmp_sat + S*dh_dtime);
 	mass *= dA * etm_mass_eqn;
       }
-      /* Assemble diffussion term */
+      /* Assemble diffusion term */
       diff = 0;
       double diff1 = 0;
       if( T_DIFFUSION ) {
 	for ( k = 0; k<DIM; k++) {
 	  diff += gradII_P[k]*gradII_S[k];
-	  diff1 += gradII_S[k]*gradII_phi_i[k];
+	  //	  diff1 += gradII_S[k]*gradII_phi_i[k];
 	}
-	diff1 *= D;
+	//	diff1 *= D;
 
-	diff *= -phi_i*h*h*h/12/mu;
+	diff *= -h*h*h/12/mu;
 	
-	diff += diff1;
-
-	diff *= dA * etm_diff_eqn;
+	//	diff += diff1;
+	wt_func = phi_i;
+	double supg_P = 0;
+	if(mp->Ewt_funcModel == SUPG) {
+	  for (k; k<DIM; k++) {
+	    supg_P += gradII_P[k]*gradII_phi_i[k];
+	  }
+	  supg_P *= -h*h/12/mu*h_elem_inv;
+	  wt_func += supg_P;
+	}
+	diff *= wt_func * dA * etm_diff_eqn;
+	
 
       }      
       lec->R[peqn][i] += mass + diff;
@@ -14553,16 +14567,23 @@ assemble_shell_tfmp(double time,   /* Time */
 	  mass *= dA * etm_mass_eqn;
 	  // Assemble diffusion term
 	  diff = 0.0;
-
+	  diff1 = 0.;
+	  diff2 = 0.;
+	  double diff3 = 0.0;
+	  double diff4 = 0.0;
 	  if ( T_DIFFUSION ) {
 	    for ( k = 0; k < DIM ; k++) {
-	      diff += gradII_phi_j[k]*gradII_S[k];
-	      //if (k == 2) diff += gradII_phi_j[k];
+	      diff1 += gradII_phi_j[k]*gradII_S[k];
+	      diff2 += gradII_P[k]*gradII_S[k];
+	      diff3 += gradII_phi_i[k]*gradII_P[k];
+	      diff4 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
 	  }
-	  //diff *= -h*h*h*phi_i/12/mu;
-	  diff *= -phi_i*h*h*h/12/mu;
-	  //diff = 0;
+	  diff = diff1*-phi_i*h*h*h/12/mu;
+
+	  if(mp->Ewt_funcModel == SUPG) {
+	    diff += -supg*h*h*h*h*h/12/12/mu/mu*h_elem_inv*(diff1*diff3 + diff2*diff4);
+	  }
 	  diff *= dA * etm_diff_eqn;
 
 	  // Assemble full Jacobian
@@ -14590,10 +14611,11 @@ assemble_shell_tfmp(double time,   /* Time */
 	  diff1 = 0.0;
 	  diff2 = 0.0;
 	  double diff3 = 0.0;
-
+	  double diff4 = 0.0;
 	  if ( T_DIFFUSION ) {
 	    for ( k = 0; k < DIM ; k++) {
 	      diff1 += gradII_P[k]*gradII_phi_j[k];
+	      diff4 += gradII_P[k]*gradII_phi_i[k];
 	      diff2 += gradII_P[k]*gradII_S[k];
 	      diff3 += gradII_phi_i[k]*gradII_phi_j[k];
 	    }
@@ -14601,6 +14623,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	  diff += -(phi_i * h*h*h)/(12 * mu)*(diff1 - phi_j/mu*(dmu_dS)*diff2);
 	  diff3 *= D;
 	  diff += diff3;
+	  if(mp->Ewt_funcModel == SUPG) {
+	    diff += supg*-h*h/12/mu*diff4*(-h*h*h/12 * ( diff2*-1/mu/mu*dmu_dS*phi_j + 1/mu*diff1)) * h_elem_inv ;
+	    diff += supg*-h*h*h/12/mu*diff2*(-h*h/12*diff4*-1/mu/mu*dmu_dS*phi_j) * h_elem_inv ;
+	  }
 	  diff *= dA * etm_diff_eqn;
 
 	  // Assemble full Jacobian

@@ -3584,6 +3584,57 @@ assemble_momentum(dbl time,       /* current time */
 		  }
 	      }
 
+	      if ( pdv[TFMP_PRES] ) {
+		if (porous_brinkman_on) {
+		  var = TFMP_PRES;
+		  pvar = upd->vp[var];		  
+		  porous = 0;
+		  int *n_dof = NULL;
+		  int dof_map[MDE];
+		  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
+		  
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+
+		    /* Assemble */
+		    porous += LubAux->dv_avg_dp1[a][j]*grad_II_phi_j[a];
+		    porous *= phi_i * fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  safe_free((void *) n_dof);
+		}
+	      }
+	      if ( pdv[TFMP_SAT] ) {
+		if (porous_brinkman_on) {
+		  var = TFMP_SAT;
+		  pvar = upd->vp[var];		  
+		  porous = 0;
+		  int *n_dof = NULL;
+		  int dof_map[MDE];
+		  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
+		  
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+
+		    /* Assemble */
+		    porous += LubAux->dv_avg_dc[a][j]*phi_i*phi_j;
+		    porous *= fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  safe_free((void *) n_dof);
+		}
+	      }
+
 	      /*
 	       * J_m_d_delta_h (Delta_H equation for shell for porous-brinkman)
 	       */
