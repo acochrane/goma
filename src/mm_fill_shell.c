@@ -14190,7 +14190,7 @@ assemble_lubrication_power_law( double time,    /* present time value */
  * Currently, the following equations are solved.  This is likely to change as
  * different things are tested.  "Use the source, Luke".
  *
- *    0 = d/dt(rho*h) - div(h^3/12*rho/mu*grad(P))
+ *    0 = h*d/dt(rho) - h*div(h^2/12*rho/mu*grad(P))
  *    0 = d/dt(Sh) + h*div(S*v)
  *
  * where rho = S*rho_l + (1-S)*rho_g
@@ -14411,6 +14411,7 @@ assemble_shell_tfmp(double time,   /* Time */
       mass = 0;
       if( T_MASS ) {
 	mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	//mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat);
 	mass *= dA * etm_mass_eqn;
       }
       /* Assemble diffusion term */
@@ -14436,7 +14437,8 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0;
       if( T_MASS ) {
-	mass += phi_i*(h*fv_dot->tfmp_sat + S*dh_dtime);
+	//mass += phi_i*(h*fv_dot->tfmp_sat + S*dh_dtime);
+	mass += phi_i*(h*fv_dot->tfmp_sat);
 	mass *= dA * etm_mass_eqn;
       }
       /* Assemble diffusion term */
@@ -14522,6 +14524,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  
 	  if( T_MASS ) {
 	    mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+	    //mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t);
 	  }
 	  mass *= dA * etm_mass_eqn;
 	  // Assemble diffusion term
@@ -14603,7 +14606,8 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Assemble mass term
 	  mass = 0.0;
 	  if( T_MASS ) {
-	    mass = phi_i*phi_j*(h*(1+2*tt)/delta_t + dh_dtime);
+	    //mass = phi_i*phi_j*(h*(1+2*tt)/delta_t + dh_dtime);
+	    mass = phi_i*phi_j*(h*(1+2*tt)/delta_t);
 	  }
 	  mass *= dA * etm_mass_eqn;
 	  // Assemble diffusion term
