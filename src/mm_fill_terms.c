@@ -2602,8 +2602,12 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
-  
+	if (pd->e[R_TFMP_BOUND] && mp->Ewt_funcModel == SUPG ) {
+	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
+	} else {
+	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
+	}
+
 	fv->wt = wt; /*load_neighbor_var_data screws fv->wt up */
       }
       
@@ -3588,11 +3592,11 @@ assemble_momentum(dbl time,       /* current time */
 		if (porous_brinkman_on) {
 		  var = TFMP_PRES;
 		  pvar = upd->vp[var];		  
-		  porous = 0;
-		  int *n_dof = NULL;
-		  int dof_map[MDE];
-		  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-		  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+		  porous = 0.;
+		  //int *n_dof = NULL;
+		  //int dof_map[MDE];
+		  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
 		  /* Need a few more basis functions */
 		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
@@ -3601,23 +3605,23 @@ assemble_momentum(dbl time,       /* current time */
 		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 
 		    /* Assemble */
-		    porous += LubAux->dv_avg_dp1[a][j]*grad_II_phi_j[a];
-		    porous *= phi_i * fv->sdet * wt * h3;
+		    porous += -phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
+		    porous *= fv->sdet * wt * h3;
 		    porous *= porous_brinkman_etm;
 		    lec->J[peqn][pvar][ii][j] += porous;
 		  }
-		  safe_free((void *) n_dof);
+		  //safe_free((void *) n_dof);
 		}
 	      }
 	      if ( pdv[TFMP_SAT] ) {
 		if (porous_brinkman_on) {
 		  var = TFMP_SAT;
 		  pvar = upd->vp[var];		  
-		  porous = 0;
-		  int *n_dof = NULL;
-		  int dof_map[MDE];
-		  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-		  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+		  porous = 0.0;
+		  //int *n_dof = NULL;
+		  //int dof_map[MDE];
+		  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
 		  /* Need a few more basis functions */
 		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
@@ -3626,12 +3630,12 @@ assemble_momentum(dbl time,       /* current time */
 		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 
 		    /* Assemble */
-		    porous += LubAux->dv_avg_dc[a][j]*phi_i*phi_j;
+		    porous += -phi_i*( LubAux->dv_avg_dc[a][j] )*phi_j;
 		    porous *= fv->sdet * wt * h3;
 		    porous *= porous_brinkman_etm;
 		    lec->J[peqn][pvar][ii][j] += porous;
 		  }
-		  safe_free((void *) n_dof);
+		  //safe_free((void *) n_dof);
 		}
 	      }
 
