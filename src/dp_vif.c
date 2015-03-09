@@ -1789,6 +1789,12 @@ noahs_ark()
 		     (MAX_VARIABLE_TYPES + MAX_CONC)*
 		     (MAX_VARIABLE_TYPES + MAX_CONC),
 		     MPI_DOUBLE);
+      /*
+       * TFMP backward diffusivity model 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_diff_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_diff_const, 1, MPI_DOUBLE);
+		     
 
       /*
        * Loop over user-defined constants lists of lengths.

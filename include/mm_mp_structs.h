@@ -834,6 +834,10 @@ struct Material_Properties
   int len_u_tfmp_const;
   dbl *u_tfmp_const;
 
+  // TFMP indicators for the backwards diffusivity corrector experiment
+  int tfmp_diff_model;
+  dbl tfmp_diff_const;
+
   int table_index;
 
   

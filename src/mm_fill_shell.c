@@ -14257,7 +14257,15 @@ assemble_shell_tfmp(double time,   /* Time */
   //Artificial diffusion constant
   double D;
   //D = .00001;
-  D = 0.0;
+  switch (mp->tfmp_diff_model) {
+  case CONSTANT:
+    D = mp->tfmp_diff_const;
+    break;
+  default:
+    D = 0.0;
+    break;
+    }
+
 /* Declare some neighbor structures */
 /*Sa  int el1 = ei->ielem;
   int el2, nf, err;
@@ -14462,10 +14470,12 @@ assemble_shell_tfmp(double time,   /* Time */
       diff1 = 0.0;
       gradP_dot_gradS = 0.0;
       gradP_dot_gradphi_i = 0.0;
+      gradS_dot_gradphi_i = 0.0;
       if( T_DIFFUSION ) {
 	for ( k = 0; k<DIM; k++) {
 	  gradP_dot_gradS += gradII_P[k]*gradII_S[k];
 	  gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+	  gradS_dot_gradphi_i += gradII_S[k]*gradII_phi_i[k];
 	}
 
 	diff += (-h*h/12/mu)*gradP_dot_gradS;
@@ -14474,6 +14484,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	  wt_func += supg*h_elem_inv*(-h*h/12/mu)*gradP_dot_gradphi_i;
 	}
 	diff *= wt_func;
+
+	// add backwards diffusion term
+	diff += D*gradS_dot_gradphi_i;
+
 	diff *= dA * etm_diff_eqn;
 	
 
@@ -14650,7 +14664,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	    if(mp->Ewt_funcModel == SUPG && supg != 0.0) {
 	      diff += supg*h_elem_inv*(-h*h/12)*(-1.0/mu/mu)*phi_j*dmu_dS*gradP_dot_gradphi_i * (-h*h/12/mu)*gradP_dot_gradS;
 	      diff += supg*h_elem_inv*(-h*h/12/mu)*gradP_dot_gradphi_i * ( (-h*h/12)*(-1.0/mu/mu)*phi_j*dmu_dS*gradP_dot_gradS + (-h*h/12/mu)*gradP_dot_gradphi_j );
-	    }	  
+	    }
+	    // add sensitivity to backwards diffusion term
+	    diff += D*gradphi_i_dot_gradphi_j;
 	  }
 
 	  diff *= dA * etm_diff_eqn;

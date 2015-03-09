@@ -9396,17 +9396,17 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       safe_free(mat_ptr->u_tfmp_const);
       
       a_rho = (rho_l+rho_g)/2;
-      b_rho = (rho_l-rho_g);
+      b_rho = (rho_l-rho_g)/2;
       beta_rho *= b_rho;
       c_rho = atanh((rho_g + beta_rho - a_rho)/b_rho);
       d_rho = atanh((rho_l - beta_rho - a_rho)/b_rho) - c_rho;
       
       a_mu = (mu_l+mu_g)/2;
-      b_mu = (mu_l-mu_g);
+      b_mu = (mu_l-mu_g)/2;
       beta_mu *= b_mu;
       c_mu = atanh((mu_g + beta_rho - a_mu)/b_mu);
       d_mu = atanh((mu_l - beta_rho - a_mu)/b_mu) - c_mu;
-      printf("we have done something in the mp_read\n");
+      //printf("we have done something in the mp_read\n");
       mat_ptr->u_tfmp_const = alloc_dbl_1(8, 0.0);
       
       mat_ptr->u_tfmp_const[0] = a_rho;
@@ -9421,7 +9421,21 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       mat_ptr->len_u_tfmp_const = 8;
     }
   }
-  
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Backwards Diffusivity", 
+				   &(mat_ptr->tfmp_diff_model), 
+				   &(mat_ptr->tfmp_diff_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+
+    /*if(model_read == -1 && !strcmp(model_name, "CONSTANT") ) {
+      model_read = 1;
+      mat_ptr->tfmp_diff_model = CONSTANT;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_diff_const), NO_SPECIES);
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_diff_const );
+      
+      }*/
+  }  
   /*********************************************************************/
 
 
