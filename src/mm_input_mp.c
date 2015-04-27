@@ -9404,8 +9404,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       a_mu = (mu_l+mu_g)/2;
       b_mu = (mu_l-mu_g)/2;
       beta_mu *= b_mu;
-      c_mu = atanh((mu_g + beta_rho - a_mu)/b_mu);
-      d_mu = atanh((mu_l - beta_rho - a_mu)/b_mu) - c_mu;
+      c_mu = atanh((mu_g + beta_mu - a_mu)/b_mu);
+      d_mu = atanh((mu_l - beta_mu - a_mu)/b_mu) - c_mu;
       //printf("we have done something in the mp_read\n");
       mat_ptr->u_tfmp_const = alloc_dbl_1(8, 0.0);
       
