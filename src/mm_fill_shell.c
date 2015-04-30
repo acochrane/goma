@@ -14596,6 +14596,11 @@ assemble_shell_tfmp(double time,   /* Time */
       		// Assemble advection term
       		adv = 0.0;
       		gradh_dot_gradphi_j = 0.0;
+      		gradphi_i_dot_gradphi_j = 0.0;
+      		gradP_dot_gradS = 0.0;
+      		gradP_dot_gradphi_i= 0.0;
+      		gradS_dot_gradphi_j = 0.0;
+
       		if ( T_ADVECTION ) {
       			for (k = 0; k<DIM; k++ ) {
       				gradh_dot_gradphi_j       += 	gradII_h[k]*gradII_phi_j[k];
@@ -14604,7 +14609,7 @@ assemble_shell_tfmp(double time,   /* Time */
       				gradP_dot_gradphi_i 			+=	gradII_P[k]*gradII_phi_i[k];
       				gradP_dot_gradS 					+=	gradII_P[k]*gradII_S[k];
       			}
-      			adv += phi_i*(h*dv_dgradP)*gradS_dot_gradphi_j;
+      			adv += phi_i*(dv_dgradP)*gradS_dot_gradphi_j;
       			if(mp->Ewt_funcModel == SUPG) {
       				adv += supg*h_elem_inv*(dv_dgradP)*gradphi_i_dot_gradphi_j*(dv_dgradP)*gradP_dot_gradS;
       				adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradS_dot_gradphi_j;
