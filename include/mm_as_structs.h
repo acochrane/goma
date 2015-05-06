@@ -2943,6 +2943,8 @@ struct Lubrication_Auxiliaries
   double dv_avg_dh2[DIM][MDE];         /* Average velocity sensitivities w.r.t. height */
   double dv_avg_dp1[DIM][MDE];         /* Average velocity sensitivities w.r.t. lubrication pressure */
   double dv_avg_dp2[DIM][MDE];         /* Average velocity sensitivities w.r.t. lubrication pressure */
+  double dv_avg_dS1[DIM][MDE];         /* Average velocity sensitivities w.r.t. tfmp saturation */
+  double dv_avg_dS2[DIM][MDE];         /* Average velocity sensitivities w.r.t. tfmp saturation */
   double dv_avg_df[DIM][MDE];          /* Average velocity sensitivities w.r.t. level set */
   double dv_avg_dk[DIM][MDE];          /* Average veloctiy sensitivities w.r.t. curvature */
   double dv_avg_dx[DIM][DIM][MDE];     /* Average velocity sensitivities w.r.t. mesh deformation */

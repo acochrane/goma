@@ -3441,10 +3441,13 @@ calculate_lub_q_v (
     }
     Inn(grad_P, gradII_P);
 
-    /* Load Saturation */
-
+    /* Load Saturation and gradient*/
     double S = fv->tfmp_sat;
-
+    double grad_S[DIM], gradII_S[DIM];
+    for (k = 0; k<DIM; k++) {
+    	grad_S[k] = fv->grad_tfmp_sat[k];
+    }
+    Inn(grad_S, gradII_S);
 
     /* Load density and viscosity */
 
@@ -3464,6 +3467,10 @@ calculate_lub_q_v (
     double drho_dS, dmu_dS;
     drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
     dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+
+    // Load Surface Tension
+    double surface_tension;
+    surface_tension = mp->surface_tension;
       
     /***** CALCULATE HEIGHT, SLOPES, AND SENSITIVITIES *****/
     
@@ -3496,7 +3503,7 @@ calculate_lub_q_v (
       
     memset(v_avg, 0.0, sizeof(double)*DIM);
     for (i = 0; i< DIM; i++) {
-      v_avg[i] += -h*h/(12. * mu) * gradII_P[i];
+      v_avg[i] += -h*h/(12. * mu) * (gradII_P[i] + surface_tension*4./h*S*gradII_S[i]);
     }
       
     /*Evaluate average velocity sensitivity w.r.t. pressure */
@@ -3505,17 +3512,18 @@ calculate_lub_q_v (
       
     for (i = 0; i < DIM; i++) {
       for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
-	dv_dP[i][j] += (-h*h/12./mu);
+      	dv_dP[i][j] += (-h*h/12./mu);
       }
     }
-      
-    /*Evaluate average velocity sensitivity w.r.t. saturation */
-    dbl dv_dS[DIM][MDE];
-    memset(dv_dS, 0.0, sizeof(double)*DIM*MDE);
 
+    /*Evaluate average velocity sensitivity w.r.t. saturation */
+    dbl dv_dS1[DIM][MDE], dv_dS2[DIM][MDE];
+    memset(dv_dS1, 0.0, sizeof(double)*DIM*MDE);
+    memset(dv_dS2, 0.0, sizeof(double)*DIM*MDE);
     for (i = 0; i < DIM; i++) {
       for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
-	dv_dS[i][j] += gradII_P[i]*(-h*h/12.0)*(-1.0/mu/mu)*dmu_dS;
+      	dv_dS1[i][j] += (h*h/12./mu)*(-dmu_dS/mu*(gradII_P[i] + 4.*surface_tension/h*S*gradII_S[i]) + 4.*surface_tension/h*gradII_S[i]);
+      	dv_dS2[i][j] += (h*h/12./mu)*(4.*surface_tension/h*S);
       }
     }
       
@@ -3527,11 +3535,12 @@ calculate_lub_q_v (
       LubAux->v_avg[i] = v_avg[i];
       
       for ( j = 0; j < ei->dof[TFMP_PRES]; j++) {
-	LubAux->dv_avg_dp1[i][j] = dv_dP[i][j];
+      	LubAux->dv_avg_dp1[i][j] = dv_dP[i][j];
       }
       
       for ( j = 0; j < ei->dof[TFMP_SAT]; j++) {
-	LubAux->dv_avg_dc[i][j] = dv_dS[i][j];
+      	LubAux->dv_avg_dS1[i][j] = dv_dS1[i][j];
+      	LubAux->dv_avg_dS2[i][j] = dv_dS2[i][j];
       }
     }
   }
