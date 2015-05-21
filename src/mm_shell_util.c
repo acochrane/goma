@@ -3462,7 +3462,7 @@ calculate_lub_q_v (
     c_mu = mp->u_tfmp_const[6];
     d_mu = mp->u_tfmp_const[7];
 
-    double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
+    //double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
     double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
     double drho_dS, dmu_dS;
     drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
@@ -3489,15 +3489,16 @@ calculate_lub_q_v (
 
     double dh_dtime = dH_U_dtime - dH_L_dtime;
     /* Need gradII_(Sh) */
+    /*
     double grad_h[DIM], gradII_h[DIM];
     for (k=0; k<DIM; k++) {
       grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
     }
-      
+      */
 
 
     /* Perfrom I - nn gradient */
-    Inn(grad_h, gradII_h);
+    //Inn(grad_h, gradII_h);
       
       /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
       

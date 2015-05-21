@@ -14486,7 +14486,7 @@ assemble_shell_tfmp(double time,   /* Time */
 
 						if ( T_DIFFUSION ) {
 
-							diff += -h*rho*phi_j*grad_phi_i[l];
+							diff += -h*rho*phi_j*gradII_phi_i[l];
 						}
       			diff *= etm_diff_eqn;
 
@@ -14554,7 +14554,7 @@ assemble_shell_tfmp(double time,   /* Time */
 					for ( j = 0; j < ei->dof[var]; j++) {
 						// Load basis functions
 						ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-						// Assemble mass term ** mass term has no sensitivity to pressure
+						// Assemble mass term ** mass term has no sensitivity to velocity
 						mass = 0.0;
 
 						//mass *= dA * etm_mass_eqn;
