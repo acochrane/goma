@@ -2858,6 +2858,8 @@ set_interaction_masks(Exo_DB *exo)
           if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           v = FILL;
           if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
+          v = TFMP_SAT;
+          if(Num_Var_In_Type[v])  eqn_var_mask[e][v] = 1;
           break;
 
 	case R_SHELL_LUB_CURV_2:

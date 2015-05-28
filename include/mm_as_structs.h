@@ -634,7 +634,7 @@ struct Element_Stiffness_Pointers
   dbl **max_strain;              /* max_strain[MDE], maximum Von Mises strain */
   dbl **cur_strain;              /* cur_strain[MDE], Von Mises strain */
   dbl ***poynt;		      	 /* *v[DIM][MDE], velocity */
-  dbl **tfmp_pres;                    /* thin-film multi-phase lubrication pressure */
+  dbl **tfmp_pres;                    /*  thin-film multi-phase lubrication pressure */
   dbl **tfmp_sat;                  /* thin-film multi-phase saturation */
 
   /*

@@ -2602,7 +2602,11 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	calculate_lub_q_v(eqn, time, dt, xi, exo);
+	if (pd->e[R_TFMP_BOUND] && mp->Ewt_funcModel == SUPG ) {
+	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
+	} else {
+	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
+	}
 
 	fv->wt = wt; /*load_neighbor_var_data screws fv->wt up */
       }
@@ -3588,7 +3592,7 @@ assemble_momentum(dbl time,       /* current time */
 	      	if (porous_brinkman_on) {
 	      		var = TFMP_PRES;
 	      		pvar = upd->vp[var];
-	      		porous = 0.0;
+
 	      		//int *n_dof = NULL;
 	      		//int dof_map[MDE];
 	      		//n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
@@ -3598,10 +3602,11 @@ assemble_momentum(dbl time,       /* current time */
 	      		dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
 		  
 	      		for ( j=0; j<ei->dof[var]; j++) {
+	      			porous = 0.0;
 	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 
 	      			/* Assemble Jacobian*/
-	      			porous += phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
+	      			porous += -phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
 	      			porous *= fv->sdet * wt * h3;
 	      			porous *= porous_brinkman_etm;
 	      			lec->J[peqn][pvar][ii][j] += porous;
@@ -3613,15 +3618,38 @@ assemble_momentum(dbl time,       /* current time */
 	      	if (porous_brinkman_on) {
 	      		var = TFMP_SAT;
 	      		pvar = upd->vp[var];
-	      		porous = 0.0;
+
 	      		/* Need a few more basis functions */
 	      		dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
 		  
 	      		for ( j=0; j<ei->dof[var]; j++) {
+	      			porous = 0.0;
 	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 
 	      			/* Assemble */
 	      			porous += phi_i*(( LubAux->dv_avg_dS1[a][j] )*phi_j + LubAux->dv_avg_dS2[a][j]*grad_II_phi_j[a]);
+	      			porous *= fv->sdet * wt * h3;
+	      			porous *= porous_brinkman_etm;
+	      			lec->J[peqn][pvar][ii][j] += porous;
+	      		}
+	      		//safe_free((void *) n_dof);
+	      	}
+	      }
+
+	      if ( pdv[SHELL_LUB_CURV] ) {
+	      	if (porous_brinkman_on) {
+	      		var = SHELL_LUB_CURV;
+	      		pvar = upd->vp[var];
+
+	      		/* Need a few more basis functions */
+	      		dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
+
+	      		for ( j=0; j<ei->dof[var]; j++) {
+	      			porous = 0.0;
+	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+
+	      			/* Assemble */
+	      			porous += -phi_i*phi_j*LubAux->dv_avg_dk[a][j];
 	      			porous *= fv->sdet * wt * h3;
 	      			porous *= porous_brinkman_etm;
 	      			lec->J[peqn][pvar][ii][j] += porous;
@@ -12111,37 +12139,40 @@ if ( pd->v[SHELL_LUB_CURV_2] )
 
   /*
    * d(grad(F))/dmesh
+   * also used for tfmp_saturation plan-view curvature
    */
-  if (pd->v[FILL])
-    {
-      v = FILL;
-      vdofs  = ei->dof[v];
-#ifdef DO_NO_UNROLL
-      siz = sizeof(double)*DIM*DIM*MDE;
-      memset(fv->d_grad_F_dmesh,0, siz);
-      for (p = 0; p < dimNonSym; p++)
-	{
-	  for (b = 0; b < dim; b++)
-	    {
-	      for (j = 0; j < mdofs; j++)
-		{
-		  for (i = 0; i < vdofs; i++)
-		    {
-		      fv->d_grad_F_dmesh[p] [b][j] +=
-			*esp->F[i]  *  bf[v]->d_grad_phi_dmesh[i][p] [b][j];
-		    }
-		}
-	    }
-	}
-#else
-      for ( j=0; j<mdofs; j++)
-	{
-	  F_i = *esp->F[0];
+  if (pd->v[FILL] || (pd->v[TFMP_SAT] && pd->e[R_SHELL_LUB_CURV]) ) {
+  	dbl *F;
+  	if (pd->v[FILL]) {
+  		v = FILL;
+  		F = *esp->F;
+  	} else if (pd-> v[TFMP_SAT] && pd->e[R_SHELL_LUB_CURV]) {
+  		v = TFMP_SAT;
+  		F = *esp->tfmp_sat;
+  	}
 
-	  fv->d_grad_F_dmesh[0] [0][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][0] [0][j];
-	  fv->d_grad_F_dmesh[1] [1][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][1] [1][j];
-	  fv->d_grad_F_dmesh[1] [0][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][1] [0][j];
-	  fv->d_grad_F_dmesh[0] [1][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][0] [1][j];
+  	vdofs  = ei->dof[v];
+
+#ifdef DO_NO_UNROLL
+  	siz = sizeof(double)*DIM*DIM*MDE;
+  	memset(fv->d_grad_F_dmesh,0, siz);
+  	for (p = 0; p < dimNonSym; p++) {
+  		for (b = 0; b < dim; b++) {
+	      for (j = 0; j < mdofs; j++) {
+	      	for (i = 0; i < vdofs; i++) {
+	      		fv->d_grad_F_dmesh[p] [b][j] +=
+	      				F[i]  *  bf[v]->d_grad_phi_dmesh[i][p] [b][j];
+	      	}
+	      }
+  		}
+  	}
+#else
+  	for ( j=0; j<mdofs; j++) {
+  		F_i = F[0];
+  		fv->d_grad_F_dmesh[0] [0][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][0] [0][j];
+  		fv->d_grad_F_dmesh[1] [1][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][1] [1][j];
+  		fv->d_grad_F_dmesh[1] [0][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][1] [0][j];
+  		fv->d_grad_F_dmesh[0] [1][j] = F_i  *  bf[v]->d_grad_phi_dmesh[0][0] [1][j];
 		
 	  if (dimNonSym == 3) 
 	    {
@@ -12154,7 +12185,7 @@ if ( pd->v[SHELL_LUB_CURV_2] )
 		
 	  for (i = 1; i < vdofs; i++)
 	    {
-	      F_i = *esp->F[i];
+	      F_i = F[i];
 			
 	      fv->d_grad_F_dmesh[0] [0][j] += F_i  *  bf[v]->d_grad_phi_dmesh[i][0] [0][j];
 	      fv->d_grad_F_dmesh[1] [1][j] += F_i  *  bf[v]->d_grad_phi_dmesh[i][1] [1][j];

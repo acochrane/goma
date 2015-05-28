@@ -3499,12 +3499,17 @@ calculate_lub_q_v (
 
     /* Perfrom I - nn gradient */
     //Inn(grad_h, gradII_h);
-      
+
+    // Load kappaII and create curvature variable, kappa
+    dbl kappaII, kappa;
+    kappaII = fv->sh_l_curv;
+    kappa = 2.0/h + kappaII;
+
       /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
       
     memset(v_avg, 0.0, sizeof(double)*DIM);
     for (i = 0; i< DIM; i++) {
-      v_avg[i] += -h*h/(12. * mu) * (gradII_P[i] + surface_tension*4./h*S*gradII_S[i]);
+      v_avg[i] += -(h*h/12./mu)*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa);
     }
       
     /*Evaluate average velocity sensitivity w.r.t. pressure */
@@ -3523,13 +3528,21 @@ calculate_lub_q_v (
     memset(dv_dS2, 0.0, sizeof(double)*DIM*MDE);
     for (i = 0; i < DIM; i++) {
       for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
-      	dv_dS1[i][j] += (h*h/12./mu)*(-dmu_dS/mu*(gradII_P[i] + 4.*surface_tension/h*S*gradII_S[i]) + 4.*surface_tension/h*gradII_S[i]);
-      	dv_dS2[i][j] += (h*h/12./mu)*(4.*surface_tension/h*S);
+      	dv_dS1[i][j] += (h*h/12./mu)*(-dmu_dS/mu*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa) + 2.*surface_tension*gradII_S[i]*kappa);
+      	dv_dS2[i][j] += (h*h/12./mu)*(2.*surface_tension*S*kappa);
       }
     }
-      
-      
-      
+
+    /*Evaluate average velocity sensitivity w.r.t. curvature */
+    dbl dv_dk[DIM][MDE];
+    memset(dv_dk, 0.0, sizeof(double)*DIM*MDE);
+    if (pd->e[R_SHELL_LUB_CURV]) {
+    	for (i = 0; i < DIM; i++) {
+    		for (j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
+    			dv_dk[i][j] += -(h*h/12./mu)*(1.*surface_tension*S*gradII_S[i]);
+    		}
+    	}
+    }
     /******* STORE THE INFORMATION TO LUBRICATION AUXILIARIES STRUCTURE ***********/
       
     for (i = 0; i < DIM; i++) {
@@ -3542,6 +3555,9 @@ calculate_lub_q_v (
       for ( j = 0; j < ei->dof[TFMP_SAT]; j++) {
       	LubAux->dv_avg_dS1[i][j] = dv_dS1[i][j];
       	LubAux->dv_avg_dS2[i][j] = dv_dS2[i][j];
+      }
+      for ( j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
+      	LubAux->dv_avg_dk[i][j] = dv_dk[i][j];
       }
     }
   }
