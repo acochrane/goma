@@ -1358,6 +1358,9 @@ rd_timeint_specs(FILE *ifp,
      structure as a global variable for poroelastic probs */
   tran->theta = 0.0;
 
+  /* set default frequency to 0 */
+  tran->fix_freq = 0;
+
   if(pd_glob[0]->TimeIntegration != STEADY) {
 
     look_for(ifp,"delta_t",input,'=');
@@ -1490,8 +1493,6 @@ rd_timeint_specs(FILE *ifp,
       }
 
     /* Look for fix frequency */
-    /* set default frequency to 0 */
-    tran->fix_freq = 0;
 
     /* only look for fix frequency in parallel */
     if (Num_Proc > 1) {
@@ -6447,6 +6448,37 @@ rd_solver_specs(FILE *ifp,
       ECHO("(Pressure Stabilization Scaling = 0.0) (default)", echo_file);
     }
 
+  iread = look_for_optional(ifp, "Continuity Stabilization", input, '=');
+  if (iread == 1)
+    {
+      (void) read_string(ifp, input, '\n');
+      strip(input);
+      if (strcmp(input,"no") == 0)
+	{
+	  Cont_GLS = 0;
+	}
+      else if(strcmp(input,"yes") == 0)
+	{
+	  Cont_GLS = 1;
+	}
+
+      else if(strcmp(input,"local")==0)
+	{
+          Cont_GLS = 2;
+	}
+       
+      else
+	{
+	  EH( -1, "invalid choice: Continuity Stabilization yes, local, or no");
+	}
+      SPF(echo_string, eoformat, "Continuity Stabilization", input); ECHO(echo_string,echo_file);	  
+	
+    }
+  else
+    {
+      Cont_GLS = 0;
+      ECHO("(Continuity Stabilization = None) (default)", echo_file);
+    }
 
   /*IGBRK*/
   iread = look_for_optional(ifp, "Linear Stability", input, '=');
@@ -6494,17 +6526,20 @@ rd_solver_specs(FILE *ifp,
     {
     (void) read_string(ifp, input, '\n');
     strip(input);
-    if ( strcmp(input,"no") == 0 )
+    if ( strncmp(input,"no",2) == 0 )
       {
         Include_Visc_Sens = TRUE;
       }
-    else if ( strcmp(input,"yes") == 0 )
+    else if ( strncmp(input,"yes",3) == 0 )
       {
+	char temp_string[80];
         Include_Visc_Sens = FALSE;
+        if (sscanf(input, "%s %d", temp_string, &Visc_Sens_Factor) != 2)
+	    {  Visc_Sens_Factor = 2; }
       }
     else
       {
-        EH( -1, "invalid choice for Disable Viscosity Sensitivities:must be yesor no");
+        EH( -1, "invalid choice for Disable Viscosity Sensitivities:must be yes or no");
       }
       SPF(echo_string,eoformat,"Disable Viscosity Sensitivities", input); ECHO(echo_string,echo_file);
     }

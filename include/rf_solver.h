@@ -151,11 +151,12 @@ int Gfill_zeros;        /* number of nonzeros in fill matrix for the
 int PSPG;               /* 1 means pressure stabilized Petrov-Galerkin is used */
 int PSPP;               /* 1 means pressure stabilized polynomial projection is used */
 double PS_scaling;      /* This term is a constant scaling for the PSPG or PSPP term */
+int Cont_GLS;          /* 1 means continuity stabilization is used */
 
 int Filter_Species, filter_species_material_number;
 double c_min, c_max;
 
-int Include_Visc_Sens, Visc_Sens_Copy;
+int Include_Visc_Sens, Visc_Sens_Copy, Visc_Sens_Factor;
 				 /* 1 means to include the sensitivities of the 
 				viscosity functions in the jacobian matrix.  
 				0 indicates that these sensitivities are not to 
