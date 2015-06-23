@@ -3517,7 +3517,8 @@ calculate_lub_q_v (
     } else {
     	kappaII = 0.0;
     }
-    kappa = 2.0/h + kappaII;
+//    kappa = 2.0/h - kappaII;
+    kappa =  kappaII;
 
       /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
       
@@ -3553,7 +3554,7 @@ calculate_lub_q_v (
     if (pd->e[R_SHELL_LUB_CURV]) {
     	for (i = 0; i < DIM; i++) {
     		for (j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
-    			dv_dk[i][j] += -(h*h/12./mu)*(surface_tension*rho*gradII_rho[i]/c_comb);
+    			dv_dk[i][j] += -(h*h/12./mu)*(-surface_tension*rho*gradII_rho[i]/c_comb);
     		}
     	}
     }

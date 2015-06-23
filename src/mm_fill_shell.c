@@ -12020,7 +12020,11 @@ assemble_lubrication_curvature(
     LSnormal_mag += gradII_F[i] * gradII_F[i];
   }
   LSnormal_mag = sqrt(LSnormal_mag);
-  LSnormal_maginv = ( LSnormal_mag <= 0.01 ) ? 1.0 : 1.0 / LSnormal_mag;
+  if (LSnormal_mag <= 0.1) {
+    LSnormal_maginv = 1.0;
+  } else {
+    LSnormal_maginv = 1.0 / LSnormal_mag;
+  }
   for ( i = 0; i < DIM; i++ ) {
     LSnormal[i] = gradII_F[i] * LSnormal_maginv;
   }
