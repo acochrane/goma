@@ -11995,9 +11995,22 @@ assemble_lubrication_curvature(
   	ShellRotate(fv->grad_F, d_grad_F_dmesh, gradII_F, d_gradII_F_dmesh, n_dof[MESH_DISPLACEMENT1]);
   	adv_var = FILL;
   }
+  double drho_dS;
   if (pd->e[R_TFMP_BOUND]) {
   	ShellRotate(fv->grad_tfmp_sat, d_grad_F_dmesh, gradII_F, d_gradII_F_dmesh, n_dof[MESH_DISPLACEMENT1]);
   	adv_var = TFMP_SAT;
+  	double a_rho, b_rho, c_rho, d_rho, S;
+  	S = fv->tfmp_sat;
+
+  	a_rho = mp->u_tfmp_const[0];
+  	b_rho = mp->u_tfmp_const[1];
+  	c_rho = mp->u_tfmp_const[2];
+  	d_rho = mp->u_tfmp_const[3];
+
+  	drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+  	for ( k = 0; k<DIM; k++ ) {
+  		gradII_F[k] *= drho_dS;
+  	}
   }
   ShellRotate(fv->grad_sh_l_curv, d_grad_kappa_dmesh, gradII_kappa, d_gradII_kappa_dmesh, n_dof[MESH_DISPLACEMENT1]);
 
@@ -12007,11 +12020,10 @@ assemble_lubrication_curvature(
     LSnormal_mag += gradII_F[i] * gradII_F[i];
   }
   LSnormal_mag = sqrt(LSnormal_mag);
-  LSnormal_maginv = ( LSnormal_mag == 0.0 ) ? 1.0 : 1.0 / LSnormal_mag;
+  LSnormal_maginv = ( LSnormal_mag <= 0.01 ) ? 1.0 : 1.0 / LSnormal_mag;
   for ( i = 0; i < DIM; i++ ) {
     LSnormal[i] = gradII_F[i] * LSnormal_maginv;
   }
-
   /* Calculate sensitivity of level set normal to mesh */
   dbl d_LSnormal_dmesh[DIM][DIM][MDE];
   dbl d_LSnormal_mag_dmesh[DIM][MDE];
@@ -12032,7 +12044,6 @@ assemble_lubrication_curvature(
       }
     }
   }
-
   /* Calculate sensitivity of level set normal to F */
   dbl d_LSnormal_mag_dF[MDE] ;
   dbl d_LSnormal_dF[DIM][MDE];
@@ -12052,6 +12063,11 @@ assemble_lubrication_curvature(
     for ( a = 0; a < DIM; a++ ) {
       d_LSnormal_dF[a][i]  = grad_II_phi_i[a] * LSnormal_maginv;
       d_LSnormal_dF[a][i] -= gradII_F[a] * d_LSnormal_mag_dF[i] * pow(LSnormal_maginv,2);
+    }
+    if (adv_var == TFMP_SAT) {
+    	for (k = 0; k < DIM; k++) {
+    		d_LSnormal_dF[k][i] *= drho_dS;
+    	}
     }
 
   }

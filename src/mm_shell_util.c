@@ -3462,11 +3462,21 @@ calculate_lub_q_v (
     c_mu = mp->u_tfmp_const[6];
     d_mu = mp->u_tfmp_const[7];
 
-    //double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
+    double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
+    double rhofl = a_rho + b_rho*tanh(c_rho + d_rho*1.0);
+    double rhofg = a_rho + b_rho*tanh(c_rho + d_rho*0.0);
+
     double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
-    double drho_dS, dmu_dS;
+    double drho_dS, dmu_dS, gradII_rho[DIM];
     drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
     dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+    for (k = 0; k<DIM; k++) {
+    	gradII_rho[k] = drho_dS*gradII_S[k];
+    }
+    double c_square_bracket, c_angle_bracket, c_comb;
+    c_square_bracket = rhofl-rhofg;
+    c_angle_bracket = (rhofl+rhofg)/2.0;
+    c_comb = c_square_bracket*c_angle_bracket;
 
     // Load Surface Tension
     double surface_tension;
@@ -3502,14 +3512,18 @@ calculate_lub_q_v (
 
     // Load kappaII and create curvature variable, kappa
     dbl kappaII, kappa;
-    kappaII = fv->sh_l_curv;
+    if (pd->e[R_SHELL_LUB_CURV]) {
+    	kappaII = fv->sh_l_curv;
+    } else {
+    	kappaII = 0.0;
+    }
     kappa = 2.0/h + kappaII;
 
       /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
       
     memset(v_avg, 0.0, sizeof(double)*DIM);
     for (i = 0; i< DIM; i++) {
-      v_avg[i] += -(h*h/12./mu)*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa);
+      v_avg[i] += -(h*h/12./mu)*(gradII_P[i] + surface_tension*kappa*rho*gradII_rho[i]/c_comb);
     }
       
     /*Evaluate average velocity sensitivity w.r.t. pressure */
@@ -3528,8 +3542,8 @@ calculate_lub_q_v (
     memset(dv_dS2, 0.0, sizeof(double)*DIM*MDE);
     for (i = 0; i < DIM; i++) {
       for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
-      	dv_dS1[i][j] += (h*h/12./mu)*(-dmu_dS/mu*(gradII_P[i] + 2.*surface_tension*S*gradII_S[i]*kappa) + 2.*surface_tension*gradII_S[i]*kappa);
-      	dv_dS2[i][j] += (h*h/12./mu)*(2.*surface_tension*S*kappa);
+      	dv_dS1[i][j] += -(h*h/12./mu)*(dmu_dS/mu*(gradII_P[i] + surface_tension*kappa/c_comb*rho*gradII_rho[i]) + surface_tension*kappa/c_comb*drho_dS*gradII_rho[i]);
+      	dv_dS2[i][j] += (h*h/12./mu)*(surface_tension*kappa/c_comb*rho*drho_dS);
       }
     }
 
@@ -3539,10 +3553,11 @@ calculate_lub_q_v (
     if (pd->e[R_SHELL_LUB_CURV]) {
     	for (i = 0; i < DIM; i++) {
     		for (j = 0; j < ei->dof[SHELL_LUB_CURV]; j++) {
-    			dv_dk[i][j] += -(h*h/12./mu)*(1.*surface_tension*S*gradII_S[i]);
+    			dv_dk[i][j] += -(h*h/12./mu)*(surface_tension*rho*gradII_rho[i]/c_comb);
     		}
     	}
     }
+
     /******* STORE THE INFORMATION TO LUBRICATION AUXILIARIES STRUCTURE ***********/
       
     for (i = 0; i < DIM; i++) {

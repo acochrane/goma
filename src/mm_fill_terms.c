@@ -3576,8 +3576,8 @@ assemble_momentum(dbl time,       /* current time */
 			    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 			    
 			    /* Assemble */
-			    porous -= LubAux->dv_avg_dp1[a][j] * grad_II_phi_j[a];
-			    porous -= LubAux->dv_avg_dp2[a][j] * phi_j;
+			    porous += LubAux->dv_avg_dp1[a][j] * grad_II_phi_j[a];
+			    porous += LubAux->dv_avg_dp2[a][j] * phi_j;
 			    porous *= phi_i * fv->sdet * wt * h3;
 			    // porous *= phi_i * wt * h3;
 			    porous *= porous_brinkman_etm;
@@ -3649,7 +3649,7 @@ assemble_momentum(dbl time,       /* current time */
 	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 
 	      			/* Assemble */
-	      			porous += -phi_i*phi_j*LubAux->dv_avg_dk[a][j];
+	      			porous += phi_i*phi_j*LubAux->dv_avg_dk[a][j];
 	      			porous *= fv->sdet * wt * h3;
 	      			porous *= porous_brinkman_etm;
 	      			lec->J[peqn][pvar][ii][j] += porous;
