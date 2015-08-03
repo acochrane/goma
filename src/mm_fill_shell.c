@@ -11402,7 +11402,7 @@ assemble_porous_shell_two_phase(
   }
   dbl Pc = Pg-Pl;
 
-  Inn(grad_Pl, gradII_Pl);   /* commented for performance issues for now */
+  Inn(grad_Pl, gradII_Pl);
   Inn(grad_Pg, gradII_Pg);
 
   dbl a, b, c, d;
@@ -11411,7 +11411,7 @@ assemble_porous_shell_two_phase(
   c = mp->u_lub_sat_const[2];
   d = mp->u_lub_sat_const[3];
   
-  // Build Saturation Function, should be implimented elsewhere, no?  yes. -AMC
+  // Build Saturation Function, should be implemented elsewhere, no?  yes. -AMC
 
   dbl Theta, sechTheta, tanhTheta, saturation;
   Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
@@ -11486,19 +11486,19 @@ assemble_porous_shell_two_phase(
       mass = 0.0;
       if ( T_MASS ) {
 	//mass += (-(dS_dPc*H)*dPc_dPl*Pl_dot + (H*dS_dH + saturation)*dH_dtime) * phi_i; /* __Reduced_Order_Exp */
-	mass += (-dS_dPc*dPc_dPl*Pl_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (-dS_dPc*dPc_dPl*Pl_dot + (saturation/H + dS_dH)*dH_dtime) * phi_i;
       }
       mass *= dA * etm_mass_eqn;
       
       // Assemble diffusion term
       diff = 0.0;
       if ( T_DIFFUSION ) {
-	for ( k = 0; k < DIM; k++) {
-	  diff += gradII_Pl[k] * gradII_phi_i[k];
-	}
+      	for ( k = 0; k < DIM; k++) {
+      		diff += gradII_Pl[k] * gradII_phi_i[k];
+      	}
+      	diff *= -k_liq*H*H/12.0/mu_l * dA * etm_diff_eqn;
       }
-      diff *= -k_liq*H*H/12.0/mu_l * dA * etm_diff_eqn;
-      
+
       // Assemble full residual
       lec->R[peqn][i] += mass + diff;
       
@@ -11526,7 +11526,7 @@ assemble_porous_shell_two_phase(
       // Assemble mass term
       mass = 0.0;
       if ( T_MASS ) {
-	mass += (-dS_dPc*dPc_dPg*Pg_dot + dS_dH*dH_dtime) * phi_i;
+	mass += (-dS_dPc*dPc_dPg*Pg_dot + ((1-saturation)/H - dS_dH)*dH_dtime) * phi_i;
       }
       mass *= -dA * etm_mass_eqn;
       
@@ -11566,30 +11566,31 @@ assemble_porous_shell_two_phase(
       // Assemble sensitivities of R_LUBP_LIQ to LUBP_LIQ ********************************************************************
       var = LUBP_LIQ;
       if (pd->v[var]) {
-	etm_mass_var = pd->etm[var][(LOG2_MASS)];
-	etm_diff_var = pd->etm[var][(LOG2_DIFFUSION)];
-  	pvar = upd->vp[var];
+      	etm_mass_var = pd->etm[var][(LOG2_MASS)];
+      	etm_diff_var = pd->etm[var][(LOG2_DIFFUSION)];
+      	pvar = upd->vp[var];
 
-  	// Loop over DOF (j)
-  	for ( j = 0; j < ei->dof[var]; j++) {
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
 
-	  // Load j basis functions
-	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
-	  phi_j = bf[var]->phi[j];
-	  Inn(bf[var]->grad_phi[j], gradII_phi_j);
-	  //for (k = 0; k<DIM; k++) {      
-	  //gradII_phi_j[k] = bf[var]->grad_phi[j][k];
-	  //} 
-	  dbl dPl_dPlj = phi_j;
-	  // Assemble mass term
-	  mass = 0.0;
+      		// Load j basis functions
+      		/* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
+      		phi_j = bf[var]->phi[j];
+      		Inn(bf[var]->grad_phi[j], gradII_phi_j);
+      		//for (k = 0; k<DIM; k++) {
+      		//gradII_phi_j[k] = bf[var]->grad_phi[j][k];
+      		//}
+      		dbl dPl_dPlj = phi_j;
+      		// Assemble mass term
+      		mass = 0.0;
 
-	  if ( T_MASS ) {
-	    //	    mass += phi_i * phi_j * (dH_dtime*(H*dPc_dPl*d2S_dPcdH + dS_dPc*dPc_dPl) - Pl_dot*dPc_dPl*(H*dPc_dPl*d2S_dPc2) - H*dPc_dPl*dS_dPc*Plj_dot_over_Plj);  /* __Reduced_Order_Exp */
-	    mass += phi_i*phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH - dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
-	    //	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
-	  }
-	  mass *=  dA * etm_mass_eqn;// * etm_mass_var;
+      		if ( T_MASS ) {
+      			//	    mass += phi_i * phi_j * (dH_dtime*(H*dPc_dPl*d2S_dPcdH + dS_dPc*dPc_dPl) - Pl_dot*dPc_dPl*(H*dPc_dPl*d2S_dPc2) - H*dPc_dPl*dS_dPc*Plj_dot_over_Plj);  /* __Reduced_Order_Exp */
+      			mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPl - dPc_dPl*d2S_dPcdH) - dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
+      			//	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
+      			mass *=  dA * etm_mass_eqn;// * etm_mass_var;
+      		}
+
 	  
 	  // Assemble diffusion term
 	  diff = 0.0;
@@ -11600,9 +11601,9 @@ assemble_porous_shell_two_phase(
 	      diff1 += gradII_Pl[k]*gradII_phi_i[k];
 	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
 	    }
+		  diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
+		  diff *= -H*H/12.0/mu_l * dA * etm_diff_eqn;// * etm_diff_var;
 	  }
-	  diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
-	  diff *= -H*H/12.0/mu_l * dA * etm_diff_eqn;// * etm_diff_var;
 	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += mass + diff;
@@ -11634,7 +11635,7 @@ assemble_porous_shell_two_phase(
 
 	  if ( T_MASS ) {
 	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
-	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH - dPc_dPl*Pl_dot*dPc_dPg*d2S_dPc2);
+	    mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPg - dPc_dPg*d2S_dPcdH) - dPc_dPl*Pl_dot*dPc_dPg*d2S_dPc2);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *=  dA * etm_mass_eqn;// * etm_mass_var;
@@ -11698,7 +11699,7 @@ assemble_porous_shell_two_phase(
 	  mass = 0.0;
 
 	  if ( T_MASS ) {
-	    mass += phi_i*phi_j * (dH_dtime*dPc_dPl*d2S_dPcdH - dPc_dPg*(Pg_dot*dPc_dPl*d2S_dPc2));
+	    mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPl - dPc_dPl*d2S_dPcdH) - dPc_dPg*(Pg_dot*dPc_dPl*d2S_dPc2));
 	    //	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
@@ -11747,7 +11748,7 @@ assemble_porous_shell_two_phase(
 
 	  if ( T_MASS ) {
 	    //	    mass += phi_i * phi_j * ( -dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
-	    mass += phi_i*phi_j * (dH_dtime*dPc_dPg*d2S_dPcdH - dPc_dPg*(dS_dPc*Pgj_dot_over_Pgj + Pg_dot*dPc_dPg*d2S_dPc2));
+	    mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPg - dPc_dPg*d2S_dPcdH) - dPc_dPg*(dS_dPc*Pgj_dot_over_Pgj + Pg_dot*dPc_dPg*d2S_dPc2));
 	    //if ( i == j ) mass += E_MASS_P[i] * phi_i;
 	  }
 	  mass *=  -dA * etm_mass_eqn;// * etm_mass_var;
