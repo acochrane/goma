@@ -223,6 +223,8 @@ rd_bc_specs(FILE *ifp,
   
   SPF(echo_string,"%s = %d", "Number of BC", Num_BC); ECHO(echo_string, echo_file);
       
+/* initialize number of interface sources*/
+  Num_Interface_Srcs = 0;
   for (ibc = 0; ibc < Num_BC; ibc++)
     {
 
@@ -490,6 +492,7 @@ rd_bc_specs(FILE *ifp,
 	case CAP_ENDFORCE_SCALAR_BC:
 	case SURFTANG_SCALAR_EDGE_BC:
         case FLOW_PRESSURE_BC:
+	case FLOW_PRESSURE_VAR_BC:
         case FLOW_STRESSNOBC_BC:
         case FLOW_GRADV_BC:
 	case FILL_INLET_BC:
@@ -1450,7 +1453,13 @@ rd_bc_specs(FILE *ifp,
           /*   outside slip coeff, gas_factor,  contact_friction   */
 	  if ( fscanf(ifp, "%lf", &BC_Types[ibc].BC_Data_Float[9]) != 1)
 	    {
+	      if ( !strcmp(BC_Types[ibc].desc->name1,"VELO_THETA_HOFFMAN"))
+                  {
+/* Max DCA for Hoffman condition  */
+		      BC_Types[ibc].BC_Data_Float[9] = 180.0;
+                  } else  { 
 		      BC_Types[ibc].BC_Data_Float[9] = 1.0/sqrt(LITTLE_PENALTY*BIG_PENALTY);
+                  }
 	    }
           else
             SPF(endofstring(echo_string)," %lf", BC_Types[ibc].BC_Data_Float[9]);
@@ -1467,112 +1476,6 @@ rd_bc_specs(FILE *ifp,
           else
             SPF(endofstring(echo_string)," %lf", BC_Types[ibc].BC_Data_Float[11]);
 
-#if 0 
-	      if ( !strcmp(BC_Types[ibc].desc->name1,"VELO_THETA_TPL") ||
-	           !strcmp(BC_Types[ibc].desc->name1,"VELO_THETA_HOFFMAN") ||
-	           !strcmp(BC_Types[ibc].desc->name1,"VELO_THETA_COX") ||
-	           !strcmp(BC_Types[ibc].desc->name1,"WETTING_SPEED_BLAKE") ||
-	           !strcmp(BC_Types[ibc].desc->name1,"WETTING_SPEED_HOFFMAN") ||
-	           !strcmp(BC_Types[ibc].desc->name1,"WETTING_SPEED_COX")
-		   )
-		{ /*sanity*/
-		  /*
-		   * Check some parameters for sanity.
-		   *
-		   */
-
-		  /*
-		   * Equilibrium contact angles shall be between 1 and 179 degrees. If you can't
-		   * fit within that range you have no business here.
-		   */
-
-		  if ( BC_Types[ibc].BC_Data_Float[0] < 1. ||
-		       BC_Types[ibc].BC_Data_Float[0] > 179. )
-		    {
-		      sr = sprintf(err_msg, "BC %s angle %g not in (1,179)",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[0]);
-		      EH(-1, err_msg);
-		    }
-
-		  /*
-		   * Normal vector magnitudes ought to be pretty close to 1.
-		   */
-
-		  if ( fabs( BC_Types[ibc].BC_Data_Float[1]*
-			     BC_Types[ibc].BC_Data_Float[1] +
-			     BC_Types[ibc].BC_Data_Float[2]*
-			     BC_Types[ibc].BC_Data_Float[2] +
-			     BC_Types[ibc].BC_Data_Float[3]*
-			     BC_Types[ibc].BC_Data_Float[3] - 1 ) > 1e-3)
-		    {
-		      sr = sprintf(err_msg, "BC %s ss normal (%g,%g,%g) not unit.",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[1],
-				   BC_Types[ibc].BC_Data_Float[2],
-				   BC_Types[ibc].BC_Data_Float[3]);
-		      WH(-1,"Will use variable wall normal for VELO_THETA_TPL" );
-		    }
-		
-		  /*
-		   * Other parameters in our Blake model should be positive...
-		   */
-
-		  if ( BC_Types[ibc].BC_Data_Float[4] < 0 )
-		    {
-		      sr = sprintf(err_msg, "BC %s preexponential %g negative.",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[4]);
-		      EH(-1, err_msg);
-		    }
-
-		  if ( BC_Types[ibc].BC_Data_Float[5] < 0 )
-		    {
-		      sr = sprintf(err_msg, 
-				   "BC %s thermally-scaled surface energy %g negative.",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[5]);
-		      EH(-1, err_msg);
-		    }
-
-		  /*
-		   * t_relax = 0 is OK; means just do it with no relaxation...
-		   */
-
-		  if ( BC_Types[ibc].BC_Data_Float[6] < 0 )
-		    {
-		      sr = sprintf(err_msg, "BC %s relaxation time %g negative.",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[6]);
-		      EH(-1, err_msg);
-		    }
-		  if ( BC_Types[ibc].BC_Data_Float[7] < 0 )
-		    {
-		      sr = sprintf(err_msg, "BC %s old tpl velocity %g negative.",
-				   BC_Types[ibc].desc->name1, 
-				   BC_Types[ibc].BC_Data_Float[7]);
-		      EH(-1, err_msg);
-		    }
-		}
-
-	      if ( !strcmp(BC_Types[ibc].desc->name1,"VAR_CA_EDGE"))	  
-		{
-		  /*
-		   * Normalize substrate normal vector 
-		   */
-		  dbl *norm = &BC_Types[ibc].BC_Data_Float[5];
-		  dbl mag = sqrt(SQUARE(norm[0])+SQUARE(norm[1])+SQUARE(norm[2]));
-		  if (mag == 0.0) {
-		    sprintf(err_msg,
-			    "%s: ERROR for BC %s, zero length normal vector\n",
-			    yo, BC_Types[ibc].desc->name1);
-		    EH(-1, err_msg);
-		  } else {
-		    norm[0] /= mag; norm[1] /= mag; norm[2] /= mag;
-		  }
-		}
-	    
-#endif
 	    }
 		
 	  BC_Types[ibc].BC_Data_Int[3] = ( BC_Types[ibc].BC_Name == BLAKE_DIRICH_ROLL_BC ||
@@ -1648,6 +1551,7 @@ rd_bc_specs(FILE *ifp,
 	case MOVING_CA_BC:
 	case REP_FORCE_ROLL_BC:
 	case REP_FORCE_ROLL_RS_BC:
+	case CAP_REPULSE_TABLE_BC:
 	  if ( fscanf(ifp, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", 
 		      &BC_Types[ibc].BC_Data_Float[0],
 		      &BC_Types[ibc].BC_Data_Float[1],
@@ -1666,11 +1570,19 @@ rd_bc_specs(FILE *ifp,
 	    }
 	  for(i=0;i<10;i++) SPF(endofstring(echo_string)," %.4g", BC_Types[ibc].BC_Data_Float[i]);
           
+  	  if (fscanf(ifp, "%d", &BC_Types[ibc].BC_Data_Int[2]) != 1)
+    		{
+      		 BC_Types[ibc].BC_Data_Int[2] = -1;
+    		}
+	  else
+		SPF(endofstring(echo_string)," %d", BC_Types[ibc].BC_Data_Int[2]);
+
 	  break;
 
 	case CAP_REPULSE_ROLL_BC:
+	case CAP_REPULSE_USER_BC:
 
-	  if ( fscanf(ifp, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", 
+	  if ( fscanf(ifp, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", 
 		      &BC_Types[ibc].BC_Data_Float[0],
 		      &BC_Types[ibc].BC_Data_Float[1],
 		      &BC_Types[ibc].BC_Data_Float[2],
@@ -1683,9 +1595,10 @@ rd_bc_specs(FILE *ifp,
 		      &BC_Types[ibc].BC_Data_Float[9],
 		      &BC_Types[ibc].BC_Data_Float[10],
 		      &BC_Types[ibc].BC_Data_Float[11],
-		      &BC_Types[ibc].BC_Data_Float[12]) != 13)
+		      &BC_Types[ibc].BC_Data_Float[12],
+		      &BC_Types[ibc].BC_Data_Float[13]) != 14)
 	    {
-	      sr = sprintf(err_msg, "%s: Expected 13 flts for %s.",
+	      sr = sprintf(err_msg, "%s: Expected 14 flts for %s.",
 			   yo, BC_Types[ibc].desc->name1);
 	      EH(-1, err_msg);
 	    }
@@ -2246,6 +2159,8 @@ rd_bc_specs(FILE *ifp,
         case LUBP_SH_FP_FLUX_BC:
         case T_CONTACT_RESIS_BC:
         case T_CONTACT_RESIS_2_BC:
+        case LIGHTP_JUMP_BC:
+        case LIGHTM_JUMP_BC:
 
 	  if ( fscanf(ifp, "%d %d", &BC_Types[ibc].BC_Data_Int[0],
 		      &BC_Types[ibc].BC_Data_Int[1]) != 2)
@@ -2477,6 +2392,12 @@ rd_bc_specs(FILE *ifp,
 	    if (BC_Types[ibc].BC_Name == IS_EQUIL_PRXN_BC) {
 	      assign_global_species_var_type(SPECIES_CONCENTRATION, FALSE);
 	    }
+	    if (BC_Types[ibc].species_eq == 0 && 
+                 (BC_Types[ibc].BC_Name == IS_EQUIL_PRXN_BC ||
+                  BC_Types[ibc].BC_Name == VL_EQUIL_PRXN_BC)) {
+                 IntSrc_BCID[Num_Interface_Srcs] = BC_Types[ibc].BC_ID;
+                 Num_Interface_Srcs++;
+            }
 
 	    for(i=0;i<3;i++) SPF(endofstring(echo_string)," %d", BC_Types[ibc].BC_Data_Int[i]);
 	    SPF(endofstring(echo_string)," %.4g", BC_Types[ibc].BC_Data_Float[0]);
@@ -2487,6 +2408,7 @@ rd_bc_specs(FILE *ifp,
 	   * and two float 
 	   */
 	case POROUS_GAS_BC:
+	case YFLUX_DISC_RXN_BC:
 	  if (fscanf(ifp, "%d %d %d %lf %lf", 
 		      &BC_Types[ibc].BC_Data_Int[0],
 		      &BC_Types[ibc].BC_Data_Int[1],

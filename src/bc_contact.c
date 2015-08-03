@@ -65,8 +65,6 @@
 
 int
 apply_contact_bc (
-          int    ija[],         /* Vector of integer pointers into the vector a */
-          double a[],           /* Jacobian */
           double x[],           /* Solution vector for the current processor    */
           double resid_vector[],/* Residual vector for the current processor    */
           const double delta_t, /* current time step size                       */
@@ -1466,7 +1464,7 @@ apply_embedded_bc (
 		    }
 		  if( pd->e[R_MOMENTUM1] && !ls->AdaptIntegration )
 		    {
-		      err = assemble_momentum_path_dependence(time_value, theta, dt, pg_data->h_elem_avg);
+		      err = assemble_momentum_path_dependence(time_value, theta, dt, pg_data);
 		      EH( err, "assemble_momentum_path_dependence");
 		    }
 		  if( pd->e[R_PRESSURE] && !ls->AdaptIntegration )

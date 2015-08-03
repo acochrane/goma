@@ -3710,8 +3710,6 @@ put_fluid_stress_on_shell(int id, /* local element node number for the
 			  int id_shell, /* local shell element node number corresponding to id */
 			  int I, /* Global node number                      */
 			  int ielem_dim, /* physical dimension of the elem  */
-			  int ija[], /* column pointer array                */
-			  double a[], /* nonzero array entries              */
 			  double resid_vector[], /* Residual vector         */
 			  int local_node_list_fs[], /* MDE list to keep track
 						     * of nodes at which 
@@ -6643,6 +6641,22 @@ assemble_lubrication(const int EQN,     /* equation type: either R_LUBP or R_LUB
     }  
     break;
   }
+
+  /* Check for nehative lubrication height, if so, get out */
+  if(H <= 0.0)
+   {
+    neg_lub_height = TRUE;
+
+#ifdef PARALLEL
+    fprintf(stderr,"\nP_%d: Lubrication height =  %e\n",ProcID,H);
+#else
+    fprintf(stderr,"\n Lubrication height =  %e\n",H);
+#endif
+
+    status = 2;
+    return(status);
+   }
+
 
   /* Lubrication wall velocity from model */
   velocity_function_model(veloU, veloL, time, dt);

@@ -54,9 +54,9 @@
 				/* component is set =0.*/
 
 #ifndef _CK_NAME_DEF
-typedef char CK_NAME[16];       /* Typedefs for common names used for naming
+typedef char CK_NAME[64];       /* Typedefs for common names used for naming
 				   domains and species */
-typedef char CK_NAME_STR[17];
+typedef char CK_NAME_STR[64];
 #define     _CK_NAME_DEF
 #endif
 
@@ -998,6 +998,7 @@ struct Transient_Information
 		                            theta = .5 => Crack-Nicholson  */
   dbl eps;          /* time step error  */
   int use_var_norm[MAX_VARIABLE_TYPES]; /* Booleans used for time step truncation error control */
+  int fix_freq;
   int print_freq;
   double print_delt;
   double print_delt2_time;
@@ -2885,6 +2886,14 @@ struct pspg_dependence
   double S[DIM][MAX_MODES][DIM][DIM][MDE]; /* stress mode dependence. */
 };
 typedef struct pspg_dependence PSPG_DEPENDENCE_STRUCT;
+
+/* struct for d_cont_gls */
+struct cont_gls_dependence
+{
+  double v[DIM][MDE];      /* velocity dependence */
+  double X[DIM][MDE];      /* mesh dependence */
+};
+typedef struct cont_gls_dependence CONT_GLS_DEPENDENCE_STRUCT;
 
 
 struct Petrov_Galerkin_Data {

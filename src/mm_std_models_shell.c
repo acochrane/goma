@@ -539,10 +539,6 @@ height_function_model (double *H_U,
    }
 
  H = *H_U - *H_L;
- if(H <= 0.0) 
-   {
-     EH(-1, "Negative Lubrication Gap");
-   }
 
  return(H);
 

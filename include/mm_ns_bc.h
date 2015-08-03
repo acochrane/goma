@@ -70,7 +70,8 @@ PROTO((JACOBIAN_VAR_DESC_STRUCT *,    /*  *func_jac        */
        const double [MAX_PDIM],       /*  x_dot[MAX_PDIM]  */
        const double,                  /*  time               */
        const double,                  /*  tt               */
-       const double ));               /*  dt               */
+       const double,               /*  dt               */
+       const int ));               /*  interface_id               */
 
 EXTERN double sdc_stefan_volume_flow
 PROTO((JACOBIAN_VAR_DESC_STRUCT *,    /*  *func_jac        */
@@ -190,22 +191,20 @@ PROTO((double [],		/* func                                      */
 				 * method from BE(0) to CN(1/2) to FE(1)     */
        const dbl ));		/* dt - current value of the time step size  */
 
-EXTERN void fvelo_slip_bc	/* mm_ns_bc.c                                */
-PROTO((double [MAX_PDIM],	/* func                                      */
-       double [MAX_PDIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE], /* d_func      */
-       double [],               /* solution vector x */
-       const int ,		/* type - whether rotational or not          */
-       double ,			/* beta - Navier slip coefficient input deck */
-       const double ,		/* vsx                                       */
-       const double ,		/* vsy                                       */
-       const double ,		/* vsz - velocity components of solid surface
-				 * in which slip condition is applied        */
-       const int ,		/* DCL node id          */
-       const double ,		/* slip extent */
-       const double [MAX_PDIM], /*gauss point coordinates   **/
-       const double ,           /* tt - parameter to vary time integration
-                                 * method from BE(0) to CN(1/2) to FE(1)     */
-       const double ));         /* dt - current value of the time step size  */
+void
+fvelo_slip_bc(double func[MAX_PDIM],
+	      double d_func[MAX_PDIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
+	      double x[],
+	      const int type,    /* whether rotational or not */
+              double bc_float[MAX_BC_FLOAT_DATA],
+	      const int dcl_node,/*   node id for DCL  */
+	      const double xsurf[MAX_PDIM], /* coordinates of surface Gauss  *
+					     * point, i.e. current position  */
+	      const double tt,   /* parameter in time stepping alg           */
+	      const double dt);   /* current time step value                  */
+
+int
+exchange_fvelo_slip_bc_info(int ibc /* Index into BC_Types for VELO_SLIP_BC */);
 
 
 EXTERN void fvelo_slip_level
@@ -262,9 +261,6 @@ PROTO((double [MDE][DIM],	/* cfunc                                     */
        const int ,		/* id_side - ID of the side of the element   */
        const double ,		/* sigma - surface tension                   */
        const double ,		/* pb - applied pressure                     */
-       const double ,		/* pr - coefficient for repulsion force to 
-				 * ensure no penetration of the solid boundary
-				 * by the free surface                       */
        struct elem_side_bc_struct *, /* elem_side_bc                         */
        const int ,		/* iconnect_ptr                              */
        double [DIM][MDE]));	/* dsigma_dx                               */
@@ -285,7 +281,6 @@ PROTO((double cfunc[MDE][DIM],
 EXTERN void apply_repulsion_roll
 PROTO((double cfunc[MDE][DIM],
        double d_cfunc[MDE][DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
-       const double ,		/* surface tensionf  */
        const double ,		/* roll radius      */
        const double [3],		/* axis origin      */
        const double [3],		/* direction angles      */
@@ -296,6 +291,35 @@ PROTO((double cfunc[MDE][DIM],
        const double ,		/* omega - roll rotation rate    */
        struct elem_side_bc_struct *, /* elem_side_bc */
        const int ));		/* iconnect_ptr */
+
+EXTERN void apply_repulsion_user
+PROTO((double cfunc[MDE][DIM],
+       double d_cfunc[MDE][DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
+       const double ,		/* roll radius      */
+       const double [3],		/* axis origin      */
+       const double [3],		/* direction angles      */
+       const double ,		/* repulsion length scale      */
+       const double ,		/* repulsion exponent     */
+       const double ,		/* repulsion coefficient     */
+       const double ,		/* inverse slip coefficient    */
+       const double ,		/* omega - roll rotation rate    */
+       struct elem_side_bc_struct *, /* elem_side_bc */
+       const int ));		/* iconnect_ptr */
+
+EXTERN void apply_repulsion_table
+PROTO((double cfunc[MDE][DIM],
+       double d_cfunc[MDE][DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
+       double [],		/* Solution vector */
+       const double ,		/* repulsion length scale      */
+       const double ,		/* repulsion exponent     */
+       const double ,		/* repulsion coefficient     */
+       const double ,		/* inverse slip coefficient    */
+       const double ,		/* exclusion scale    */
+       const double [3],		/* wall velocity      */
+       const int ,		/* DCL node id    */
+       struct elem_side_bc_struct *, /* elem_side_bc */
+       const int ));		/* iconnect_ptr */
+
 
 EXTERN void apply_vapor_recoil
 PROTO((double cfunc[MDE][DIM],
@@ -315,6 +339,12 @@ PROTO((double [DIM],		/* func                                      */
        const double ,		/* b for pressure variation                  */
        const double ,		/* c for pressure variation                  */
        const double ));		/* d - pressure variation                    */
+
+EXTERN void flow_n_dot_T_var_density
+PROTO((double [DIM],            /* func                                      */
+       double [DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],/* d_func            */
+       const double,            /* a - reference pressure                  */
+       const double));          /* time - current time                       */
 
 #if 0
 /* deprecated March 2002 by TAB */
@@ -686,6 +716,15 @@ PROTO((double [DIM],              /* func */
        const int ,                /* value id_block_1  */
        const int ,                /* value id_block_2  */
        const double ));           /* value Rinv  */
+
+EXTERN void qside_light_jump
+PROTO((double [DIM],              /* func */
+       double [DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE], /*   d_func   */
+       const double,	/* Time                                      */
+       const int,	/* bc_type */     
+       const int ,                /* value id_block_1  */
+       const int                 /* value id_block_2  */
+        ));           /* value Rinv  */
 
 EXTERN void qside_ls
 PROTO((double [DIM],              /* func */

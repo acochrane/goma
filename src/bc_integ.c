@@ -69,10 +69,7 @@
 #include "goma.h"
 
 int
-apply_integrated_bc(
-		    int    ija[],         /* Vector of integer pointers into the vector a */
-		    double a[],           /* Jacobian */
-		    double x[],           /* Solution vector for the current processor    */
+apply_integrated_bc(double x[],           /* Solution vector for the current processor    */
 		    double resid_vector[],/* Residual vector for the current processor    */
 		    const double delta_t, /* current time step size                       */
 		    const double theta,	/* parameter (0 to 1) to vary time integration
@@ -134,6 +131,7 @@ apply_integrated_bc(
   struct BC_descriptions *bc_desc;
   VARIABLE_DESCRIPTION_STRUCT *vd;
   double surface_centroid[DIM]; 
+  int interface_id = -1;
 
   tran->time_value = time_intermediate;
 
@@ -370,12 +368,24 @@ apply_integrated_bc(
        */
       if (bc->BC_Name == VL_EQUIL_PRXN_BC ||
 	  bc->BC_Name == IS_EQUIL_PRXN_BC ||
-	  bc->BC_Name == SDC_STEFANFLOW_BC ) {
-	new_way = TRUE;
+	  bc->BC_Name == YFLUX_DISC_RXN_BC ||
+	  bc->BC_Name == SDC_STEFANFLOW_BC ||
+	  bc->BC_Name == SDC_KIN_SF_BC ) {
+	  new_way = TRUE;
+	  for (icount = 0; icount < Num_Interface_Srcs; icount++)  {
+                if(bc->BC_ID == IntSrc_BCID[icount])    {
+                     interface_id = icount;
+                     }
+                }
+          if (is) 
+            {
+	     for (icount = 0; icount < mp->Num_Species; icount++)  {
+                    is[interface_id].Processed[icount] = FALSE;
+                    }
+	    }
       } else {
         new_way = FALSE;
       }
-      if (is) is->Processed = FALSE;
       iapply = 0;
       skip_other_side = FALSE;
       if (ei->elem_blk_id == ss_to_blks[1][ss_index]) {
@@ -681,12 +691,8 @@ apply_integrated_bc(
  	case VELO_SLIP_ROT_FILL_BC:
 	  fvelo_slip_bc(func, d_func, x, 
 			(int) bc->BC_Name,
-			bc->BC_Data_Float[0],
-			bc->BC_Data_Float[1], 
-			bc->BC_Data_Float[2], 
-			bc->BC_Data_Float[3],
+			bc->BC_Data_Float,
 			(int) bc->BC_Data_Int[0],
-			bc->BC_Data_Float[4],
 			xsurf, theta, delta_t);
 	  break;  
 
@@ -920,6 +926,8 @@ apply_integrated_bc(
 	case CAPILLARY_BC:
 	case CAP_REPULSE_BC:
 	case CAP_REPULSE_ROLL_BC:
+	case CAP_REPULSE_USER_BC:
+	case CAP_REPULSE_TABLE_BC:
 	case CAP_RECOIL_PRESS_BC:
 	case CAPILLARY_SHEAR_VISC_BC:
 	case CAPILLARY_TABLE_BC:
@@ -946,7 +954,7 @@ apply_integrated_bc(
 
 	    fn_dot_T(cfunc, d_cfunc, elem_side_bc->id_side,
 		     bc->BC_Data_Float[0], pb,
-		     0., elem_side_bc, iconnect_ptr, dsigma_dx);
+		     elem_side_bc, iconnect_ptr, dsigma_dx);
 
 	    if (bc->BC_Name == CAP_REPULSE_BC) {
 	      apply_repulsion(cfunc, d_cfunc, bc->BC_Data_Float[2],
@@ -956,15 +964,37 @@ apply_integrated_bc(
 	    }
 
 	    if (bc->BC_Name == CAP_REPULSE_ROLL_BC) {
-	      apply_repulsion_roll(cfunc, d_cfunc, bc->BC_Data_Float[0], 
-                               bc->BC_Data_Float[1], 
-			       &(bc->BC_Data_Float[2]),
-			       &(bc->BC_Data_Float[5]),
-                               bc->BC_Data_Float[8], 
+	      apply_repulsion_roll(cfunc, d_cfunc, 
+                               bc->BC_Data_Float[2], 
+			       &(bc->BC_Data_Float[3]),
+			       &(bc->BC_Data_Float[6]),
                                bc->BC_Data_Float[9], 
                                bc->BC_Data_Float[10], 
                                bc->BC_Data_Float[11], 
                                bc->BC_Data_Float[12], 
+                               bc->BC_Data_Float[13], 
+			      elem_side_bc, iconnect_ptr);
+	    }
+	    if (bc->BC_Name == CAP_REPULSE_USER_BC) {
+	      apply_repulsion_user(cfunc, d_cfunc, 
+                               bc->BC_Data_Float[2], 
+			       &(bc->BC_Data_Float[3]),
+			       &(bc->BC_Data_Float[6]),
+                               bc->BC_Data_Float[9], 
+                               bc->BC_Data_Float[10], 
+                               bc->BC_Data_Float[11], 
+                               bc->BC_Data_Float[12], 
+                               bc->BC_Data_Float[13], 
+			      elem_side_bc, iconnect_ptr);
+	    }
+	    if (bc->BC_Name == CAP_REPULSE_TABLE_BC) {
+	      apply_repulsion_table(cfunc, d_cfunc, x, bc->BC_Data_Float[2], 
+                               bc->BC_Data_Float[3], 
+                               bc->BC_Data_Float[4], 
+                               bc->BC_Data_Float[5], 
+                               bc->BC_Data_Float[6], 
+			       &(bc->BC_Data_Float[7]),
+                               bc->BC_Data_Int[2],
 			      elem_side_bc, iconnect_ptr);
 	    }
 	    if (BC_Types[bc_input_id].BC_Name == CAP_RECOIL_PRESS_BC)
@@ -1013,6 +1043,12 @@ apply_integrated_bc(
 			     bc->BC_Data_Float[1],
 			     bc->BC_Data_Float[2],
 			     bc->BC_Data_Float[3]);
+	  break;
+
+	case FLOW_PRESSURE_VAR_BC:
+	  flow_n_dot_T_var_density(func, d_func,
+			     bc->BC_Data_Float[0],
+			     time_value);
 	  break;
 
 	case FLOW_STRESSNOBC_BC:
@@ -1136,16 +1172,24 @@ apply_integrated_bc(
 		      bc->BC_Data_Float[4]);
 	  break;
 
+	case YFLUX_DISC_RXN_BC:
+
+	  yflux_disc_rxn_bc(func, d_func, bc->BC_Data_Int[0],
+			    bc->BC_Data_Int[1], bc->BC_Data_Int[2],
+			    bc->BC_Data_Float[0], bc->BC_Data_Float[1], delta_t, theta) ;
+
+	  break;
+
 	case VL_EQUIL_PRXN_BC:
 	  new_way = TRUE;
 	  func[0] = raoults_law_prxn(&jacCol, bc, ip, elem_side_bc, 
-				     x_dot, time_value, theta, delta_t);
+		  x_dot, time_value, theta, delta_t,interface_id);
 	  break;
 
 	case IS_EQUIL_PRXN_BC:
 	  new_way = TRUE;
 	  func[0] = is_equil_prxn(&jacCol, bc, ip, elem_side_bc,
-				  x_dot, time_value, theta, delta_t);
+          	  x_dot, time_value, theta, delta_t,interface_id);
 	  break;
 
         case SDC_STEFANFLOW_BC:
@@ -1161,7 +1205,7 @@ apply_integrated_bc(
 	  }
 	  if (iapply) {
 	    func[0] = sdc_stefan_flow(&jacCol, bc, ip, elem_side_bc,
-				      x_dot, time_value, theta, delta_t);
+		      x_dot, time_value, theta, delta_t,interface_id);
 	  } else {
 	    skip_other_side = TRUE;
 	  }
@@ -1180,7 +1224,7 @@ apply_integrated_bc(
 	  }
 	  if (iapply) {
 	    func[0] = sdc_stefan_flow(&jacCol, bc, ip, elem_side_bc,
-				      x_dot, time_value, theta, delta_t);
+	             x_dot, time_value, theta, delta_t, interface_id);
 	  } else {
 	    skip_other_side = TRUE;
 	  }
@@ -1575,6 +1619,12 @@ apply_integrated_bc(
                       bc->BC_Data_Float[1], bc->BC_Data_Float[2],
                       bc->BC_Data_Int[0]);
 	    break;
+	case LIGHTP_JUMP_BC:
+	case LIGHTM_JUMP_BC:
+	  qside_light_jump(func, d_func, time_intermediate,(int)bc->BC_Name,
+			    bc->BC_Data_Int[0],
+			    bc->BC_Data_Int[1]);
+	 break;
 	case APR_NOBC_BC:
 	case API_NOBC_BC:
 	  acoustic_nobc_surf (func, d_func, time_intermediate, (int)bc->BC_Name);
@@ -1877,6 +1927,8 @@ apply_integrated_bc(
 	  if ((BC_Types[bc_input_id].BC_Name == CAPILLARY_BC || 
 	       BC_Types[bc_input_id].BC_Name == CAP_REPULSE_BC ||
 	       BC_Types[bc_input_id].BC_Name == CAP_REPULSE_ROLL_BC ||
+	       BC_Types[bc_input_id].BC_Name == CAP_REPULSE_USER_BC ||
+	       BC_Types[bc_input_id].BC_Name == CAP_REPULSE_TABLE_BC ||
 	       BC_Types[bc_input_id].BC_Name == CAP_RECOIL_PRESS_BC ||
 	       BC_Types[bc_input_id].BC_Name == CAPILLARY_TABLE_BC ||
 	       BC_Types[bc_input_id].BC_Name == ELEC_TRACTION_BC ||
@@ -1952,6 +2004,8 @@ apply_integrated_bc(
                   BC_Types[bc_input_id].BC_Name != YFLUX_USER_BC &&
 		  BC_Types[bc_input_id].BC_Name != CAP_REPULSE_BC &&
 		  BC_Types[bc_input_id].BC_Name != CAP_REPULSE_ROLL_BC &&
+		  BC_Types[bc_input_id].BC_Name != CAP_REPULSE_USER_BC &&
+		  BC_Types[bc_input_id].BC_Name != CAP_REPULSE_TABLE_BC &&
 		  BC_Types[bc_input_id].BC_Name != CAP_RECOIL_PRESS_BC &&
 		  BC_Types[bc_input_id].BC_Name != CAPILLARY_TABLE_BC &&
 		  BC_Types[bc_input_id].BC_Name != TENSION_SHEET_BC &&
@@ -2014,6 +2068,7 @@ apply_integrated_bc(
 		       bc->BC_Name == VL_EQUIL_BC ||
 		       bc->BC_Name == VL_POLY_BC ||
 		       bc->BC_Name == SDC_STEFANFLOW_BC ||
+		       bc->BC_Name == SDC_KIN_SF_BC ||
 		       bc->BC_Name == T_CONTACT_RESIS_2_BC)) {
 		    ldof_eqn += 1;
 		  }

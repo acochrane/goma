@@ -285,6 +285,9 @@ int setup_problem(Exo_DB *exo,	/* ptr to the finite element mesh database */
    */
   init_shell_element_blocks(exo);
 
+  /* Communicate non-shared but needed BC information */
+  exchange_bc_info();
+
   return 0;
 }
 /************************************************************************/
@@ -829,6 +832,7 @@ bc_matrl_index(Exo_DB *exo)
 	  * are in the second and third integer slots
 	  */
      case VL_EQUIL_BC:
+     case YFLUX_DISC_RXN_BC:
      case DISCONTINUOUS_VELO_BC:	 
 	 bc_ptr->BC_matrl_index_1 = map_mat_index(bc_ptr->BC_Data_Int[1]);
 	 bc_ptr->BC_matrl_index_2 = map_mat_index(bc_ptr->BC_Data_Int[2]);
@@ -1124,6 +1128,8 @@ determine_dvi_index(void)
     case CAPILLARY_BC:
     case CAPILLARY_TABLE_BC:
     case CAP_REPULSE_ROLL_BC:
+    case CAP_REPULSE_USER_BC:
+    case CAP_REPULSE_TABLE_BC:
     case CAPILLARY_SHEAR_VISC_BC:
     case LATENT_HEAT_BC:
     case YFLUX_USER_BC:
@@ -1197,6 +1203,7 @@ determine_dvi_index(void)
 	break;
 
     case VL_EQUIL_PRXN_BC:
+    case YFLUX_DISC_RXN_BC:
     case SDC_SURFRXN_BC:
         if (! bc_ptr->Internal_Boundary) {
           fprintf(stderr,

@@ -156,6 +156,7 @@ extern FSUB_TYPE dsyev_(char *JOBZ, char *UPLO, int *N, double *A, int *LDA,
 *  heat_source                 double
 *  ls_modulate_heatsource 
 *  calc_pspg
+*  calc_cont_gls
 *  assemble_ls_latent_heat_source
 *  assemble_acoustic		int 
 *  assemble_acoustic_reynolds_stress int
@@ -2452,6 +2453,12 @@ assemble_momentum(dbl time,       /* current time */
 					   of the vertices for Q1. It comes from
 					   the routine "element_velocity." */
 
+  //Continuity stabilization
+  dbl continuity_stabilization;
+  dbl cont_gls;
+  CONT_GLS_DEPENDENCE_STRUCT d_cont_gls_struct;
+  CONT_GLS_DEPENDENCE_STRUCT *d_cont_gls = &d_cont_gls_struct;
+
   int *n_dof = NULL;
   int dof_map[MDE];
   
@@ -2711,6 +2718,12 @@ assemble_momentum(dbl time,       /* current time */
 
   (void) momentum_source_term(f, df, time);
 
+  //Call continuity stabilization if desired
+  if(Cont_GLS)
+    {
+      calc_cont_gls(&cont_gls, d_cont_gls, time, pg_data);
+    }
+
   /*
    * Residuals_________________________________________________________________
    */
@@ -2906,6 +2919,16 @@ assemble_momentum(dbl time,       /* current time */
 		     * source term. */
 		    source = element_particle_info[ei->ielem].source_term[i];
 		}
+	      
+	      //Continuity residual
+	      continuity_stabilization = 0.0;
+              if (Cont_GLS)
+		{
+		  for (p=0; p<VIM; p++){
+		    continuity_stabilization += grad_phi_i_e_a[p][p];
+		    }
+                  continuity_stabilization *= cont_gls*d_area;
+	        }
 
 	      /*
 	       * Add contributions to this residual (globally into Resid, and 
@@ -2913,7 +2936,7 @@ assemble_momentum(dbl time,       /* current time */
 	       */
 		  
 	      /*lec->R[peqn][ii] += mass + advection + porous + diffusion + source;*/
-	      R[ii] += mass + advection + porous + diffusion + source;
+              R[ii] += mass + advection + porous + diffusion + source + continuity_stabilization;
 
 #ifdef DEBUG_MOMENTUM_RES
 	      printf("R_m[%d][%d] += %10f %10f %10f %10f %10f\n",
@@ -3474,8 +3497,20 @@ assemble_momentum(dbl time,       /* current time */
 			    {
 			      source    = phi_i * df->v[a][b][j] * d_area;
 			      source   *= source_etm;
-			    }		
-			  J[j] +=  mass + advection + porous + diffusion + source;
+			    }
+
+			  continuity_stabilization = 0.0;
+			  if (Cont_GLS)
+			    {
+			      for (p=0; p<VIM; p++)
+				{
+				  continuity_stabilization += grad_phi_i_e_a[p][p];
+				}
+			      continuity_stabilization *= d_cont_gls->v[b][j]*d_area;
+			    }
+
+
+			  J[j] +=  mass + advection + porous + diffusion + source + continuity_stabilization;
 
 			  /*lec->J[peqn][pvar][ii][j] +=  mass + advection + porous + diffusion + source; */
 			}
@@ -3633,7 +3668,9 @@ assemble_momentum(dbl time,       /* current time */
 				}
 				porous *= phi_i * wt;
 
+
 				J[jk] += porous;
+    
 			      }
 			    }
 
@@ -3827,6 +3864,7 @@ assemble_momentum(dbl time,       /* current time */
 			      source    = phi_i * df->C[a][w][j] * det_J * h3 *wt;
 			      source   *= pd->etm[eqn][(LOG2_SOURCE)];
 			    }
+		  
 
 			  lec->J[peqn][MAX_PROB_VAR + w][ii][j] +=
 			    mass + advection + porous + diffusion + source;
@@ -3898,8 +3936,8 @@ assemble_momentum(dbl time,       /* current time */
 			      a,i,j,mass,advection,porous,diffusion);
 #endif /* DEBUG_MOMENTUM_JAC */
 				   
-		    J[j] += diffusion ;
 		    /*lec->J[peqn][pvar][ii][j] += diffusion ;  */
+		    J[j] += diffusion;
 		  }
 	      }
 
@@ -4259,7 +4297,20 @@ assemble_momentum(dbl time,       /* current time */
 				advection *= (1.0 - p_vol_frac);
 			      }
 
-			    J[j] += mass + advection + porous + diffusion + source;
+			    continuity_stabilization = 0.0;
+			    if (Cont_GLS)
+			      {
+				for(p=0; p<VIM; p++)
+				  {
+				    continuity_stabilization += d_grad_phi_i_e_a_dmesh[p][p][b][j] * cont_gls*d_area;
+				    continuity_stabilization += grad_phi_i_e_a[p][p] * d_cont_gls->X[b][j]*d_area;
+				    continuity_stabilization += grad_phi_i_e_a[p][p]*cont_gls *
+				                                (d_det_J_dmesh_bj *h3 + det_J *dh3dmesh_bj)*wt;
+				  }
+				
+			      }
+
+			    J[j] += mass + advection + porous + diffusion + source + continuity_stabilization;
 			  }
 
 			/* Special Case for shell lubrication velocities with bounding continuum.  Note j-loop is over bulk element */			
@@ -16477,6 +16528,301 @@ interpolate_table( struct Data_Table *table,
 }
 
 
+/***************************************************************************/
+
+double
+table_distance_search( struct Data_Table *table, 
+			double x[], 
+			double *sloper,
+			double dfunc_dx[])
+  /* 
+   *      A routine to find the shortest distance from a point
+   *      to a table represented curve
+	  
+	  Author: Robert B. Secor
+	  Date  : December 5, 2014
+	  Revised: 
+
+      Parameters:
+          table = pointer to Data_Table structure
+	  x     = array of point coordinates
+	  slope = d(ordinate)/dx 
+
+      returns:
+          value of distance
+   */
+{
+  int i, N, iinter, istartx, istarty,basis,ordinate,i_min=0,elem,iter;
+  double func=0, y1, y2, y3, y4, tt, uu;
+  double *t, *t2, *t3, *f;
+  double cee, phi[3],xleft,xright,delta,epstol=0.0001,update,point;
+  double phic[3]={0,0,0};
+  int ngrid1,ngrid2,ngrid3;
+  double dist, dist_min = BIG_PENALTY;
+
+  N = table->tablelength - 1;
+  t = table->t;
+  t2 = table->t2;
+  t3 = table->t3;
+  f = table->f;
+  if(table->t_index[0] == MESH_POSITION1)
+     {basis = 0;ordinate =1;}
+  else
+  if(table->t_index[0] == MESH_POSITION2)
+     {basis = 1;ordinate =0;}
+  else
+     {basis = 0;ordinate =1;}
+  uu=0.0;
+
+  switch ( table->interp_method )
+  {
+  case LINEAR:      /* This is knucklehead linear interpolation scheme */
+
+/*  maybe someday you would prefer a more logical fem-based interpolation */
+
+      if(0)
+      {
+	for( i=0; i < N ; i++)
+	{
+	  cee = (x[0]-t[i])/(t[i+1] - t[i]);
+	  if( (cee >= 0.0 && cee <= 1.0) || (cee < 0.0 && i == 0)
+	      || (cee > 1.0 && i == N-1))
+	  {
+	    phi[0]=-cee+1.;
+	    phi[1]=cee;
+	    table->slope[0] = f[i]*phi[0]+f[i+1]*phi[1];
+	    table->slope[1] = f[N+1+i]*phi[0]+f[N+2+i]*phi[1];
+	    break;
+	  }
+	}
+	table->slope[2] = 0.0;
+      }
+      else
+      {
+	if ( x[0] < t[0] )
+	{
+	  table->slope[0] = ( f[1] - f[0] ) / ( t[1] - t[0] );
+	  func = f[0] +  (table->slope[0]) * ( x[0] - t[0] );
+	}
+      
+	for( i=0; x[0] >= t[i] &&  i < N ; i++)
+	{
+	  if ( x[0] >= t[i] && x[0] < t[i+1] )
+	  {
+	    table->slope[0] = ( f[i+1] - f[i] ) / ( t[i+1] - t[i] );
+	    func  = f[i] + (table->slope[0]) * ( x[0] - t[i] );
+	  }
+	}
+	if ( x[0]>= t[N] )
+	{
+	  table->slope[0] = ( f[N] - f[N-1] ) / ( t[N] - t[N-1] );
+	  func = f[N] + (table->slope[0]) * ( x[0] - t[N] ) ;
+	}
+	table->slope[1]=0.0;
+	*sloper=table->slope[0];
+      }
+      break;
+
+  case QUADRATIC:      /* quadratic lagrangian interpolation scheme */
+
+      if(table->columns == 3)
+      {
+	for( i=0; i < N ; i+=2)
+        {
+          cee = (x[0]-t[i])/(t[i+2] - t[i]);
+          if( (cee >= 0.0 && cee <= 1.0) || (cee < 0.0 && i == 0)
+	      || (cee > 1.0 && i == N-2))
+	  {
+	    phi[0]=2.*cee*cee-3.*cee+1.;
+	    phi[1]=-4.*cee*cee+4.*cee;
+	    phi[2]=2.*cee*cee-cee;
+	    table->slope[0] = f[i]*phi[0]+f[i+1]*phi[1]+f[i+2]*phi[2];
+	    table->slope[1] = f[N+1+i]*phi[0]+f[N+2+i]*phi[1]+f[N+3+i]*phi[2];
+	    break;
+	  }
+        }
+        table->slope[2] = 0.0;
+      }
+      else
+      {
+        /* search through points for minimum distance*/
+        dist_min = dist = sqrt(SQUARE(x[basis]-t[0])+SQUARE(x[ordinate]-f[0]));
+	for( i=1; i < N ; i++)
+        {
+          dist = sqrt(SQUARE(x[basis]-t[i])+SQUARE(x[ordinate]-f[i]));
+          if(dist < dist_min)
+              { i_min = i;  dist_min = dist; }
+        }
+        elem = i_min/2-1; cee = 0.;
+        for(iter=0 ; iter<10 ; iter++)
+          {
+	    phi[0]=2.*cee*cee-3.*cee+1.;
+	    phi[1]=-4.*cee*cee+4.*cee;
+	    phi[2]=2.*cee*cee-cee;
+	    func = f[2*elem]*phi[0]+f[2*elem+1]*phi[1]+f[2*elem+2]*phi[2];
+	    phic[0]=4.*cee-3.;
+	    phic[1]=-8.*cee+4.;
+	    phic[2]=4.*cee-1.;
+            delta = t[2*elem+2] - t[2*elem];
+	    *sloper = (f[2*elem]*phic[0]+f[2*elem+1]*phic[1]+f[2*elem+2]*phic[2]);
+            point = t[2*elem]+cee*delta;
+            update = ((point-x[basis])*delta+(func-x[ordinate])*(*sloper))
+                             /(SQUARE(delta)+SQUARE(*sloper));
+            cee -= update;
+            if(fabs(update) < epstol) break;
+            if(cee < 0.0 && elem > 0) 
+                   { cee += 1.0;    elem -= 1;}
+            if(cee > 1.0 && elem <  ((N-1)/2-1)) 
+                   { cee -= 1.0;    elem += 1;}
+	  }
+        dist_min = sqrt(SQUARE(x[basis]-point)+SQUARE(x[ordinate]-func));
+        table->slope[0] = dfunc_dx[basis] = (point-x[basis])/dist_min;
+        dfunc_dx[ordinate] = (func-x[ordinate])/dist_min;
+	table->slope[1]=point;
+	table->slope[2]=func;
+	*sloper=table->slope[0];
+      }
+      break;
+
+  case QUAD_GP:      /* quadratic lagrangian interpolation scheme */
+
+      if(table->columns == 3)
+      {
+	for( i=0; i < N ; i+=3)
+        {
+          xleft=(5.+sqrt(15.))/6.*t[i]-2./3.*t[i+1]+(5.-sqrt(15.))/6.*t[i+2];
+          xright=(5.-sqrt(15.))/6.*t[i]-2./3.*t[i+1]+(5.+sqrt(15.))/6.*t[i+2];
+          cee = (x[0]-xleft)/(xright-xleft);
+          if( (cee >= 0.0 && cee <= 1.0) || (cee < 0.0 && i == 0)
+	      || (cee > 1.0 && i == N-3))
+	  {
+	    phi[0]=(20.*cee*cee-2.*(sqrt(15.)+10.)*cee+sqrt(15.)+5.)/6.;
+	    phi[1]=(-10.*cee*cee+10.*cee-1.)*2./3.;
+	    phi[2]=(20.*cee*cee+2.*(sqrt(15.)-10.)*cee-sqrt(15.)+5.)/6.;
+	    table->slope[0] = f[i]*phi[0]+f[i+1]*phi[1]+f[i+2]*phi[2];
+	    table->slope[1] = f[N+1+i]*phi[0]+f[N+2+i]*phi[1]+f[N+3+i]*phi[2];
+	    break;
+	  }
+        }
+        table->slope[2] = 0.0;
+      }
+      else
+      {
+	for( i=0; i < N ; i+=3)
+        {
+          xleft=(5.+sqrt(15.))/6.*t[i]-2./3.*t[i+1]+(5.-sqrt(15.))/6.*t[i+2];
+          xright=(5.-sqrt(15.))/6.*t[i]-2./3.*t[i+1]+(5.+sqrt(15.))/6.*t[i+2];
+          cee = (x[0]-xleft)/(xright-xleft);
+          if( (cee >= 0.0 && cee <= 1.0) || (cee < 0.0 && i == 0)
+	      || (cee > 1.0 && i == N-3))
+	  {
+	    phi[0]=(20.*cee*cee-2.*(sqrt(15.)+10.)*cee+sqrt(15.)+5.)/6.;
+	    phi[1]=(-10.*cee*cee+10.*cee-1.)*2./3.;
+	    phi[2]=(20.*cee*cee+2.*(sqrt(15.)-10.)*cee-sqrt(15.)+5.)/6.;
+	    func = f[i]*phi[0]+f[i+1]*phi[1]+f[i+2]*phi[2];
+	    phi[0]=(20.*cee-sqrt(15.)+10.)/3.;
+	    phi[1]=(-40.*cee+20.)/3.;
+	    phi[2]=(20.*cee+sqrt(15.)-10.)/3.;
+	    table->slope[0] = (f[i]*phi[0]+f[i+1]*phi[1]+f[i+2]*phi[2])
+		/(xright-xleft);
+	    break;
+	  }
+        }
+	table->slope[1]=0.0;
+	*sloper=table->slope[0];
+      }
+      break;
+
+  case BIQUADRATIC:      /* biquadratic lagrangian interpolation scheme */
+
+      ngrid1 = table->tablelength/table->ngrid;
+      if(table->columns == 5)
+      {
+ 	table->slope[0] = quad_isomap_invert(x[0],x[1],0,t,t2,NULL,f
+				     ,ngrid1,table->ngrid,1,2,2,dfunc_dx);
+ 	table->slope[1] = quad_isomap_invert(x[0],x[1],0,t,t2,NULL,&f[N+1]
+				     ,ngrid1,table->ngrid,1,2,2,dfunc_dx);
+ 	table->slope[2] = quad_isomap_invert(x[0],x[1],0,t,t2,NULL,&f[2*N+2]
+				     ,ngrid1,table->ngrid,1,2,2,dfunc_dx);
+      }
+      else
+      {
+ 	func = quad_isomap_invert(x[0],x[1],0,t,t2,NULL,f
+ 				  ,ngrid1,table->ngrid,1,2,2,dfunc_dx);
+      }
+      break;
+
+
+
+
+  case BILINEAR:  /* BILINEAR Interpolation Scheme */
+      /*Find Interval of Different Values of Abscissa #1*/
+      iinter=0;
+      for(i=0;i<N;i++)
+      {
+	if(table->t[i]!=table->t[i+1] && iinter==0)
+	{ iinter=i+1;}
+      }
+      if(iinter == 1) 
+      { 
+	fprintf(stderr," MP Interpolate Error - Need more than 1 point per set");
+	EH(-1, "Table interpolation not implemented");
+      }
+
+      istartx=iinter;
+
+      for(i=iinter;t[i]<=x[0] && i<N-iinter+1;i=i+iinter)
+      { istartx=i+iinter;}
+
+      istarty=istartx;
+
+      for(i=istartx+1;t2[i]<=x[1] && i<istartx+iinter-1;i++)
+      { istarty=i;}
+
+      y1=f[istarty];
+      y2=f[istarty+1];
+      y3=f[istarty+1-iinter];
+      y4=f[istarty-iinter];
+
+      tt=(x[1]-t2[istarty])/(t2[istarty+1]-t2[istarty]);
+      uu=(x[0]-t[istarty])/(t[istarty+1-iinter]-t[istarty]);
+
+      func=(1.-tt)*(1.-uu)*y1+tt*(1.-uu)*y2+tt*uu*y3+(1.-tt)*uu*y4;
+
+      table->slope[1]= ( f[istarty+1] - f[istarty] ) / ( t2[istarty+1] - t2[istarty] );
+      table->slope[0]= ( f[istarty+1] - f[istarty+1-iinter] ) / ( t[istarty+1] - t[istarty+1-iinter] );
+      *sloper=table->slope[0];
+	if(dfunc_dx != NULL)
+	   {
+		dfunc_dx[0] = table->slope[0];
+		dfunc_dx[1] = table->slope[1];
+	   }
+      break;
+
+   case TRILINEAR:      /* trilinear lagrangian interpolation scheme */
+ 
+       ngrid1 = table->ngrid;
+       ngrid2 = table->ngrid2/table->ngrid;
+       ngrid3 = table->tablelength/table->ngrid2;
+       func = quad_isomap_invert(x[0],x[1],x[2],t,t2,t3,f
+ 				  ,ngrid1,ngrid2,ngrid3,1,3,dfunc_dx);
+       break;
+ 
+   case TRIQUADRATIC:      /* triquadratic lagrangian interpolation scheme */
+ 
+       ngrid1 = table->ngrid;
+       ngrid2 = table->ngrid2/table->ngrid;
+       ngrid3 = table->tablelength/table->ngrid2;
+       func = quad_isomap_invert(x[0],x[1],x[2],t,t2,t3,f
+ 				  ,ngrid1,ngrid2,ngrid3,2,3,dfunc_dx);
+       break;
+
+  default:
+      EH(-1, "Table interpolation order not implemented");
+  }
+
+  return(dist_min);
+}
 /*******************************************************************************
  *
  * continuous_surface_tension(): This function computes a tensor (csf) which is
@@ -18095,8 +18441,6 @@ assemble_PPPS_generalized(Exo_DB *exo)
   double scaling_over_visc_e, my_multiplier=1.0;
   double R_new[MDE], R_old[MDE];  /*old and new resid vect pieces for the pressure equation */
 
-
-  
   asdv(&A, ei->ielem_dim * ei->ielem_dim);
 
   npass = 1;
@@ -18323,6 +18667,7 @@ assemble_PPPS_generalized(Exo_DB *exo)
 	  We[i][i] = S[i][i]*(2.-S[i][i])/De_hat[i][i];
 	}
       
+      memset(WeEe,0,sizeof(double) * (DIM+1) * MDE);
       for(i=0; i < ei->ielem_dim+1; i++)
 	{
 	  for(j=0; j < ei->dof[eqn] ; j++)
@@ -18675,7 +19020,7 @@ apply_distributed_sources ( int elem, double width,
 	        }
               if( pd->e[R_MOMENTUM1] )
                 {
-                  err = assemble_momentum_path_dependence(time, theta, dt, pg_data->h_elem_avg);
+                  err = assemble_momentum_path_dependence(time, theta, dt, pg_data);
                   EH( err, "assemble_momentum_path_dependence");
                 }
               if( pd->e[R_PRESSURE] )
@@ -25216,11 +25561,10 @@ assemble_momentum_path_dependence(dbl time,       /* currentt time step */
 				  dbl tt,	  /* parameter to vary time integration from
                                                      explicit (tt = 1) to implicit (tt = 0) */
 				  dbl dt,	  /* current time step size */
-				  dbl h_elem_avg) /* average global element size for PSPG,
-						     taken constant wrt to Jacobian        */
+				  const PG_DATA *pg_data)
 {
   int dim, wim;
-  int i, j, a;
+  int i, j, a, p;
   int ledof, eqn, var, ii, peqn, pvar;
   int status;
   struct Basis_Functions *bfm;
@@ -25311,6 +25655,11 @@ assemble_momentum_path_dependence(dbl time,       /* currentt time step */
   dbl porous_brinkman_etm;
   dbl source_etm;
 
+  dbl h_elem_avg;
+
+  /*Continuity stabilization*/
+  dbl cont_gls, continuity_stabilization;
+
 
   status = 0;
 
@@ -25385,6 +25734,7 @@ assemble_momentum_path_dependence(dbl time,       /* currentt time step */
    * Material property constants, etc. Any variations for this
    * Gauss point were evaluated in load_material_properties().
    */
+  h_elem_avg = pg_data->h_elem_avg;
 
   /*** Density ***/
 
@@ -25481,6 +25831,12 @@ assemble_momentum_path_dependence(dbl time,       /* currentt time step */
   fluid_stress( Pi, NULL );
 
   (void) momentum_source_term(f, NULL, time);
+
+  //Call continuity stabilization if desired
+  if(Cont_GLS)
+    {
+      calc_cont_gls(&cont_gls, NULL, time, pg_data);
+    }
 
   if ( af->Assemble_Jacobian )
   {
@@ -25638,10 +25994,20 @@ assemble_momentum_path_dependence(dbl time,       /* currentt time step */
 						  * source term. */
 						  source = element_particle_info[ei->ielem].source_term[i];
 				  }
+
+				  //Continuity residual
+				  continuity_stabilization = 0.0;
+				  if (Cont_GLS)
+				    {
+				      for (p=0; p<VIM; p++){
+					continuity_stabilization += grad_phi_i_e_a[p][p];
+				      }
+				      continuity_stabilization *= cont_gls*d_area;
+				    }
 				  
 				  
 				  momentum_residual =
-					  mass + advection + porous + diffusion + source;
+					  mass + advection + porous + diffusion + source + continuity_stabilization;
 				  
 				  var = FILL;
 				  pvar = upd->vp[var];
@@ -26348,11 +26714,11 @@ assemble_LM_source ( double *xi,
  *  This includes the diagonal pressure contribution
  *
  *  Pi = stress tensor
- *  d_Pi = dependence of the stress tensor on the independent variables.
+ *  d_Pi = dependence of the stress tensor on the independent variables
  */
 void
 fluid_stress( double Pi[DIM][DIM],
-              STRESS_DEPENDENCE_STRUCT *d_Pi )
+              STRESS_DEPENDENCE_STRUCT *d_Pi)
 {
 
   /*
@@ -26423,6 +26789,7 @@ fluid_stress( double Pi[DIM][DIM],
   dbl (* grad_phi_e ) [DIM][DIM][DIM] = NULL;
 
   int eqn = R_MOMENTUM1;
+
  
   dim   = pd->Num_Dim;
   wim   = dim;
@@ -26450,6 +26817,7 @@ fluid_stress( double Pi[DIM][DIM],
    */
 
   P = fv->P;
+
   
   /* if d_Pi == NULL, then the dependencies aren't needed,
      so we won't need the viscosity dependencies, either
@@ -26789,6 +27157,7 @@ fluid_stress( double Pi[DIM][DIM],
           Pi[a][b]  = -P * (double)delta(a,b)
 	    + mu * gamma[a][b] - tau_p[a][b];
         }
+
       // Add in the diagonal contribution
       if (!kappaWipesMu) {
 	Pi[a][a] -= (mu / 3.0 - 0.5 * kappa) * gamma[a][a];
@@ -27576,7 +27945,7 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
     {
        double intensity;
        double k_prop, k_inh = 0, free_rad;
-       double *param,h,dhdC[MAX_CONC],dhdT;
+       double *param,dhdC[MAX_CONC],dhdT;
        int model_bit, num_mon, O2_spec=-1, rad_spec=-1, init_spec = 0;
 
        param = mp->u_heat_source;
@@ -27594,6 +27963,7 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
        if(pd->e[R_LIGHT_INTD])
           { intensity += fv->poynt[2];}
        intensity *= mp->u_species_source[init_spec][1];
+       intensity = MAX(intensity,0.0);
 #else
       intensity = mp->u_species_source[init_spec][1]*
                      (SQUARE(fv->apr)+SQUARE(fv->api));
@@ -27625,8 +27995,8 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
             }
        else
             {
-            free_rad = sqrt(SQUARE(mp->u_species_source[init_spec+1][2]*
-                       intensity*fv->c[init_spec]));
+            free_rad = sqrt(mp->u_species_source[init_spec+1][2]*
+                       intensity*fv->c[init_spec]);
             }
 
       for(w=init_spec+2 ; w<init_spec+num_mon+2 ; w++)
@@ -27634,21 +28004,24 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
           k_prop = mp->u_species_source[w][1]*
                 exp(-mp->u_species_source[w][2]*
                 (1./fv->T - 1./mp->u_species_source[w][3]));
-          h += k_prop*fv->c[w]*free_rad*param[1];
-          dhdC[w] += k_prop*free_rad*param[1];
+          h += k_prop*fv->c[w]*free_rad*param[w]*mp->molecular_weight[w];
+          dhdC[w] += k_prop*free_rad*param[w]*mp->molecular_weight[w];
           dhdT += k_prop*mp->u_species_source[w][2]/SQUARE(fv->T)
-                *fv->c[w]*free_rad*param[1];
+                *fv->c[w]*free_rad*param[w]*mp->molecular_weight[w];
 
           if(model_bit & 2)
-               { dhdC[rad_spec] += k_prop*fv->c[w]*param[1]; }
+               { 
+                dhdC[rad_spec] += k_prop*fv->c[w]*param[w]*mp->molecular_weight[w];
+               }
           else if(model_bit & 1)
                { 
-                dhdC[O2_spec] += k_prop*fv->c[w]*param[1]*
-                      (SQUARE(k_inh/2.)*fv->c[O2_spec]/
+                dhdC[O2_spec] += k_prop*fv->c[w]*param[w]*
+                      mp->molecular_weight[w]*(SQUARE(k_inh/2.)*fv->c[O2_spec]/
                        sqrt(SQUARE(k_inh*fv->c[O2_spec])/4.+
                 mp->u_species_source[init_spec+1][2]*intensity*fv->c[init_spec])
                        -k_inh/2.);
-                dhdC[init_spec] += k_prop*fv->c[w]*param[1]*
+                dhdC[init_spec] += k_prop*fv->c[w]*param[w]*
+                       mp->molecular_weight[w]*
                        0.5*mp->u_species_source[init_spec+1][2]*intensity/
                        sqrt(SQUARE(k_inh*fv->c[O2_spec])/4.+
            mp->u_species_source[init_spec+1][2]*intensity*fv->c[init_spec]);
@@ -27656,7 +28029,8 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
                }
           else 
                { 
-                dhdC[init_spec] += k_prop*fv->c[w]*param[1]*
+                dhdC[init_spec] += k_prop*fv->c[w]*param[w]*
+                       mp->molecular_weight[w]*
                        0.5*sqrt(mp->u_species_source[init_spec+1][2]*intensity/
                        fv->c[init_spec]);
                }
@@ -27664,8 +28038,8 @@ double heat_source( HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
 
 /**  add heat generation from light absorption  **/
 
-      h +=  param[2]*intensity*fv->c[init_spec];
-      dhdC[init_spec] += param[2]*intensity;
+      h +=  param[1]*intensity*fv->c[init_spec];
+      dhdC[init_spec] += param[1]*intensity;
 
       var = TEMPERATURE;
       if ( d_h != NULL && pd->e[var] )
@@ -27986,7 +28360,7 @@ calc_pspg( dbl pspg[DIM],
   /* variables for Brinkman porous flow */
   dbl por=0, por2=0, per=0, vis=0, dvis_dT[MDE], sc=0, speed=0;
 
-  dbl h_elem=0, h_elem_inv=0;
+  dbl h_elem=0;
   dbl Re;
   dbl tau_pspg=0.;
   dbl tau_pspg1=0.;
@@ -28075,14 +28449,7 @@ calc_pspg( dbl pspg[DIM],
 	v_g[2][2] = VELOCITY_GRADIENT33;
   }
 
-/*  if( TRUE || !is_initialized ) { 
-    memset( div_tau_p, 0, sizeof(double) * DIM);
-	memset( d_div_tau_p_dgd, 0, sizeof(double) * DIM*DIM*DIM*MDE);
-	memset( d_div_tau_p_dy, 0, sizeof(double) * DIM*MAX_CONC*MDE);
-	memset( d_div_tau_p_dv, 0, sizeof(double) * DIM*DIM*MDE);
-	memset( d_div_tau_p_dX, 0, sizeof(double) * DIM*DIM*MDE);
-} */
-	  /* initialize dependencies */
+  /* initialize dependencies */
   memset( d_tau_pspg_dv, 0, sizeof(double) * DIM*MDE);
   memset( d_tau_pspg_dX, 0, sizeof(double) * DIM*MDE);
   
@@ -28110,28 +28477,19 @@ calc_pspg( dbl pspg[DIM],
     }
 
 
-  /* use global average for element size */
-
+  // Global average for pspg_global's element size
   h_elem = h_elem_avg;
-  /* The 1/h_elem was FPE'ing.  It is only used below for moving mesh
-   * problems.
-   */
-  if ( pd->v[MESH_DISPLACEMENT1] )
-    {
-      if ( h_elem != 0. )
-        h_elem_inv=1./h_elem;
-      else
-        h_elem_inv = 0.;
-    }
 
   /*** Density ***/
   rho = density(d_rho, time_value);
 
-  /* Now calculate the element Reynolds number based on a global
-  norm of the velocity */
-
   if(pspg_global)
     {
+      
+      /* Now calculate the element Reynolds number based on a global
+       * norm of the velocity and determine tau_pspg discretely from Re 
+       * The global version has no Jacobian dependencies
+       */
       Re = rho * U_norm * h_elem / (2.0 * mu_avg);
 
       if (Re <= 3.0)
@@ -28142,39 +28500,6 @@ calc_pspg( dbl pspg[DIM],
 	{
 	  tau_pspg = PS_scaling * h_elem / (2.0 * rho * U_norm);
 	}
-      /* set up mesh derivative for tau_pspg, if necessary */
-      /* this is only necessary for local pspg terms, so it is
-	 essentially commented out */
-
-      if ( pd->v[MESH_DISPLACEMENT1]&& pspg_local )
-	{
-	  for ( b=0; b<dim; b++)
-	    {
-	      var = MESH_DISPLACEMENT1+b;
-	      if ( d_pspg != NULL && pd->v[var] )
-		{
-		  for ( j=0; j<ei->dof[var]; j++)
-		    {
-		      d_tau_pspg_dX[b][j] = 0.;
-		      for( w=0; w<dim; w++ )
-			{
-			  if(Re <= 3.0)
-			    {
-			      d_tau_pspg_dX[b][j] += PS_scaling *
-				pg_data->hh[w][b]*pg_data->dh_dxnode[w][j]
-                                  / (24.0 * mu_avg);
-			    }
-			  else
-			    {
-			      d_tau_pspg_dX[b][j] += PS_scaling *
-				 pg_data->hh[w][b]*pg_data->dh_dxnode[w][j]*h_elem_inv
-                                    / (8.0 * rho * U_norm);
-			    }
-			}
-		    }
-		}
-	    }
-	}
     }
   else if (pspg_local)
     {
@@ -28183,37 +28508,25 @@ calc_pspg( dbl pspg[DIM],
 	{
 	  hh_siz += hsquared[p];
 	}
-      /* This is the average value of h**2 in the element */
-
+      // Average value of h**2 in the element
       hh_siz = hh_siz/ ((double )dim);
 
-      /* This is the average value of v**2 in the element */
+      // Average value of v**2 in the element 
       vv_speed = 0.0;
       for ( a=0; a<wim; a++)
 	{
 	  vv_speed += v_avg[a]*v_avg[a];
 	}
-
-      tau_pspg1 = (vv_speed/hh_siz
-		   +pow(3.*mu_avg/(rho_avg*hh_siz), 2.));
+      
+      // Use vv_speed and hh_siz for tau_pspg, note it has a continuous dependence on Re
+      tau_pspg1 = rho_avg*rho_avg*vv_speed/hh_siz + (9.0*mu_avg*mu_avg)/(hh_siz*hh_siz);
       if (  pd->TimeIntegration != STEADY)
 	{
-	  tau_pspg1 += 4./(dt*dt);
+	  tau_pspg1 += 4.0/(dt*dt);
 	}
-      tau_pspg = PS_scaling/(rho_avg*sqrt(tau_pspg1));
+      tau_pspg = PS_scaling/sqrt(tau_pspg1);
 
-
-      Re = rho * sqrt(vv_speed) * sqrt(hh_siz) / (2.0 * mu_avg);
-
-      if (Re <= 3.0)
-	{
-	  tau_pspg = PS_scaling * hh_siz / (12.0 * mu_avg);
-	}
-      else if (Re > 3.0)
-	{
-	  tau_pspg = PS_scaling * sqrt(hh_siz) / (2.0 * rho * sqrt(vv_speed));
-	}
-
+      // tau_pspg derivatives wrt v from vv_speed
       if ( d_pspg != NULL && pd->v[VELOCITY1] )
 	{
 	  for ( b=0; b<dim; b++)
@@ -28223,13 +28536,14 @@ calc_pspg( dbl pspg[DIM],
 		{
 		  for ( j=0; j<ei->dof[var]; j++)
 		    {
-		      d_tau_pspg_dv[b][j]=-tau_pspg/tau_pspg1*
-					  v_avg[b]*pg_data->dv_dnode[b][j]/hh_siz;
+		      d_tau_pspg_dv[b][j] = -tau_pspg/tau_pspg1; 
+		      d_tau_pspg_dv[b][j] *= rho_avg*rho_avg/hh_siz * v_avg[b]*pg_data->dv_dnode[b][j];
 		    }
 		}
 	    }
 	}
 
+      // tau_pspg derivatives wrt mesh from hh_siz
       if ( d_pspg != NULL && pd->v[MESH_DISPLACEMENT1] )
 	{
 	  for ( b=0; b<dim; b++)
@@ -28238,14 +28552,11 @@ calc_pspg( dbl pspg[DIM],
 	      if ( pd->v[var] )
 		{
 		  for ( j=0; j<ei->dof[var]; j++)
-		    {
-		      d_tau_pspg_dX[b][j] = 0.;
-		      for( w=0; w<dim; w++ )
-			{
-			  d_tau_pspg_dX[b][j]+=tau_pspg/(tau_pspg1*hh_siz*hh_siz)
-					       *(vv_speed+2.0*pow(3.*mu_avg/rho_avg, 2.)/hh_siz)
-		       *pg_data->hh[w][b]*pg_data->dh_dxnode[w][j]*delta(w,b);
-			}
+		    {			
+		      d_tau_pspg_dX[b][j] = tau_pspg/tau_pspg1;
+		      d_tau_pspg_dX[b][j] *= (rho_avg*rho_avg*vv_speed + 18.0*mu_avg*mu_avg/hh_siz) / (hh_siz*hh_siz);
+		      d_tau_pspg_dX[b][j] *= pg_data->hhv[b][b]*pg_data->dhv_dxnode[b][j]/((double)dim);
+		      
 		    }
 		}
 	    }
@@ -28771,6 +29082,219 @@ calc_pspg( dbl pspg[DIM],
   }
 is_initialized = TRUE; 
 return 0;
+}
+
+
+int
+calc_cont_gls( dbl *cont_gls,
+                CONT_GLS_DEPENDENCE_STRUCT *d_cont_gls,
+		dbl time_value,                          /*Current time value, needed for density */
+ 	        const PG_DATA *pg_data)                  /*Petrov-Galerkin data, needed for tau_cont   */
+{
+  dbl div_v = fv->div_v;
+  dbl tau_cont, d_tau_dmesh[DIM][MDE], d_tau_dv[DIM][MDE];
+  dbl advection_etm, advection, Re, div_phi_j_e_b, div_v_dmesh;
+  int eqn; 
+  int var, dim, wim, b, j, p;
+  int advection_on=0;
+  static int is_initialized = FALSE;
+
+  //Density terms
+  dbl rho;
+  DENSITY_DEPENDENCE_STRUCT d_rho_struct;
+  DENSITY_DEPENDENCE_STRUCT *d_rho = &d_rho_struct;
+
+  //Petrov-Galerkin values
+  dbl h_elem = 0, U, hh_siz, vv;
+  const dbl h_elem_avg = pg_data->h_elem_avg;
+  const dbl *hsquared = pg_data->hsquared; 
+  const dbl U_norm = pg_data->U_norm;
+  const dbl *v_avg = pg_data->v_avg;
+  const dbl mu_avg = pg_data->mu_avg;
+  
+  //Initialize and Define
+  dim = pd->Num_Dim;
+  wim=dim;
+  if(pd->CoordinateSystem == SWIRLING ||
+     pd->CoordinateSystem == PROJECTED_CARTESIAN)
+    wim = wim+1;
+
+  tau_cont = 0;
+  *cont_gls = 0.0;
+  eqn = R_PRESSURE;
+  advection_on = pd->e[eqn] & T_ADVECTION;
+  advection_etm = pd->etm[eqn][(LOG2_ADVECTION)];
+
+  if (d_cont_gls==NULL)
+    {
+      d_rho = NULL;
+    }
+  else if(!is_initialized)
+    {
+      memset(d_cont_gls->v, 0, sizeof(double)*DIM*MDE);
+      memset(d_cont_gls->X, 0, sizeof(double)*DIM*MDE);
+    }
+
+  /* Calculate stabilization parameter tau_cont
+   * From Wall:
+   * tau_cont = h_elem*u_norm*max{Re,1}/2;
+   * The Reynolds number, Re, is defined as in calc_pspg
+   */
+  if(Cont_GLS==1)
+    {
+      h_elem = h_elem_avg;
+      U = U_norm;
+    }
+  else
+    {
+      hh_siz = 0.0;
+      vv = 0.0;
+      for(p=0; p<dim; p++)
+	{
+	  hh_siz += hsquared[p]/((double)dim);
+	  vv += v_avg[p]*v_avg[p];
+	}
+      h_elem = sqrt(hh_siz);
+      U = sqrt(vv);
+    }
+  
+  tau_cont = U*h_elem /2.0;
+
+  //We need density for the Reynolds number
+  rho = density(d_rho, time_value);
+  Re = rho*U*h_elem / (2.0*mu_avg);
+  if (Re > 1.0)
+    {
+      tau_cont *= Re;
+    }
+  
+  //d_tau terms for Jacobian
+  if(d_cont_gls != NULL && pd->v[VELOCITY1])
+    {
+      for(b=0; b<dim; b++)
+	{
+	  var = VELOCITY1+b;
+	  if(pd->v[var])
+	    {
+	      for(j=0; j<ei->dof[var]; j++)
+		{
+		  if(Cont_GLS==1 || U==0)
+		    {
+		      d_tau_dv[b][j] = 0.0;
+		    }
+		  else if(Re > 1.0)
+		    {		      
+		      d_tau_dv[b][j] = rho/(2.0*mu_avg) * h_elem*h_elem * v_avg[b]*pg_data->dv_dnode[b][j];			
+		    }
+		  else
+		    {		     		
+		      d_tau_dv[b][j] = h_elem/(2.0*U) * v_avg[b]*pg_data->dv_dnode[b][j];			
+		    }
+		}
+	    }
+	}
+    }
+
+  if(d_cont_gls != NULL && pd->v[MESH_DISPLACEMENT1])
+    {
+      for(b=0; b<dim; b++)
+	{
+	  var = MESH_DISPLACEMENT1+b;
+	  if(pd->v[var])
+	    {
+	      for(j=0; j<ei->dof[var]; j++)
+		{
+		  if(Cont_GLS==1 || h_elem==0)
+		    {
+		      d_tau_dmesh[b][j] = 0.0;
+		    }
+		  else if(Re > 1.0)
+		    {	      	
+		      d_tau_dmesh[b][j] = rho/(2.0*mu_avg) * U*U * pg_data->hhv[b][b]*pg_data->dhv_dxnode[b][j]/((double)dim);		
+		    }
+		  else
+		    {
+		      d_tau_dmesh[b][j] = U/(2.0*h_elem) * pg_data->hhv[b][b]*pg_data->dhv_dxnode[b][j]/((double)dim);
+		    }
+		}
+	    }
+	}
+    }
+
+  
+  /*
+   * Calculate residual 
+   * This term refers to the standard del dot v . 
+   */
+  advection = 0.0;
+  if (advection_on)
+    {
+      if (pd->v[VELOCITY1])
+	{
+	  advection = div_v;
+	  advection *= advection_etm;
+	}
+    }
+
+  /*Multiply tau_cont by residual resulting in cont_gls
+   *This eventually then gets combined with the stabilization functional
+   *in assemble_momentum to form the GLS stabilization for continuity
+   */
+  *cont_gls = tau_cont*advection;
+
+
+  //Determine Jacobian terms
+
+  //J_v
+  for (b=0; b<wim; b++)
+    {
+      var = VELOCITY1+b;
+      if (pd->v[var] && d_cont_gls!=NULL)
+	{	  
+	for (j=0; j<ei->dof[var]; j++)
+	  {				  
+	    advection  = 0.;			  
+	    if (advection_on)
+	      {
+		div_phi_j_e_b = 0.;
+		for (p=0; p<VIM; p++)
+		  {
+		    div_phi_j_e_b += bf[var]->grad_phi_e[j][b] [p][p];
+		  }
+		advection = div_phi_j_e_b*advection_etm;
+	      }
+	    d_cont_gls->v[b][j] = tau_cont*advection + d_tau_dv[b][j]*div_v*advection_etm;
+	  }
+	}
+    }
+
+
+  //J_d 
+  for (b=0; b<dim; b++)
+    {
+      var = MESH_DISPLACEMENT1+b;
+      if (pd->v[var])
+	{
+	  for (j=0; j<ei->dof[var]; j++)
+	    {
+	      advection = 0.0;
+	      if (advection_on)
+		{
+		  if (pd->v[VELOCITY1] && d_cont_gls!=NULL)
+		    {
+		      div_v_dmesh = fv->d_div_v_dmesh[b][j];
+		      advection += div_v_dmesh;
+		    }
+		}
+	      advection *= advection_etm;
+	      d_cont_gls->X[b][j] = tau_cont*advection + d_tau_dmesh[b][j]*div_v*advection_etm;
+	    }
+	}
+    }
+
+
+  is_initialized = TRUE;
+  return 0;
 }
 
 
@@ -31059,7 +31583,7 @@ assemble_poynting(double time,	/* present time value */
   /*
  *    Radiative transfer equation variables - connect to input file someday
  */
-  double svect[3]={0.,-1,0.};
+  double svect[3]={0.,-1.,0.};
   double mucos=1.0;
 
   /*

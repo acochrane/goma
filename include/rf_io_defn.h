@@ -35,6 +35,8 @@ char	Exo_LB_File[MAX_FNL]="\0"; /* EXODUS II load balance info for mesh */
 
 char	ExoFileOut[MAX_FNL]="\0";  /* output EXODUS II database w/ results */
 
+char	ExoFileOutMono[MAX_FNL]="\0";  /* output EXODUS II database without per proc identifier */
+
 char	ExoAuxFile[MAX_FNL]="\0";  /* auxiliary EXODUS II database for initguess */
 
 int     ExoTimePlane = INT_MAX;    /* Time plane # or continuation # of soln to use as an initguess */
@@ -99,7 +101,9 @@ int     Anneal_Mesh;            /* flag specifying creation of a special exodus
 				 * deformed coordinates (i.e. new displacements
 				 * are set to zero and mesh is deemed stress-free */
 
-double Porous_liq_inventory;    /*global variable for finite-insult boundary 					condition */
+double Porous_liq_inventory; /*global variable for finite-insult boundary condition*/
+double **Spec_source_inventory; /*global variable for cumulative reacted source */
+double *Spec_source_lumped_mass; /*global variable for species lumped mass */
 
 const char anneal_file[] = ANNEAL_FILE_NAME;
 

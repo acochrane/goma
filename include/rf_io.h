@@ -36,13 +36,15 @@ extern char Exo_LB_File[MAX_FNL]; /* EXODUS II load balance info for mesh */
 
 extern char ExoFileOut[MAX_FNL];  /* output EXODUS II database w/ results */
 
+extern char ExoFileOutMono[MAX_FNL]; /* output EXODUSS II database without per proc string */
+
 extern char ExoAuxFile[MAX_FNL];  /* auxiliary EXODUS II database for initguess */
 
 extern int  ExoTimePlane;         /* initial time plane to use */
 
 extern char Echo_Input_File[MAX_FNL];	 /* echo of problem def file  */
 
-extern char Brk_File[MAX_FNL];
+extern char Brk_File[MAX_FNL];    /* Brk file for breaking EXODUS II for parallel */
 
 extern char DomainMappingFile[MAX_FNL]; /* Domain Mapping file. Maps the materials
 				       and names of material boundaries 
@@ -60,6 +62,8 @@ extern char Init_GuessFile[MAX_FNL];
 extern char Soln_OutFile[MAX_FNL]; 
 			        /* ASCII file holding solution vector, */
 			        /* same format as Init_GuessFile      */
+
+extern int Brk_Flag;            /* Flag to check for built-in brking */
 
 extern int Debug_Flag;		/* Flag to specify debug info is to be     */
 				/* printed out. The value of this flag     */
@@ -104,6 +108,8 @@ extern int Anneal_Mesh;         /* Flag specifying creation of a special exodus
 				 * are set to zero and mesh is deemed stress-free */
 
 extern double Porous_liq_inventory; /*global variable for finite-insult boundary 					condition */
+extern double **Spec_source_inventory; 
+extern double *Spec_source_lumped_mass; 
 extern const char anneal_file[];
 
 extern char front_scratch_directory[MAX_FNL]; /* def'd in main.c */

@@ -124,7 +124,7 @@ evaluate_flux(
   int ip_total, ielem_type, gnn, ledof, matIndex;
   int num_local_nodes, iconnect_ptr, dim, ielem_dim, current_id;
   int nset_id, sset_id;
-  double Tract[3], Torque[3], local_Torque[3];
+  double Tract[DIM], Torque[DIM], local_Torque[DIM];
 
   /* 
    * Variables for vicosity and derivative 
@@ -263,7 +263,7 @@ evaluate_flux(
   for (a=0; a < DIM; a++) {
     base_normal[a] = 0;
   }
-  memset( Torque, 0, sizeof(double)*3 );
+  memset( Torque, 0, sizeof(double)*DIM );
 
   /* load eqn and variable number in tensor form */
   err = stress_eqn_pointer(v_s);
@@ -277,7 +277,7 @@ evaluate_flux(
         if( (jfp=fopen(filenm,"a")) != NULL)
                 {
       fprintf(jfp,"Time/iteration = %e \n", time_value);
-      fprintf(jfp," %s  Side_Set  %d Block  %d \n", qtity_str,side_set_id,blk_id);
+      fprintf(jfp," %s  Side_Set  %d Block  %d Species %d\n", qtity_str,side_set_id,blk_id,species_id);
                 if(profile_flag)
                    {
                     fprintf(jfp," x  y  z  flux  flux_conv");
@@ -555,44 +555,6 @@ evaluate_flux(
 /*	get density  */
 
 	    rho = density( NULL, time_value );
-
-	    /*		  if (mp->DensityModel == CONSTANT )
-		    {
-		      rho   = mp->density;
-		    }
-		  else if(mp->DensityModel == USER )
-		    {
-		      err = usr_density(mp->u_density);
-		      rho   = mp->density;
-		    }
-		  else if (mp->DensityModel == FILL )
-		    {
-		      F = fv->F;
-		      rho = mp->u_density[0];
-		      if(fv->F < 0.1)
-			{
-			  rho = mp->u_density[1];
-			}
-		    }
-		  else if (mp->DensityModel == SUSPENSION )
-		    {
-		      species = (int) mp->u_density[0];
-		      rho_f = mp->u_density[1];
-		      rho_s = mp->u_density[2];
-		      
-		      vol = fv->c[species];
-		      if(vol < 0.)
-			{
-			  vol = 0.;
-			}
-		      
-		      rho = rho_f + (rho_s - rho_f)*vol;
-		    }
-		  else
-		    {
-		      EH(-1,"Unrecognized density model");
-		    }
-	    */
 
 /**   get solid stresses  **/
 
@@ -894,7 +856,8 @@ evaluate_flux(
 
                       local_q +=  0.5 * fv->x[1] * fabs(fv->snormal[1]) ;
                       local_flux += weight*det* local_q ;
-                      local_flux_conv = 0.0;
+		      local_flux_conv = 0.0;
+/*                      local_flux_conv += weight*det*mp->surface_tension ;*/
 
                       break;
 
@@ -1145,6 +1108,23 @@ evaluate_flux(
                                   fv->snormal[a]*fv->grad_c[species_id][a] );
                           local_qconv += ( fv->snormal[a]*(fv->v[a]-x_dot[a])*fv->c[species_id] );
                         }
+                          local_qconv = 0;
+                          local_flux +=  weight*det*local_q;
+                          local_flux_conv += weight*det*local_qconv;
+		      break;
+
+		    case SPECIES_FLUX_REVOLUTION:
+
+		      Diffusivity();
+
+                      for(a=0; a<VIM; a++)
+                        {
+                          local_q += ( -mp->diffusivity[species_id]*
+                                  fv->snormal[a]*fv->grad_c[species_id][a] );
+                          local_qconv += ( fv->snormal[a]*(fv->v[a]-x_dot[a])*fv->c[species_id] );
+                        }
+                      local_q *=  0.5 * fv->x[1] * fabs(fv->snormal[1]) ;
+                      local_qconv *=  0.5 * fv->x[1] * fabs(fv->snormal[1]) ;
                           local_flux +=  weight*det*local_q;
                           local_flux_conv += weight*det*local_qconv;
 		      break;
@@ -1359,26 +1339,26 @@ evaluate_flux(
 			      fv->x[2] = 0.0;
 			      fv->snormal[2] = 0.0;
 			    }
-			  for ( a=0; a<3; a++)
+			  for ( a=0; a<DIM; a++)
 			    {
 			      Tract[a] = 0.0;
-			      for ( b=0; b<3; b++)
+			      for ( b=0; b<DIM; b++)
 				{
 				  Tract[a] += (vs[a][b]+ves[a][b]) * fv->snormal[b];
 				}
 			    }
-			  for ( a=0; a<3; a++)
+			  for ( a=0; a<DIM; a++)
 			    {
-			      for ( b=0; b<3; b++)
+			      for ( b=0; b<DIM; b++)
 				{
-				  for ( c=0; c<3; c++)
+				  for ( c=0; c<DIM; c++)
 				    {
 				      local_Torque[a] += ( permute(b,c,a) *
 						     fv->x[b]*Tract[c] );
 				    }
 				}
 			    }
-			  for ( a=0; a<3; a++)
+			  for ( a=0; a<DIM; a++)
 			    { Torque[a] += weight * det * local_Torque[a];}
 			  local_flux = Torque[2];
 			}
@@ -1767,6 +1747,148 @@ evaluate_flux(
 
 		      break;
 
+		    case REPULSIVE_FORCE:
+                      for (a = 0; a < Num_BC; a++) {
+                         if( BC_Types[a].BC_ID != side_set_id ||
+                             BC_Types[a].BC_Name < CAP_REPULSE_BC ||
+                             BC_Types[a].BC_Name > CAP_REPULSE_TABLE_BC)
+                            {continue;}
+                         else if(BC_Types[a].BC_Name == CAP_REPULSE_ROLL_BC )
+                            {
+		              double roll_rad, origin[3],dir_angle[3];
+		              double hscale, repexp, P_rep, betainv;
+                              double factor,t,axis_pt[3],R,kernel,tangent,dist;
+                              double coord[3]={0,0,0};
+
+	                      roll_rad = BC_Types[a].BC_Data_Float[1];
+			      origin[0] =  BC_Types[a].BC_Data_Float[2];
+			      origin[1] =  BC_Types[a].BC_Data_Float[3];
+			      origin[2] =  BC_Types[a].BC_Data_Float[4];
+			      dir_angle[0] =  BC_Types[a].BC_Data_Float[5];
+			      dir_angle[1] =  BC_Types[a].BC_Data_Float[6];
+			      dir_angle[2] =  BC_Types[a].BC_Data_Float[7];
+	                      hscale = BC_Types[a].BC_Data_Float[8];
+	                      repexp = BC_Types[a].BC_Data_Float[9];
+	                      P_rep = BC_Types[a].BC_Data_Float[10];
+	                      betainv = BC_Types[a].BC_Data_Float[11];
+/*  initialize variables */
+
+			  for( b=0 ; b<pd->Num_Dim ; b++)
+			    {  coord[b] = fv->x[b];  }
+/*  find intersection of axis with normal plane - i.e., locate point on
+ *          axis that intersects plane normal to axis that contains local point. */
+    factor = SQUARE(dir_angle[0]) + SQUARE(dir_angle[1]) + SQUARE(dir_angle[2]);
+    t = (dir_angle[0]*(coord[0]-origin[0]) + dir_angle[1]*(coord[1]-origin[1])
+        + dir_angle[2]*(coord[2]-origin[2]))/factor;
+    axis_pt[0] = origin[0]+dir_angle[0]*t;
+    axis_pt[1] = origin[1]+dir_angle[1]*t;
+    axis_pt[2] = origin[2]+dir_angle[2]*t;
+
+/*  compute radius and radial direction */
+
+    R = sqrt( SQUARE(coord[0]-axis_pt[0]) + SQUARE(coord[1]-axis_pt[1]) +
+                SQUARE(coord[2]-axis_pt[2]) );
+    dist = R - roll_rad;
+
+/*  repulsion function  */
+                              kernel = P_rep/pow(dist/hscale, repexp); 
+                              tangent = betainv/pow(dist/hscale, repexp); 
+                              local_q = kernel;
+                              local_qconv = tangent;
+			      for( b=0 ; b<pd->Num_Dim ; b++)
+                                 {local_Torque[b] = fv->x[b]*kernel;}
+                            }
+                         else if(BC_Types[a].BC_Name == CAP_REPULSE_TABLE_BC )
+                            {
+		              double hscale, repexp, P_rep, betainv, exp_scale;
+                              double mod_factor,kernel,dist=0,tangent;
+                              double dcl_dist, slope, d_tfcn[3];
+                              int bc_table_id=-1,dcl_node,k,nsp,i1,i2;
+                              double point[3]={0,0,0};
+                              double coord[3]={0,0,0};
+
+	                      hscale = BC_Types[a].BC_Data_Float[0];
+	                      repexp = BC_Types[a].BC_Data_Float[1];
+	                      P_rep = BC_Types[a].BC_Data_Float[2];
+			      betainv =  BC_Types[a].BC_Data_Float[3];
+			      exp_scale =  BC_Types[a].BC_Data_Float[4];
+			      dcl_node =  BC_Types[a].BC_Data_Int[2];
+/*  initialize variables */
+
+			  for( b=0 ; b<pd->Num_Dim ; b++)
+			    {  coord[b] = fv->x[b];  }
+
+                          for (b = 0; b < Num_BC; b++) {
+                              if( BC_Types[b].BC_Name == GD_TABLE_BC )
+                                  { bc_table_id = b; }
+                              }
+                          if(bc_table_id != -1)
+      dist = table_distance_search(BC_Types[bc_table_id].table, coord, 
+                                                         &slope, d_tfcn);
+                          if(dcl_node != -1)
+                            {
+                             nsp = match_nsid(dcl_node);
+                             k = Proc_NS_List[Proc_NS_Pointers[nsp]];
+                             for (b = 0; b < Proc_NS_Count[nsp]; b++)
+                               {
+               k = Proc_NS_List[Proc_NS_Pointers[nsp]+b];
+               i1 = Index_Solution (k, MESH_DISPLACEMENT1, 0, 0, -1);
+               EH(i1, "Could not resolve index_solution.");
+                                for(i2=0 ; i2<pd->Num_Dim ; i2++)
+                                  {
+                                   point[i2] = Coor[i2][k] + x[i1+i2];
+                                  }
+                               }
+                             dcl_dist = sqrt(SQUARE(coord[0]-point[0])
+                                        +SQUARE(coord[1]-point[1])
+                                        +SQUARE(coord[2]-point[2]));
+                             }  else	{ dcl_dist = 0.; }
+/*  modifying function for DCL  */
+                           mod_factor = 1. - exp(-dcl_dist/exp_scale);
+/*  repulsion function  */
+                           kernel = P_rep*mod_factor/pow(dist/hscale, repexp); 
+                           tangent = betainv*mod_factor/pow(dist/hscale,repexp); 
+/*  repulsion function  */
+                           local_q = kernel;
+                           local_qconv = tangent;
+			   for( b=0 ; b<pd->Num_Dim ; b++)
+                                 {local_Torque[b] = fv->x[b]*kernel;}
+                           if(pd->Num_Dim < DIM)
+                                 {local_Torque[pd->Num_Dim] = dist*kernel;}
+                            }
+                         else if(BC_Types[a].BC_Name == CAP_REPULSE_BC )
+                            {
+		              double repexp, P_rep, factor, denom;
+                              double kernel,dist=0;
+                              double ap, bp, cp, dp;
+
+	                      repexp = 4.;
+	                      P_rep = BC_Types[a].BC_Data_Float[0];
+			      ap =  BC_Types[a].BC_Data_Float[1];
+			      bp =  BC_Types[a].BC_Data_Float[2];
+			      cp =  BC_Types[a].BC_Data_Float[3];
+			      dp =  BC_Types[a].BC_Data_Float[4];
+                              denom = sqrt(ap*ap + bp*bp + cp*cp);
+                              factor = ap*fv->x[0] + bp*fv->x[1] + cp*fv->x[2] +dp;
+                              dist = fabs(factor)/denom;
+/*  initialize variables */
+/*  repulsion function  */
+                           kernel = P_rep/pow(dist, repexp); 
+/*  repulsion function  */
+                           local_q = kernel;
+			   for( b=0 ; b<pd->Num_Dim ; b++)
+                                 {local_Torque[b] = fv->x[b]*kernel;}
+                            }
+                         else 
+                            {EH(-1,"Repulsive force not found\n");} 
+                         }
+
+			      local_flux += weight * det * local_q;
+                              local_flux_conv += weight *det*local_qconv;
+			      for( b=0 ; b<DIM ; b++)
+                                 {Torque[b] += local_Torque[b]*weight*det;}
+		      break;
+
 		    case SURF_DISSIP:
 		      /* This is the energy dissipated at the surface due to surface tension 
 		       *  See Batchelor, JFM, 1970 for details 
@@ -1780,7 +1902,9 @@ evaluate_flux(
 					 -fv->snormal[a]*fv->snormal[b] ) );
 			    }
 			}
+
 			      local_flux += weight * det * local_q;
+                              local_flux_conv += weight *det*local_qconv;
 		      break;
 
 		    case N_DOT_X:
@@ -2930,7 +3054,8 @@ evaluate_flux(
 					(fv->v[a]-x_dot[a]) *
 					bf[var]->phi[j] * delta(w,species_id);
 				  }
-				  J_AC[c] += d_term + d_term1;
+				  /*J_AC[c] += d_term + d_term1;*/
+				  J_AC[c] += d_term;
 				}
 			      }
 			    }
@@ -3385,10 +3510,10 @@ evaluate_flux(
                                 {
                                   for (j=0; j<ei->dof[var]; j++)
                                     {
-                                      J_AC[ ei->gun_list[var][j]  ] += weight*
-                                        (fv->x[1]*(fv->snormal[0]*fv->dsurfdet_dx[p][j]
-                                                + det*fv->dsnormal_dx[0][p][j])
-                                        + det*fv->snormal[0]*bf[var]->phi[j]*delta(p,1));
+                                      J_AC[ ei->gun_list[var][j]  ] += 0.5*weight*
+                     SGN(fv->snormal[1])*(fv->x[1]*(fv->snormal[1]*fv->dsurfdet_dx[p][j]
+                                                   + det*fv->dsnormal_dx[1][p][j])
+                         + det*fv->snormal[1]*bf[var]->phi[j]*delta(p,1));
                                     }
                                 }
                             }
@@ -4137,8 +4262,14 @@ evaluate_flux(
 	    }
 	  else
 	    { 
-              fprintf(jfp," flux=  %e %e  area= %e  \n", local_flux,local_flux_conv,local_area);
-	      fprintf(jfp, "\n"); 
+              fprintf(jfp," flux=  %e %e  area= %e  ", local_flux,local_flux_conv,local_area);
+	        if(quantity==REPULSIVE_FORCE)
+	           {
+		    for( b=0 ; b<DIM ; b++)
+                       {Torque[b] /= local_flux;}
+      fprintf(jfp," centers=  %e %e %e  ", Torque[0],Torque[1],Torque[2]);
+                   }
+	      fprintf(jfp, "\n\n"); 
 	      fflush(jfp);	
 	    }
 	  fclose(jfp);
@@ -4179,6 +4310,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
 			 const int species_id, /* species identification */
 			 const char *filenm, /* File name pointer */
 			 const double *params,
+                         const int num_params,
 			 double *J_AC,   /* Pointer to AC sensitivity vector, may be NULL */
 			 const double x[],	/* solution vector */
 			 const double xdot[],	/* dx/dt vector */
@@ -4190,7 +4322,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
   int eb,e_start,e_end, elem;
 
   int err=0;
-  int ip, ip_total;
+  int mn, ip, ip_total;
   double sum = 0.0;
   extern int PRS_mat_ielem;
   extern int MMH_ip; 
@@ -4221,6 +4353,8 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
   adaptive_integration_active = ( ls != NULL && ls->AdaptIntegration &&
 				 ( quantity == I_POS_FILL ||
 				   quantity == I_NEG_FILL ||
+				   quantity == I_POS_VOLPLANE ||
+				   quantity == I_NEG_VOLPLANE ||
 				   quantity == I_POS_CENTER_X ||
                                    quantity == I_POS_CENTER_Y ||
                                    quantity == I_POS_CENTER_Z ||
@@ -4239,6 +4373,8 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
 				 !adaptive_integration_active &&
 				 ( quantity == I_POS_FILL ||
 				   quantity == I_NEG_FILL ||
+				   quantity == I_POS_VOLPLANE ||
+				   quantity == I_NEG_VOLPLANE ||
                                    quantity == I_POS_CENTER_X ||
                                    quantity == I_POS_CENTER_Y ||
                                    quantity == I_POS_CENTER_Z ||
@@ -4258,6 +4394,8 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
                                         ( params == NULL || params[0] == 0. ) &&
 				        ( quantity == I_POS_FILL ||
 				          quantity == I_NEG_FILL ||
+				          quantity == I_POS_VOLPLANE ||
+				          quantity == I_NEG_VOLPLANE ||
                                           quantity == I_POS_CENTER_X ||
                                           quantity == I_POS_CENTER_Y ||
                                           quantity == I_POS_CENTER_Z ||
@@ -4298,7 +4436,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
     }
   }
 
-  map_mat_index(blk_id);
+  mn = map_mat_index(blk_id);
   if( ( eb = in_list(blk_id, 0, exo->num_elem_blocks, exo->eb_id) ) != -1 )
     {
 
@@ -4343,6 +4481,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
               if ((Use_Subelement_Integration = current_elem_on_isosurface(FILL, 0.)))
 		{
                   if ( quantity == I_NEG_FILL ||
+		       quantity == I_NEG_VOLPLANE ||
 		       quantity == I_NEG_VX ||
 		       quantity == I_NEG_VY ||
 		       quantity == I_NEG_VZ  ||
@@ -4351,6 +4490,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
                        quantity == I_NEG_CENTER_Z ) {
                     ip_total = get_subelement_integration_pts ( &s, &weight, NULL, 0., -2, -1 );
                   } else if ( quantity == I_POS_FILL ||
+		              quantity == I_POS_VOLPLANE ||
 		              quantity == I_POS_VX ||
 		              quantity == I_POS_VY ||
 		              quantity == I_POS_VZ  ||
@@ -4379,6 +4519,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
  		for(i=0;i<ei->num_local_nodes;i++)	{ls_F[i]=*esp_old->F[i];}
  		wt_type = 2;
  		if( quantity == I_NEG_FILL || 
+				quantity == I_NEG_VOLPLANE ||
 				quantity == I_NEG_CENTER_X ||
                                 quantity == I_NEG_CENTER_Y ||
                                 quantity == I_NEG_CENTER_Z ||
@@ -4535,7 +4676,7 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
              if ( subelement_surf_integration_active ) bf[pd->ShapeVar]->detJ = 1.;
              
              compute_volume_integrand( quantity, elem, species_id, 
-                              params, &sum, J_AC, adaptive_integration_active,
+                              params, num_params, &sum, J_AC, adaptive_integration_active,
 				       time_value, delta_t, xi, exo);
 #ifdef PARALLEL
              delta_sum = sum - sum0;
@@ -4575,6 +4716,11 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
   
   if ( ls != NULL ) ls->on_sharp_surf = FALSE;
 
+  if (quantity == I_SPECIES_SOURCE)
+      { 
+      Spec_source_inventory[mn][species_id] += 0.5*sum*(delta_t+tran->delta_t);
+      }
+
 
   if( print_flag && ProcID == 0 )
     {
@@ -4582,7 +4728,10 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
       
       if( (jfp = fopen( filenm, "a")) != NULL )	{
 	if (ppvi_type == PPVI_VERBOSE) {
-	  fprintf(jfp,"   volume= %10.7e \n", sum );
+           if(quantity == I_SPECIES_SOURCE)
+	      {fprintf(jfp,"   volume= %10.7e \n", Spec_source_inventory[mn][species_id] );}
+              else
+	      {fprintf(jfp,"   volume= %10.7e \n", sum );}
 	}
 	if (ppvi_type == PPVI_CSV) {
 	  fprintf(jfp,"%10.7e\n", sum );
@@ -4603,7 +4752,8 @@ evaluate_volume_integral(const Exo_DB *exo, /* ptr to basic exodus ii mesh infor
 
 int
 compute_volume_integrand(const int quantity, const int elem,
-			 const int species_no, const double *params,
+			 const int species_no, const double *params, 
+                         const int num_params,
  			 double *sum, double *J_AC, const int adapt_int_flag,
 			 const double time, const double delta_t, double xi[], const Exo_DB *exo)
 
@@ -4659,6 +4809,42 @@ compute_volume_integrand(const int quantity, const int elem,
 		}
 	    }
 	}
+	       
+      break;
+    case I_VOLUME_PLANE:
+      {
+       double dist=0;
+       if(num_params < 4)
+         {
+           WH(-1,"not enough plane parameters for VOL_PLANE\n");
+         }
+       dist = params[0]*fv->x[0]+params[1]*fv->x[1]
+                                +params[2]*fv->x[2]+params[3];
+       dist /= sqrt(SQUARE(params[0])+SQUARE(params[1])+SQUARE(params[2]));
+
+       if(dist > 0)
+       {
+      *sum += weight*det;
+
+      if( J_AC != NULL )
+	{
+	  for( p=0; p<dim; p++)
+	    {
+	      var = MESH_DISPLACEMENT1 + p;
+
+	      if( pd->v[var] )
+		{
+
+		  for( j=0; j<ei->dof[var]; j++)
+		    {
+		      J_AC[ ei->gun_list[var][j] ] += weight * ( h3 * bf[pd->ShapeVar]->d_det_J_dm[p][j] +
+								 fv->dh3dq[p]*bf[var]->phi[j] * det_J );
+		    }
+		}
+	    }
+	}
+      }
+     }
 	       
       break;
     case I_LUB_LOAD:
@@ -4831,19 +5017,44 @@ compute_volume_integrand(const int quantity, const int elem,
 
     case I_SPECIES_MASS:
       {
- 	double dens_factor, rho;
- 	    rho = density( NULL, time );
+ 	double dens_factor, density_tot, untracked_spec=0;
+        density_tot = calc_density(mp, FALSE, NULL, 0.0);
    		switch ( mp->Species_Var_Type )
      			{
  			case SPECIES_DENSITY:
  				{ dens_factor=1.; break;	}
  			case SPECIES_UNDEFINED_FORM:
  			case SPECIES_MASS_FRACTION:
- 				{ dens_factor=rho; break;	}
+ 				{ dens_factor=density_tot; break;	}
  			default:
  				{ dens_factor=1.; break;	}
  			}
- 	*sum += weight*det*( dens_factor*fv->c[species_no] ) ;
+      if( species_no < pd->Num_Species_Eqn)
+        { *sum += weight*det*( dens_factor*fv->c[species_no] ) ; }
+      else  {
+      switch(mp->Species_Var_Type)   {
+      case SPECIES_CONCENTRATION:
+        untracked_spec = density_tot;
+        for (j=0 ; j < pd->Num_Species_Eqn ; j++)       {
+                untracked_spec -= fv->c[j]*mp->molecular_weight[j];
+                }
+        untracked_spec /= mp->molecular_weight[pd->Num_Species_Eqn];
+        break;
+      case SPECIES_DENSITY:
+        untracked_spec = density_tot;
+        for (j=0 ; j < pd->Num_Species_Eqn ; j++)       {
+                untracked_spec -= fv->c[j];
+                }
+        break;
+      case SPECIES_MASS_FRACTION:
+      case SPECIES_UNDEFINED_FORM:
+        untracked_spec = 1.0;
+        for (j=0 ; j < pd->Num_Species_Eqn ; j++)       {
+                untracked_spec -= fv->c[j];
+                }
+        }
+        *sum += weight*det*( dens_factor*untracked_spec ) ; 
+      }
 
 	if( J_AC != NULL )
 	  {
@@ -4882,6 +5093,77 @@ compute_volume_integrand(const int quantity, const int elem,
       }
       break;
 
+    case I_SPECIES_SOURCE:
+      {
+        struct Species_Conservation_Terms s_terms; 
+        int w1,i,ie,ldof,eqn=MASS_FRACTION;
+        zero_structure(&s_terms, sizeof(struct Species_Conservation_Terms), 1);
+        get_continuous_species_terms(&s_terms, time, tran->theta, delta_t, NULL);
+        if(time > tran->init_time+delta_t)
+ 	   {*sum += weight*det*(-s_terms.MassSource[species_no]) ;}
+#if 1  
+  if (efv->ev) {
+        if( efv->i[species_no] != I_TABLE)
+          {       
+           for (i = 0; i < ei->num_local_nodes; i++) {
+                ie = Proc_Elem_Connect[ei->iconnect_ptr + i];
+		ldof=ei->ln_to_dof[eqn][i];
+                if(ldof >= 0 )
+                   {
+        if(time <= tran->init_time+delta_t)
+ 	   {*sum += weight*det*efv->ext_fld_ndl_val[species_no][ie] ;}
+                  efv->ext_fld_ndl_val[species_no][ie] += 
+                  bf[eqn]->phi[ldof]*weight*det*
+                       0.5*(delta_t+tran->delta_t)
+                              *(-s_terms.MassSource[species_no]);
+                     if(species_no == 0)	{
+                          Spec_source_lumped_mass[ie] += 
+                               bf[eqn]->phi[ldof]*weight*det;
+                                }
+                   }
+                } 
+          }
+  }
+#endif
+
+	if( J_AC != NULL )
+	  {
+	    for( a=0; a<dim ; a++)
+	      {
+		var = MESH_DISPLACEMENT1 + a;
+
+		if( pd->v[var] )
+		  {
+		    for( j=0 ; j<ei->dof[var]; j++)
+		      {
+	    
+			J_AC[ ei->gun_list[var][j] ] += weight*  ( h3 * bf[pd->ShapeVar]->d_det_J_dm[a][j] +
+ 			fv->dh3dq[a]*bf[var]->phi[j] * det_J )*s_terms.MassSource[species_no];
+		      }
+		  }
+	      }
+
+	    var = MASS_FRACTION;
+	    if (pd->v[var]) {
+	    for ( w1=0; w1<pd->Num_Species_Eqn; w1++)  {
+	      for (j = 0; j < ei->dof[var]; j++) {
+		/*
+		 * Find the material index for the current
+		 * local variable degree of freedom
+		 * (can't just query gun_list for MASS_FRACTION
+		 *  unknowns -> have to do a lookup)
+		 */		
+		gnn = ei->gnn_list[var][j];
+		ledof = ei->lvdof_to_ledof[var][j];
+		matIndex = ei->matID_ledof[ledof];
+		c = Index_Solution(gnn, var, species_no, 0, matIndex);
+ 		J_AC[c] += weight * det * s_terms.d_MassSource_dc[species_no][w1][j];
+	      }
+	     }
+	    }
+	  }
+      }
+      break;
     case I_MOMX:
     case I_MOMY:
     case I_MOMZ:
@@ -5087,6 +5369,65 @@ compute_volume_integrand(const int quantity, const int elem,
                                     det * ( sign * lsi->d_H_dF[j] );
 	      }
 	  } 
+      }
+     }
+      break;
+    case I_POS_VOLPLANE:
+    case I_NEG_VOLPLANE:
+     {
+	double alpha, height = 1.0;
+        double dist=0;
+       if(num_params < 5)
+         {
+           WH(-1,"not enough plane parameters for POS-NEG_PLANE_FILL\n");
+         }
+       dist = params[1]*fv->x[0]+params[2]*fv->x[1]
+                                +params[3]*fv->x[2]+params[4];
+       dist /= sqrt(SQUARE(params[1])+SQUARE(params[2])+SQUARE(params[3]));
+       if(dist > 0)
+       {
+      if( adapt_int_flag)
+      {
+ 	double dwt_dF=0;
+ 	*sum += height * weight * det;
+ 
+ 
+ 	if ( J_AC != NULL )
+ 	  {
+ 	    var = LS;
+ 	    for( j=0 ; j < ei->dof[var]; j++)
+ 	      {
+ 		J_AC[ ei->gun_list[var][j]  ] += dwt_dF*height*det;
+ 	      }
+ 	  } 
+      }
+      else
+      {
+	double H = 0.0, sign;
+
+	alpha = params == NULL ? ls->Length_Scale : 2.0*params[0];
+
+	load_lsi(alpha);
+
+	H = quantity == I_POS_VOLPLANE ? lsi->H : ( 1.0 - lsi->H ) ;
+	
+	*sum += height * weight * det * H;
+
+	if ( J_AC != NULL )
+	  {
+
+	    /* Do this even for uncoupled fill problems. */
+	    load_lsi_derivs();
+
+	    var = LS;
+	    for( j=0 ; j < ei->dof[var]; j++)
+	      {
+		sign = quantity == I_POS_VOLPLANE ? +1.0 : -1.0;
+		J_AC[ ei->gun_list[var][j]  ] += height * weight * 
+                                    det * ( sign * lsi->d_H_dF[j] );
+	      }
+	  } 
+      }
       }
      }
       break;
@@ -5717,10 +6058,7 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
 
 
   int c;
-  double Tract[3];
-  double Torque[3];
-  double local_Torque[3];
-  double Tract_sens[3];
+  double Tract[DIM], Torque[DIM], local_Torque[DIM], Tract_sens[DIM];
 
   SGRID *element_search_grid=	NULL;	
   double surface_centroid[DIM];
@@ -5737,7 +6075,7 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
  int ierr = 0, wt_type;
  const int Jac_state = af->Assemble_Jacobian;
 
-  memset( Torque, 0, sizeof(double)*3 );
+  memset( Torque, 0, sizeof(double)*DIM );
   memset(TT_sens, 0, sizeof(double) * MAX_PDIM * MAX_PDIM);
 
   /* load eqn and variable number in tensor form */
@@ -5751,8 +6089,7 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
         if(  (filenm != NULL) && ( (jfp=fopen(filenm,"a")) != NULL))
                 {
       fprintf(jfp,"Time/iteration = %e \n", time_value);
-      fprintf(jfp," %s  Side_Set  %d Block  %d \n", qtity_str,side_set_id,mat_id);
-      fprintf(jfp,"  %d  %d %d %d %d\n", sens_type, sens_id, sens_flt, sens_flt2,vector_id);
+      fprintf(jfp," %s  Side_Set  %d Block  %d Species %d\n", qtity_str,side_set_id,mat_id,species_id);
             if(sens_type == 1)
               {
                 fprintf(jfp," Sensitivity wrt  BC  %d  Float  %d\n",sens_id,sens_flt);
@@ -6520,11 +6857,11 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
                          vs[2][1] = 0.0;
                          vs[2][2] = -fv->P;
                        }
-		    for ( a=0; a<3; a++)
+		    for ( a=0; a<DIM; a++)
 		      {
                         Tract[a] = 0.0;
                         Tract_sens[a] = 0.0;
-			for ( b=0; b<3; b++)
+			for ( b=0; b<DIM; b++)
 			  {
 		            Tract[a] += (vs[a][b] + ves[a][b]) * fv->snormal[b];
 			    Tract_sens[a] += (vs_sens[a][b] + ves_sens[a][b])
@@ -6533,11 +6870,11 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
 			  }
 		      }
 		
-		    for ( a=0; a<3; a++)
+		    for ( a=0; a<DIM; a++)
 		      {
-			for ( b=0; b<3; b++)
+			for ( b=0; b<DIM; b++)
 			  {
-			    for ( c=0; c<3; c++)
+			    for ( c=0; c<DIM; c++)
 			      {
                                local_Torque[a] += (permute(b,c,a) * 
                                              (  fv->x[b]*Tract_sens[c] 
@@ -6545,7 +6882,7 @@ evaluate_flux_sens(const Exo_DB *exo, /* ptr to basic exodus ii mesh information
 			      }
 			  }
 		      }
-		    for ( a=0; a<3; a++)
+		    for ( a=0; a<DIM; a++)
 		      { Torque[a] +=  weight * det * local_Torque[a]; }
                    local_flux = Torque[2];
 		  }
@@ -9380,8 +9717,6 @@ switch(dim)
 		printf("3D not done yet!  %d  \n",dim);
 	}
 
-/*fprintf(stderr,"is2D wt_type F_Type %d %d %d\n",is2D,wt_type,F_type);*/
-
 return(return_val);
 } /* end of function adaptive_weight */
 /**********************************************************************/
@@ -9440,7 +9775,7 @@ int i, j;
 double a=-1, b=1;
 double x, y, sum, factor;
 double fval[MAX_CHEV];
-double ca, cb, cm;
+double ca=0, cb=0, cm;
 int idir=0;
 double f0, f1, f2, xint[2]={0,0};
 
@@ -9888,7 +10223,7 @@ surfdet_chev_coeff_2DQ(
 			const double end_pts[]
 			)
 {
-double a, b, x, y, factor;
+double a, b, y, factor;
 double fval[MAX_CHEV], sum, cder[MAX_CHEV];
 double xi[DIM];
 int i, j, err;
@@ -15081,9 +15416,7 @@ delta_chev_moments_2DQ(
 			const double end_pts[]
 			)
 {
-double gauss_mom[9]={1/9.,1/9.,1/9.,1/9.,4/9.,4/9.,4/9.,4/9.,16/9.};
 int npts=9;
-int i;
 double a,b;
 
 a = end_pts[0];

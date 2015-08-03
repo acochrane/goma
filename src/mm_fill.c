@@ -63,6 +63,10 @@
 
 #include "bc_dirich.h"
 #include "mm_qp_storage.h"
+
+#include "sl_epetra_interface.h"
+#include "sl_epetra_util.h"
+
 #define _MM_FILL_C
 #include "goma.h"
 
@@ -172,9 +176,12 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
    *    Then allocate memory here for common data elements
    */
   neg_elem_volume = FALSE;
+  neg_lub_height = FALSE;
+  zero_detJ = FALSE;
+
   e_start = exo->eb_ptr[0];
   e_end   = exo->eb_ptr[exo->num_elem_blocks];
-  for (ielem = e_start, ebn = 0; ielem < e_end && !neg_elem_volume; ielem++) {
+  for (ielem = e_start, ebn = 0; ielem < e_end && !neg_elem_volume && !neg_lub_height && !zero_detJ; ielem++) {
 
     /*First we must calculate the material-referenced element
      *number so as to be compatible with the ElemStorage struct
@@ -197,6 +204,17 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
       log_msg("Negative elem det J in element (%d)", ielem+1);
       if ( ls != NULL && ls->SubElemIntegration ) subelement_mesh_output(x, exo);
     }
+
+    if (neg_lub_height)
+      {
+       log_msg("Negative lubrication height in element (%d)", ielem+1);
+      }
+
+    if (zero_detJ)
+      {
+       log_msg("Zero determinant of Jacobian of transformation (%d)", ielem+1);
+      }
+
   }
 
   /*
@@ -205,13 +223,22 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
   global_qp_storage_destroy();
   
   /*
-   * Now coordinate the processors so that they all know about a negative
-   * volume in an element
+   * Now coordinate the processors so that they all know about a negative or zero
+   * volume in an element and negative lubrication height
    */
 #ifdef PARALLEL
   MPI_Allreduce(&neg_elem_volume, &neg_elem_volume_global, 1,
 		MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   neg_elem_volume = neg_elem_volume_global;
+
+  MPI_Allreduce(&neg_lub_height, &neg_lub_height_global, 1,
+                MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  neg_lub_height = neg_lub_height_global;
+
+  MPI_Allreduce(&zero_detJ, &zero_detJ_global, 1,
+                MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  zero_detJ = zero_detJ_global;
+
 #endif
 
   /*
@@ -220,7 +247,7 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
    */
    
   if ( xfem != NULL )
-    check_xfem_contribution( ams->npu, ams->bindx, ams->val, resid_vector, x, exo );
+    check_xfem_contribution( ams->npu, ams, resid_vector, x, exo );
     
 #if DEBUG_LS_INTEGRATION
   if ( ls != NULL )
@@ -231,6 +258,9 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
 #endif
   
   if (neg_elem_volume) return -1;
+  if (neg_lub_height) return -1;
+  if (zero_detJ) return -1;
+
   return 0;
 }
 /*****************************************************************************/
@@ -281,8 +311,6 @@ matrix_fill(
   extern int MMH_ip;
   extern int PRS_mat_ielem;
 
-  double *a = ams->val;
-  int *ija = ams->bindx;
   double delta_t, theta, time_value, h_elem_avg;  /*see arg list */
   int ielem, num_total_nodes;
   
@@ -295,8 +323,7 @@ matrix_fill(
   static int CA_id[MAX_CA];            /*  array of CA conditions */
   static int CA_fselem[MAX_CA];        /*  array of CA free surface elements  */
   static int CA_sselem[MAX_CA];        /*  array of CA solid surface elements */
-  static int Num_CAs;
-  int Num_CAs_done;
+  static int CA_proc[MAX_CA];          /*  Processor which has each CA */
 
   int mn;                     /* material block counter */
   int err;		      /* temp variable to hold diagnostic flags.      */
@@ -416,7 +443,6 @@ matrix_fill(
   }
   
 
-  
   /******************************************************************************/
   /*                                BLOCK 1                                     */
   /*          LOOP OVER THE ELEMENTS DEFINED ON THE CURRENT PROCESSOR           */
@@ -465,7 +491,11 @@ matrix_fill(
   if ((zeroCA == 1) || ((Linear_Solver != FRONT && ielem == exo->eb_ptr[0]) ||
 			(Linear_Solver == FRONT && ielem == exo->elem_order_map[0]-1)))
     {
-      Num_CAs = 0;
+      int nsp, nspk, count=-1;
+      memset( CA_fselem, -1, sizeof(int)*MAX_CA);
+      memset( CA_sselem, -1, sizeof(int)*MAX_CA);
+      memset( CA_id, -1, sizeof(int)*MAX_CA);
+      memset( CA_proc, -1, sizeof(int)*MAX_CA);
       for (j = 0;j < Num_BC;j++)
 	{
 	  switch (BC_Types[j].BC_Name)
@@ -476,15 +506,15 @@ matrix_fill(
 	    case VELO_THETA_TPL_BC:
 	    case VELO_THETA_COX_BC:
 	    case VELO_THETA_SHIK_BC:
-	      Num_CAs++;
+                 nsp = match_nsid(BC_Types[j].BC_ID);
+                 nspk = Proc_NS_List[Proc_NS_Pointers[nsp]];
+                 if(nsp != -1 && Nodes[nspk]->Proc == ProcID)
+                     {
+                       count++;
+                       CA_proc[count] = ProcID;
+                     }
 	      break;
 	    }
-	}
-      for (j = 0; j < MAX_CA; j++)
-	{
-	  CA_fselem[j] = -1;
-	  CA_sselem[j] = -1;
-	  CA_id[j]     = -1;
 	}
 
       /*
@@ -721,6 +751,23 @@ matrix_fill(
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
       }
   }
+
+  if(Cont_GLS && pde[R_PRESSURE] && pde[R_MOMENTUM1]) 
+    {
+    xi[0] = 0.0;
+    xi[1] = 0.0;
+    xi[2] = 0.0;  
+    (void) load_basis_functions(xi, bfd);
+    pg_data.mu_avg = element_viscosity();
+    pg_data.rho_avg = density(NULL, time_value);
+
+    if(Cont_GLS==2)
+      {
+	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
+	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+      }
+    }
+
   if(pde[FILL] || pde[PHASE1])      /* UMR fix for non-FILL problems */
     {
       if(ls != NULL)
@@ -992,6 +1039,7 @@ matrix_fill(
 	  err = beer_belly();
 	  EH( err, "beer_belly");
 	  if( neg_elem_volume ) return;
+          if( zero_detJ ) return;
       
 	  /*
 	   * Load up field variable values at this Gauss point, but not
@@ -1293,6 +1341,7 @@ matrix_fill(
       err = beer_belly();
       EH(err, "beer_belly");
       if (neg_elem_volume) return;
+      if( zero_detJ ) return;
       
       /*
        * Load up field variable values at this Gauss point, but not
@@ -1662,6 +1711,7 @@ matrix_fill(
 #ifdef CHECK_FINITE
           CHECKFINITE("assemble_lubrication");
 #endif
+          if (neg_lub_height) return;
         }
 
       if( pde[R_LUBP_2] )
@@ -1671,6 +1721,7 @@ matrix_fill(
 #ifdef CHECK_FINITE
           CHECKFINITE("assemble_lubrication");
 #endif
+          if (neg_lub_height) return;
         }
 
       if( pde[R_MAX_STRAIN] )
@@ -2186,7 +2237,7 @@ matrix_fill(
 		  
 	  id_side = face + 1;
 		  
-	  err = assemble_surface_species(exo, a, delta_t, theta, 
+	  err = assemble_surface_species(exo, x, delta_t, theta,
 					 ielem_type, ielem_type_mass, id_side, 
 					 neighbor, ielem, num_local_nodes);
 	  EH( err, "assemble_surface_species"); 
@@ -2263,7 +2314,7 @@ matrix_fill(
 	}
 	  
       if (call_int) {
-	err = apply_integrated_bc(ija, a, x, resid_vector, delta_t, theta,
+	err = apply_integrated_bc(x, resid_vector, delta_t, theta,
 				  pg_data.h_elem_avg, pg_data.h, pg_data.mu_avg, pg_data.U_norm,
 				  ielem, ielem_type, num_local_nodes, ielem_dim,
 				  iconnect_ptr, elem_side_bc, num_total_nodes,
@@ -2276,7 +2327,7 @@ matrix_fill(
       }
         
       if (call_shell_grad) {
-        err = apply_shell_grad_bc(ija, a, x, resid_vector, delta_t, theta,
+        err = apply_shell_grad_bc(x, resid_vector, delta_t, theta,
                                   pg_data.h_elem_avg, pg_data.h, pg_data.mu_avg, pg_data.U_norm,
                                   ielem, ielem_type, num_local_nodes, ielem_dim,
 				  iconnect_ptr, elem_side_bc, num_total_nodes,
@@ -2337,7 +2388,7 @@ matrix_fill(
        *        only do the weak integrated conditions here
        */
       if (call_int) { 
-	err = apply_integrated_curve_bc(ams, x, resid_vector, delta_t, 
+	err = apply_integrated_curve_bc(x, resid_vector, delta_t,
 					theta, ielem, 
 					ielem_type, num_local_nodes, 
 					ielem_dim, iconnect_ptr, 
@@ -2440,7 +2491,7 @@ matrix_fill(
 	if  ( Use_2D_Rotation_Vectors == TRUE )
 	  rotate_eqns_at_node_2D( iconnect_ptr, ielem_dim, num_local_nodes, ams);
 	else if( first_elem_side_BC_array[ielem] != NULL ) {
-	  err = apply_rotated_bc(ija, a, resid_vector, first_elem_side_BC_array,
+	  err = apply_rotated_bc(resid_vector, first_elem_side_BC_array,
 				 ielem, ielem_type, num_local_nodes, 
 				 ielem_dim, iconnect_ptr, num_total_nodes,
 				 exo);
@@ -2572,7 +2623,7 @@ matrix_fill(
 	 */
 	if (call_col) 
 	  {
-	    err = apply_point_colloc_bc(ija, a, resid_vector, delta_t, theta,
+	    err = apply_point_colloc_bc(resid_vector, delta_t, theta,
 					ielem, ip_total,
 					ielem_type, num_local_nodes, ielem_dim,
 					iconnect_ptr, elem_side_bc, num_total_nodes, 
@@ -2590,7 +2641,7 @@ matrix_fill(
 	 */
 	if (call_int) 
 	  {
-	    err = apply_integrated_bc(ija, a, x, resid_vector, delta_t, theta,
+	    err = apply_integrated_bc(x, resid_vector, delta_t, theta,
 				      pg_data.h_elem_avg, pg_data.h, pg_data.mu_avg, pg_data.U_norm,
 				      ielem, ielem_type, num_local_nodes, 
 				      ielem_dim, iconnect_ptr, elem_side_bc, 
@@ -2654,7 +2705,7 @@ matrix_fill(
 		EH(-1,"YOU cannot apply CONTACT_SURF BCs in mm_names.h with FILL field. R_PHASE only");
 	      }
 
-	    err = apply_contact_bc (ija, a, x, resid_vector, delta_t, theta,
+	    err = apply_contact_bc (x, resid_vector, delta_t, theta,
 				    pg_data.h_elem_avg, pg_data.h, pg_data.mu_avg, pg_data.U_norm,
 				    first_elem_side_BC_array,
 				    ielem, ielem_type, num_local_nodes, 
@@ -2706,7 +2757,7 @@ matrix_fill(
        * - only do the strong integrated conditions here
        */
       if (call_int) {
-	err = apply_integrated_curve_bc(ams, x, resid_vector, delta_t, theta, 
+	err = apply_integrated_curve_bc(x, resid_vector, delta_t, theta,
 					ielem, ielem_type, num_local_nodes, 
 					ielem_dim,  iconnect_ptr, elem_edge_bc, 
 					num_total_nodes, STRONG_INT_EDGE, exo); 
@@ -2722,7 +2773,7 @@ matrix_fill(
        * nodal points
        */
       if (call_col) {
-	err = apply_point_colloc_edge_bc(ams, x, x_old, x_older,  xdot, xdot_old,
+	err = apply_point_colloc_edge_bc(x, x_old, x_older,  xdot, xdot_old,
 					 resid_vector, delta_t, theta, 
 					 ielem, ip_total, ielem_type, 
 					 num_local_nodes, ielem_dim,
@@ -2946,13 +2997,14 @@ matrix_fill(
       || (Linear_Solver == FRONT && ielem == exo->elem_order_map[exo->num_elem_blocks]-1))
     {
       if (zeroCA == 0) {
-	Num_CAs_done = 0;
+        int count = 0, Num_CAs_done = 0;
 	for (j = 0;j < MAX_CA;j++)
 	  {
 	    if (CA_id[j] == -2) Num_CAs_done++;
+	    if (CA_proc[j] == ProcID) count++;
 	  }
 	
-	if (Num_CAs != Num_CAs_done)
+	if (count != Num_CAs_done)
 	  {
 	    WH(-1,"Not all contact angle conditions were applied!\n");
 	  }
@@ -3010,8 +3062,9 @@ load_lec(Exo_DB *exo,		/* ptr to EXODUS II finite element mesh db */
   fprintf(rrrr, "\nGlobal_NN Proc_NN  Equation    idof    Proc_SolnNum     ResidValue\n");
 #endif
 
-  /* Load up estifm in case a frontal solver is being used */
-  if (Linear_Solver == FRONT) {
+  if (strcmp(Matrix_Format, "epetra") == 0) {
+    EpetraLoadLec(exo, ielem, ams, x, resid_vector);
+  } else if (Linear_Solver == FRONT) {   /* Load up estifm in case a frontal solver is being used */
     if (af->Assemble_Jacobian) {
       memset(estifm, 0, sizeof(double)*fss->ncn[ielem]*fss->ncn[ielem]);
       ivar = 0; 
@@ -3281,7 +3334,7 @@ load_lec(Exo_DB *exo,		/* ptr to EXODUS II finite element mesh db */
 			      EH(je, "Bad var index.");
 			      ja = (ie == je) ?
 				ie : in_list(je, ija[ie], ija[ie+1], ija);
-			      EH(ja, "Could not find vbl in sparse matrix.");  
+			      EH(ja, "Could not find vbl in sparse matrix.");
 			      a[ja] += lec->J[pe][pv][i][j];
 #ifdef DEBUG_LEC
 			      {
@@ -3398,6 +3451,7 @@ load_lec(Exo_DB *exo,		/* ptr to EXODUS II finite element mesh db */
 			    ja = (ie == je) ? ie : in_list(je, ija[ie], ija[ie+1], ija);
 			    EH(ja, "Could not find vbl in sparse matrix.");  
 			    a[ja] += lec->J[pe][pv][i][j];
+
 #ifdef DEBUG_LEC
 			    {
 			      if (fabs(lec->J[pe][pv][i][j]) > DBL_SMALL || Print_Zeroes) 
@@ -3648,109 +3702,11 @@ zero_lec(void)
       * zero_lec()
       *
       *  This routine zeroes the local element stiffness vector and Jacobian.
-      *  It uses the same algorithm as the fill routine to minimize the 
-      *  the amount of zeroing. This is necessary since the local element 
-      *  Jacobian is so large. The first time through the routine, it zeroes
-      *  all entries. Note, a possible check for this algorithm would be to
-      *  check all entries. All entries should be zero after this routine.
       **************************************************************************/
 {
-  static int firstTime = TRUE;
-  int e, v, i, pe, pv, var, j, dofs, ke, kv;
-  struct Element_Indices *ei_ptr;
-  int ielem = ei->ielem;
-  if (firstTime) {
-    firstTime = FALSE;
-    var = (MAX_PROB_EQN+MAX_CONC)*MDE;
-    memset(lec->R, 0, sizeof(double)*var);  
-    var = var*var;
-    memset(lec->J, 0, sizeof(double)*var); 
-    var = 4*(MDE)*(MAX_PROB_VAR + MAX_CONC)*(MDE);
-    memset(lec->J_stress_neighbor, 0, sizeof(double)*var);
-    return;
-  } else {
-    for (e = V_FIRST; e < V_LAST; e++) {
-      pe = upd->ep[e];
-      if (pe != -1) {
-	if (e == R_MASS) {
-	  for (ke = 0; ke < upd->Max_Num_Species_Eqn; ke++) {
-	    pe = MAX_PROB_VAR + ke;
-	    dofs = ei->dof[e];
-	    for (i = 0; i < dofs; i++) {
-	      lec->R[MAX_PROB_VAR + ke][i] = 0.0;
-	      if (af->Assemble_Jacobian) {
-		for (v = V_FIRST; v < V_LAST; v++) {
-		  pv = upd->vp[v];
-		  if (pv != -1) {
-		    ei_ptr = ei;
-		    if (ei->owningElementForColVar[v] != ielem) {
-		      if (ei->owningElementForColVar[v] != -1) {
-			ei_ptr = ei->owningElement_ei_ptr[v];
-			if (ei_ptr == 0) {
-			  printf("ei_ptr == 0\n");
-			  exit(-1);
-			}
-		      }
-	     
-		    }				  
-		    if (v == MASS_FRACTION) {
-		      for (kv = 0; kv < upd->Max_Num_Species_Eqn; kv++) {
-			pv = MAX_PROB_VAR + kv;
-			for (j = 0; j < ei_ptr->dof[v]; j++) {
-			  lec->J[pe][pv][i][j] = 0.0;
-			}
-		      }
-		    } else {
-		      for (j = 0; j < ei_ptr->dof[v]; j++) {
-			lec->J[pe][pv][i][j] = 0.0;
-		      }
-		    }
-		  }
-		}
-	      }
-	    }
-	  }
-	} else {
-	  pe = upd->ep[e];
-	  dofs = ei->dof[e];
-	  for (i = 0; i < dofs; i++) {
-	    lec->R[pe][i] = 0.0;
-	    if (af->Assemble_Jacobian) {
-	      for (v = V_FIRST; v < V_LAST; v++) {
-		pv = upd->vp[v];
-		if (pv != -1) {
-		  ei_ptr = ei;
-		  if (ei->owningElementForColVar[v] != ielem) {
-		    if (ei->owningElementForColVar[v] != -1) {
-		      ei_ptr = ei->owningElement_ei_ptr[v];
-		      if (ei_ptr == 0) {
-			printf("ei_ptr == 0\n");
-			exit(-1);
-		      }
-		    }
-		  }
-		  if (v == MASS_FRACTION) {
-		    for (kv = 0; kv < upd->Max_Num_Species_Eqn; kv++) {
-		      pv = MAX_PROB_VAR + kv;
-		      
-		      for (j = 0; j < ei_ptr->dof[v]; j++) {			  
-			lec->J[pe][pv][i][j] = 0.0;
-		      }
-		    }
-		  } else {
-		    memset(lec->J[pe][pv][i], 0, sizeof(double)*ei_ptr->dof[v]);
-		    /*for (j = 0; j < ei->dof[v]; j++) {	      
-		      lec->J[pe][pv][i][j] = 0.0;
-		      }*/
-		  }
-		}
-	      }
-	    }
-	  }
-	}
-      }
-    }
-  }
+  memset(lec->R, 0, sizeof(lec->R));  
+  memset(lec->J, 0, sizeof(lec->J)); 
+  memset(lec->J_stress_neighbor, 0, sizeof(lec->J_stress_neighbor));
 }
 /****************************************************************************/
 

@@ -184,7 +184,12 @@ init_shell_element_blocks(const Exo_DB *exo)
 
 
   /* No shells? Do nothing */
-  if (num_shell_blocks == 0) return;
+  if (num_shell_blocks == 0) {
+    safe_free(mnList);
+    safe_free(eb_Used);
+    safe_free(eb_ProcessingOrder);
+    return;
+  }
   
   /* Allocate some space for the list of Shell_Block structures. */
   /* Also do some basic initialization. */
@@ -2607,6 +2612,7 @@ calculate_lub_q_v (
 	  for ( j = 0; j < DIM; j++) {
 	    for ( k = 0; k < ei->dof[MESH_DISPLACEMENT1]; k++) {
 	      jk = dof_map[k];
+	      D_H_DX[j][jk] += delta(i,j)*(dH_U_dX[i]-dH_L_dX[i])*bf[MESH_DISPLACEMENT1]->phi[k];
 	      D_H_DX[j][jk] -= fv->dsnormal_dx[i][j][jk] * fv->d[i];
 	      D_H_DX[j][jk] -= fv->snormal[i] * delta(i,j) * bf[MESH_DISPLACEMENT1]->phi[k];
 	    }

@@ -45,7 +45,11 @@ static char rcsid[] =
 
 #include "mm_qp_storage.h"
 
+#include "sl_util_structs.h"
+
 #include "sl_amesos_interface.h"
+
+#include "sl_aztecoo_interface.h"
 
 #define _MM_SOL_NONLINEAR_C
 #include "goma.h"
@@ -153,6 +157,12 @@ PROTO((double ,			/* lambda - parameter                        */
 
 int neg_elem_volume        = FALSE;
 int neg_elem_volume_global = FALSE;
+
+int neg_lub_height        = FALSE;
+int neg_lub_height_global = FALSE;
+
+int zero_detJ        = FALSE;
+int zero_detJ_global = FALSE;
 
 /*
    
@@ -658,7 +668,12 @@ int solve_nonlinear_problem(struct Aztec_Linear_Solver_System *ams,
     {
       init_vec_value(resid_vector, 0.0, numProcUnknowns);
       init_vec_value(delta_x, 0.0, numProcUnknowns);
-      init_vec_value(a, 0.0, ams->nnz);
+      /* Zero matrix values */
+      if (strcmp(Matrix_Format, "epetra") == 0) {
+        EpetraPutScalarRowMatrix(ams->RowMatrix, 0.0);
+      } else {
+        init_vec_value(a, 0.0, ams->nnz);
+      }
       get_time(ctod);
 
       /*
@@ -730,8 +745,8 @@ int solve_nonlinear_problem(struct Aztec_Linear_Solver_System *ams,
 	  }
 
 	
-      /* get global element size and velocity norm if needed for PSPG */
-      if(PSPG && Num_Var_In_Type[PRESSURE])
+      /* get global element size and velocity norm if needed for PSPG or Cont_GLS */
+	  if((PSPG && Num_Var_In_Type[PRESSURE]) || (Cont_GLS && Num_Var_In_Type[VELOCITY1]))
 	  {
           h_elem_avg = global_h_elem_siz(x, x_old, xdot, resid_vector, exo, dpi);
 		  U_norm     = global_velocity_norm(x, exo, dpi);
@@ -822,6 +837,10 @@ int solve_nonlinear_problem(struct Aztec_Linear_Solver_System *ams,
 	      augc[iAC].lsvol = 0.;
 	    }
 	  }
+
+          /* Exchange dof before matrix fill so parallel information
+             is properly communicated */
+          exchange_dof(cx,dpi, x);
 
 	  if (Linear_Solver == FRONT)
 	    {
@@ -1429,15 +1448,28 @@ EH(-1,"version not compiled with frontal solver");
 	   */
 	  break;	
           	  
-	  case AMESOS:
-		  
-	    if( strcmp( Matrix_Format,"msr" ) == 0  ) {	
-	      amesos_solve_msr( Amesos_Package, ams, delta_x, resid_vector, 1 );	
-	    } else {
-	      EH(-1," Sorry, only MSR matrix formats are currently supported with the Amesos solver suite\n");
-	    }
-	    strcpy(stringer, " 1 ");
-	    break;		  
+      case AMESOS:
+
+        if( strcmp( Matrix_Format,"msr" ) == 0 ) {
+          amesos_solve_msr( Amesos_Package, ams, delta_x, resid_vector, 1 );
+        } else if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+          amesos_solve_epetra(Amesos_Package, ams, delta_x, resid_vector);
+        } else {
+          EH(-1," Sorry, only MSR and Epetra matrix formats are currently supported with the Amesos solver suite\n");
+        }
+        strcpy(stringer, " 1 ");
+        break;
+
+      case AZTECOO:
+        if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+          aztecoo_solve_epetra(ams, delta_x, resid_vector);
+          why = (int) ams->status[AZ_why];
+          aztec_stringer(why, ams->status[AZ_its], &stringer[0]);
+          matrix_solved = (ams->status[AZ_why] == AZ_normal);
+        } else {
+          EH(-1, "Sorry, only Epetra matrix formats are currently supported with the AztecOO solver suite\n");
+        }
+        break;
 
       case MA28:
 	  /*
@@ -1526,7 +1558,14 @@ EH(-1,"version not compiled with frontal solver");
 	      break;
 		  
 	  case AMESOS: 
-	    amesos_solve_msr( Amesos_Package, ams, &wAC[iAC][0], &bAC[iAC][0], 0 );
+            if( strcmp( Matrix_Format,"msr" ) == 0 ) {
+              amesos_solve_msr( Amesos_Package, ams, &wAC[iAC][0], &bAC[iAC][0], 0 );
+            } else if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+              amesos_solve_epetra(Amesos_Package, ams, &wAC[iAC][0], &bAC[iAC][0]);
+            } else {
+              EH(-1," Sorry, only MSR and Epetra matrix formats are currently supported with the Amesos solver suite\n");
+            }
+            strcpy(stringer_AC, " 1 ");
 	    break;
 
 	  case AZTEC:
@@ -1605,6 +1644,16 @@ EH(-1,"version not compiled with frontal solver");
 #endif /* HARWELL */
 	      strcpy(stringer_AC, " 1 ");
 	      break;
+          case AZTECOO:
+            if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+              aztecoo_solve_epetra(ams, &wAC[iAC][0], &bAC[iAC][0]);
+              why = (int) ams->status[AZ_why];
+              aztec_stringer(why, ams->status[AZ_its], &stringer_AC[0]);
+              matrix_solved = (ams->status[AZ_why] == AZ_normal);
+            } else {
+              EH(-1, "Sorry, only Epetra matrix formats are currently supported with the AztecOO solver suite\n");
+            }
+            break;
 
 	  case FRONT:
 
@@ -1969,7 +2018,7 @@ EH(-1,"version not compiled with frontal solver");
            if(damp_factor2 == -1.) damp_factor = damp_factor1; 
 	   if( !Visc_Sens_Copy )
 		{
-		if(2*inewton < Max_Newton_Steps)
+		if(Visc_Sens_Factor*inewton < Max_Newton_Steps)
 			{ Include_Visc_Sens = FALSE; }
 	   	else
 			{
@@ -3559,8 +3608,15 @@ soln_sens ( double lambda,  /*  parameter */
       break;
 		
     case AMESOS:	
-      amesos_solve_msr( Amesos_Package, ams, x_sens, resid_vector_sens, 0 );
+      if( strcmp( Matrix_Format,"msr" ) == 0 ) {
+        amesos_solve_msr( Amesos_Package, ams, x_sens, resid_vector_sens, 0 );
+      } else if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+        amesos_solve_epetra(Amesos_Package, ams, x_sens, resid_vector_sens);
+      } else {
+        EH(-1," Sorry, only MSR and Epetra matrix formats are currently supported with the Amesos solver suite\n");
+      }
       strcpy(stringer, " 1 ");
+      break;
       break;
       
     case AZTEC:
@@ -3622,7 +3678,15 @@ soln_sens ( double lambda,  /*  parameter */
 	    } 
 
       break;
-
+    case AZTECOO:
+      if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
+        aztecoo_solve_epetra(ams, x_sens, resid_vector_sens);
+        aztec_stringer((int) ams->status[AZ_why], ams->status[AZ_its], &stringer[0]);
+        matrix_solved = (ams->status[AZ_why] == AZ_normal);
+      } else {
+        EH(-1, "Sorry, only Epetra matrix formats are currently supported with the AztecOO solver suite\n");
+      }
+      break;
     case MA28:
       /*
        * sl_ma28 keeps internal static variables to determine whether

@@ -2,10 +2,12 @@
 /build/
 /lib/
 /settings.mk
+/.settings/
 *~
 *.a
 *.o
 goma
 .cproject
 .project
-
+/TAGS
+/.settings/

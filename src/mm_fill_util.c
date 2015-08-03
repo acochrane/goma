@@ -111,8 +111,6 @@ PROTO ((   int *[],
 	   int  ,
 	   Exo_DB * ));
 
-static int fill_variable_vector(const int, int [], int []);
-
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
@@ -355,7 +353,18 @@ beer_belly(void)
 	+ MapBf->J[0][2] * ( MapBf->J[1][0] * MapBf->J[2][1]
 			     -MapBf->J[2][0] * MapBf->J[1][1]);
 
-      //if(fabs(MapBf->detJ) < 1.e-10) EH(-1, "Uh-oh.  You shells are not robust.  Talk to PRS");
+
+      if(fabs(MapBf->detJ) < 1.e-10)
+       	{
+         zero_detJ = TRUE;
+#ifdef PARALLEL
+         fprintf(stderr,"\nP_%d: Uh-oh, detJ =  %e\n",ProcID, fabs(MapBf->detJ));
+#else
+         fprintf(stderr,"\n Uh-oh, detJ =  %e\n",fabs(MapBf->detJ));
+#endif
+         return(2);
+        }
+
     }
   
   
@@ -3691,7 +3700,7 @@ find_VBR_problem_graph(int *indx[], int *bindx[], int *bpntr[],
 /******************************************************************************/
 /******************************************************************************/
 
-static int
+int
 fill_variable_vector(int inode, int ivec_varType[], int ivec_matID[])
 
      /************************************************************************

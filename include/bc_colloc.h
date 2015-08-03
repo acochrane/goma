@@ -31,9 +31,7 @@
 #endif
 
 EXTERN int apply_point_colloc_bc
-PROTO((int [],			/* ija - integer pointers into the vector a */
-       double [],		/* a - non-zero entries, coefficient matrix */
-       double [],		/* resid_vector */
+PROTO((double [],		/* resid_vector */
        const double ,		/* delta_t - current time step size */
        const double ,		/* theta - parameter to vary time integration:
                                  * explicit (theta = 1) -- 
@@ -145,6 +143,12 @@ PROTO((double *,		/* func                                      */
        double  ));                  /* time _value */
 
 EXTERN double interpolate_table
+PROTO((struct Data_Table *,   /* table               */
+       double [],                     /* x            */
+       double *,              /* slope                 */
+       double []));           /* gradient array         */
+
+EXTERN double table_distance_search
 PROTO((struct Data_Table *,   /* table               */
        double [],                     /* x            */
        double *,              /* slope                 */

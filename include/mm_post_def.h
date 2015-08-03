@@ -69,6 +69,8 @@
 #define FORCE_X_NEG		374
 #define FORCE_Y_NEG		375
 #define FORCE_Z_NEG		376
+#define SPECIES_FLUX_REVOLUTION	398
+#define REPULSIVE_FORCE   	399
 
 #define I_VOLUME        0
 #define I_DISSIP        1
@@ -104,6 +106,10 @@
 #define I_SURF_TEMP     31
 #define I_JOULE         32
 #define I_LUB_LOAD      33
+#define I_VOLUME_PLANE  34 
+#define I_POS_VOLPLANE  35 
+#define I_NEG_VOLPLANE  36 
+#define I_SPECIES_SOURCE  37
 
 
 #ifdef _MM_POST_PROC_C
@@ -118,7 +124,7 @@ typedef struct Post_Processing_Flux_Names FLUX_NAME_STRUCT;
 extern FLUX_NAME_STRUCT pp_flux_names[];
 extern int Num_Flux_Names;
 
-struct Post_Processing_Flux_Names pp_flux_names[44] =  {
+struct Post_Processing_Flux_Names pp_flux_names[46] =  {
         { "FORCE_NORMAL",       FORCE_NORMAL },
         { "FORCE_TANGENT1",     FORCE_TANGENT1 },
         { "FORCE_TANGENT2",     FORCE_TANGENT2 },
@@ -162,7 +168,9 @@ struct Post_Processing_Flux_Names pp_flux_names[44] =  {
         { "FORCE_Z_POS",            FORCE_Z_POS },
         { "FORCE_X_NEG",            FORCE_X_NEG },
         { "FORCE_Y_NEG",            FORCE_Y_NEG },
-        { "FORCE_Z_NEG",            FORCE_Z_NEG }
+        { "FORCE_Z_NEG",            FORCE_Z_NEG },
+        { "SPECIES_FLUX_REVOLUTION",       SPECIES_FLUX_REVOLUTION },
+        { "REPULSIVE_FORCE",       REPULSIVE_FORCE }
 };
 
 int Num_Flux_Names = sizeof(pp_flux_names) / 
@@ -213,7 +221,11 @@ VOL_NAME_STRUCT pp_vol_names[] =
   { "ELECTRIC_LOAD_X",   I_ELOADX },
   { "ELECTRIC_LOAD_Y",   I_ELOADY },
   { "ELECTRIC_LOAD_Z",   I_ELOADZ },
-  { "SURFACE_TEMPERATURE",   I_SURF_TEMP }
+  { "SURFACE_TEMPERATURE",   I_SURF_TEMP },
+  { "VOL_PLANE",          I_VOLUME_PLANE },
+  { "POS_PLANE_FILL",   I_POS_VOLPLANE},
+  { "NEG_PLANE_FILL",   I_NEG_VOLPLANE},
+  { "SPECIES_SOURCE",    I_SPECIES_SOURCE}
 };
 
 int Num_Vol_Names = sizeof( pp_vol_names )/ sizeof( VOL_NAME_STRUCT );
@@ -525,6 +537,8 @@ extern int VON_MISES_STRAIN;
 extern int VON_MISES_STRESS;
 extern int NON_VOLFRAC;		/*Nonvolatile species Volume Fraction */
 extern int LUBP_SAT;
+extern int UNTRACKED_SPEC;		/*Untracked Species Concentration */
+
 
 /*
  *  Post-processing Step 1: add a new variable flag to end of mm_post_proc.h

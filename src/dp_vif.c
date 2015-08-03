@@ -129,6 +129,7 @@ noahs_raven()
   ddd_add_member(n, &Num_Interpolations, 1, MPI_INT);
   ddd_add_member(n, &CoordinateSystem, 1, MPI_INT);
   ddd_add_member(n, &len_u_post_proc, 1, MPI_INT);
+  ddd_add_member(n, &num_AC_Tables, 1, MPI_INT);
   ddd_add_member(n, &num_BC_Tables, 1, MPI_INT);
   ddd_add_member(n, &num_MP_Tables, 1, MPI_INT);
   ddd_add_member(n, &num_ext_Tables, 1, MPI_INT);
@@ -253,6 +254,15 @@ raven_landing()
 	}
 
     }
+  /*
+   * Create landing pads for TABLE_AC Data_Table structures
+   */
+
+  for ( i=0; i< num_AC_Tables; i++) 
+    {
+      AC_Tables[i] = smalloc ( sizeof ( struct Data_Table )  ) ;
+    }
+
   /*
    * Create landing pads for TABLE_BC Data_Table structures
    */
@@ -392,19 +402,6 @@ raven_landing()
 
     }
 */
-
-  /*
-   * Element quality/distortion measures.
-   */
-  if ( nEQM > 0 )
-    {
-      eqm = (struct Element_Quality_Metrics *) 
-       array_alloc(1, nEQM, sizeof(struct Element_Quality_Metrics));
-    }
-  else
-    {
-      eqm = NULL;
-    }
 
   /*
    * Augmenting condition preliminaries...
@@ -724,7 +721,7 @@ noahs_ark()
   printf("P_%d building Noahs_Ark [E] element %d\n",
 	  ProcID, n->num_members);
 #endif
-
+  ddd_add_member(n, &tran->fix_freq, 1, MPI_INT);
   ddd_add_member(n, &tran->print_freq, 1, MPI_INT);
   ddd_add_member(n, &tran->print_delt, 1, MPI_DOUBLE);
   ddd_add_member(n, &tran->print_delt2_time, 1, MPI_DOUBLE);
@@ -848,8 +845,11 @@ noahs_ark()
   ddd_add_member(n, &PSPG, 1, MPI_INT);
   ddd_add_member(n, &PSPP, 1, MPI_INT);
   ddd_add_member(n, &PS_scaling, 1, MPI_DOUBLE);
+  ddd_add_member(n, &Cont_GLS, 1, MPI_INT);
   ddd_add_member(n, &Filter_Species, 1, MPI_INT);
   ddd_add_member(n, &Include_Visc_Sens, 1, MPI_INT);
+  ddd_add_member(n, &Visc_Sens_Copy, 1, MPI_INT);
+  ddd_add_member(n, &Visc_Sens_Factor, 1, MPI_INT);
   ddd_add_member(n, &c_min, 1, MPI_DOUBLE);
   ddd_add_member(n, &c_max, 1, MPI_DOUBLE);
 
@@ -977,6 +977,21 @@ noahs_ark()
    * names for ordinates and abscissas to other processors.
    * The table data itself will be allocated in "ark_landing"
    */
+
+  for ( i=0; i < num_AC_Tables; i++ )
+    {
+      ddd_add_member(n,   AC_Tables[i]->t_name[0], 132, MPI_CHAR);
+      ddd_add_member(n,   AC_Tables[i]->t_name[1], 132, MPI_CHAR);
+      ddd_add_member(n,   AC_Tables[i]->t_index, 2, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->columns), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->interp_method), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->tablelength), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->f_index), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->species_eq), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->ngrid), 1, MPI_INT);
+      ddd_add_member(n, &(AC_Tables[i]->yscale), 1, MPI_DOUBLE);
+      ddd_add_member(n, &(AC_Tables[i]->Emin), 1, MPI_DOUBLE);
+    }
 
   for ( i=0; i < num_BC_Tables; i++ )
     {
@@ -1108,6 +1123,9 @@ noahs_ark()
   ddd_add_member(n, &upd->Pressure_Datum, 1, MPI_DOUBLE);
   ddd_add_member(n, &upd->Max_Num_Porous_Eqn, 1, MPI_INT);
   ddd_add_member(n, &upd->XFEM, 1, MPI_INT);
+  ddd_add_member(n, &upd->Process_Temperature, 1, MPI_DOUBLE);            
+  ddd_add_member(n, &upd->Acoustic_Frequency, 1, MPI_DOUBLE);            
+  ddd_add_member(n, &upd->Light_Cosmu, 1, MPI_DOUBLE);            
 
   for (i = 0; i < upd->Num_Mat; i++)
     {
@@ -1590,6 +1608,12 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->DiffCoeff, 1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->lubsource, 1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->lubmomsource[0], DIM, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->shell_user_par,1, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->acoustic_impedance,1, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->wave_number,1, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->acoustic_absorption,1, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->refractive_index,1, MPI_DOUBLE);
+      ddd_add_member(n, &mp_glob[i]->light_absorption,1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->CapStress, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->ConductivityModel, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->Ewt_funcModel, 1, MPI_INT);
@@ -1655,6 +1679,13 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->i_ys, 1, MPI_INT);	
       ddd_add_member(n, &mp_glob[i]->ThermodynamicPotentialModel, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->InterfacialAreaModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->wave_numberModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->Acoustic_ImpedanceModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->Acoustic_AbsorptionModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->Refractive_IndexModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->Light_AbsorptionModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->Shell_User_ParModel, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->PermittivityModel, 1, MPI_INT);
 
       /* External field indeces PRS 10-1-2013 (shutdown times) */
 
@@ -1735,6 +1766,20 @@ noahs_ark()
 		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
       ddd_add_member(n, mp_glob[i]->d_thermodynamic_potential,
 		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_shell_user_par,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_acoustic_impedance,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_wave_number,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_acoustic_absorption,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_refractive_index,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_light_absorption,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, mp_glob[i]->d_permittivity,
+		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
 
       /*
        * Material properties that are fixed length matrices of doubles.
@@ -1778,6 +1823,7 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_current_source, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_density, 1, MPI_INT);   
       ddd_add_member(n, &mp_glob[i]->len_u_electrical_conductivity, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_permittivity, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_heat_capacity, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_heat_source, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_mass_source, 1, MPI_INT);
@@ -1809,7 +1855,24 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_thermodynamic_potential, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_interfacial_area, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_lub_sat_const, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_shell_user_par, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_acoustic_impedance, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_wave_number, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_acoustic_absorption, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_refractive_index, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_light_absorption, 1, MPI_INT);
 
+      ddd_add_member(n, &mp_glob[i]->thermal_conductivity_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->acoustic_impedance_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->wave_number_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->acoustic_absorption_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->refractive_index_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->light_absorption_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->viscosity_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->dilationalViscosity_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->heat_capacity_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->diffusivity_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->saturation_tableid, 1, MPI_INT);
       /*
        * Material property constants that are vectors over the concentration
        * index.
@@ -2069,6 +2132,26 @@ noahs_ark()
 	  ddd_add_member(n, &mp_glob[i]->mp2nd->MomentumSourceModel, 1, MPI_INT);
 	  ddd_add_member(n, &mp_glob[i]->mp2nd->momentumsource, 1, MPI_DOUBLE);
 	  ddd_add_member(n, &mp_glob[i]->mp2nd->momentumsourcemask[0], 2, MPI_INT);
+
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->wavenumberModel, 1, MPI_INT);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->wavenumber, 1, MPI_DOUBLE);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->wavenumbermask[0], 2, MPI_INT);
+
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->AcousticImpedanceModel, 1, MPI_INT);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->acousticimpedance, 1, MPI_DOUBLE);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->acousticimpedancemask[0], 2, MPI_INT);
+
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->AcousticAbsorptionModel, 1, MPI_INT);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->acousticabsorption, 1, MPI_DOUBLE);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->acousticabsorptionmask[0], 2, MPI_INT);
+
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->RefractiveIndexModel, 1, MPI_INT);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->refractiveindex, 1, MPI_DOUBLE);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->refractiveindexmask[0], 2, MPI_INT);
+
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->LightAbsorptionModel, 1, MPI_INT);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->lightabsorption, 1, MPI_DOUBLE);
+	  ddd_add_member(n, &mp_glob[i]->mp2nd->lightabsorptionmask[0], 2, MPI_INT);
 	}
 
       /*
@@ -2281,6 +2364,7 @@ noahs_ark()
 
       ddd_add_member(n, elc_rs_glob[i]->d_lame_TempShift,
 		     MAX_VARIABLE_TYPES + MAX_CONC, MPI_DOUBLE);
+      ddd_add_member(n, &elc_rs_glob[i]->lame_TempShift_tableid, 1, MPI_INT);
 
       ddd_add_member(n, &elc_rs_glob[i]->poisson, 1, MPI_DOUBLE);
       ddd_add_member(n, &elc_rs_glob[i]->Strss_fr_sol_vol_frac, 1, MPI_DOUBLE);
@@ -2400,6 +2484,7 @@ noahs_ark()
   ddd_add_member(n, &VON_MISES_STRESS, 1, MPI_INT);
   ddd_add_member(n, &NON_VOLFRAC, 1, MPI_INT);
   ddd_add_member(n, &LUBP_SAT, 1, MPI_INT);
+  ddd_add_member(n, &UNTRACKED_SPEC, 1, MPI_INT);
 
   if ( len_u_post_proc > 0 )
     {
@@ -2484,6 +2569,7 @@ noahs_ark()
 	  ddd_add_member(n, &(pp_volume[i]->species_no), 1, MPI_INT );
 	  ddd_add_member(n, &(pp_volume[i]->blk_id), 1, MPI_INT );
 	  ddd_add_member(n,   pp_volume[i]->volume_fname, MAX_FNL, MPI_CHAR );
+	  ddd_add_member(n, &(pp_volume[i]->num_params), 1, MPI_INT );
 	}
     }
 			 
@@ -2720,6 +2806,12 @@ ark_landing()
       dalloc( m->len_u_electrical_conductivity,
 	      m->    u_electrical_conductivity);
 
+      dalloc( m->len_u_permittivity,
+	      m->    u_permittivity);
+
+      dalloc( m->len_u_elect_surf_diffusivity,
+	      m->    u_elect_surf_diffusivity);
+
       dalloc( m->len_u_heat_capacity,
 	      m->    u_heat_capacity);
 
@@ -2806,6 +2898,25 @@ ark_landing()
 
       dalloc( m->len_u_lub_sat_const,
               m->    u_lub_sat_const);
+
+      dalloc( m->len_u_shell_user_par,
+              m->    u_shell_user_par);
+
+      dalloc( m->len_u_acoustic_impedance,
+              m->    u_acoustic_impedance);
+
+      dalloc( m->len_u_wave_number,
+              m->    u_wave_number);
+
+      dalloc( m->len_u_acoustic_absorption,
+              m->    u_acoustic_absorption);
+
+      dalloc( m->len_u_refractive_index,
+              m->    u_refractive_index);
+
+      dalloc( m->len_u_light_absorption,
+              m->    u_light_absorption);
+
 
       /*
        * User defined material property lists for each species...
@@ -2994,6 +3105,11 @@ ark_landing()
                augc[i].DataFlt );
     }
 
+  for ( i=0; i < nn_volume; i++ )
+    {
+       dalloc( pp_volume[i]->num_params, pp_volume[i]->params );
+    }
+
 #ifdef DEBUG
   printf("P%d: Finished ark_landing\n", ProcID); fflush(stdout);
 #endif      
@@ -3055,6 +3171,12 @@ noahs_dove()
 
     crdv( m->len_u_electrical_conductivity,
 	  m->    u_electrical_conductivity);
+
+    crdv( m->len_u_permittivity,
+	  m->    u_permittivity);
+
+    crdv( m->len_u_elect_surf_diffusivity,
+	  m->    u_elect_surf_diffusivity);
 
     crdv( m->len_u_heat_capacity,
 	  m->    u_heat_capacity);
@@ -3142,6 +3264,24 @@ noahs_dove()
 
     crdv( m->len_u_interfacial_area,
 	  m->    u_interfacial_area);
+
+    crdv( m->len_u_shell_user_par,
+	  m->    u_shell_user_par);
+
+    crdv( m->len_u_acoustic_impedance,
+	  m->    u_acoustic_impedance);
+
+    crdv( m->len_u_wave_number,
+	  m->    u_wave_number);
+
+    crdv( m->len_u_acoustic_absorption,
+	  m->    u_acoustic_absorption);
+
+    crdv( m->len_u_refractive_index,
+	  m->    u_refractive_index);
+
+    crdv( m->len_u_light_absorption,
+	  m->    u_light_absorption);
 
     /*
      *  Add species names
@@ -3394,6 +3534,12 @@ noahs_dove()
     {
       crdv( augc[i].len_AC,
             augc[i].DataFlt );
+    }
+  /*   Post-processing parameters    */
+
+  for( i=0; i< nn_volume; i++)
+    {
+     crdv( pp_volume[i]->num_params, pp_volume[i]->params);
     }
   
   ddd_set_commit(n);
