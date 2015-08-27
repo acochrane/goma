@@ -11310,6 +11310,7 @@ assemble_porous_shell_open(
  *
  * Created:     Tuesday, March 5 2014, Andrew Cochrane (acochrane@gmail.com)
  * Really, Copied from SAR's assemble_porous_shell_open...
+ * Revisted:		Thursday, August 27, 2015, AC
  */
 
 int
@@ -11322,30 +11323,37 @@ assemble_porous_shell_two_phase(
 ) {
 
   /* --- Initialization -----------------------------------------------------*/    
+	// Initialize output status function
+	int status = 0;
+	// Bail out of function if there is nothing to do
+  //eqn = R_LUBP_LIQ;
+  if (!(pd->e[R_LUBP_LIQ] || pd->e[R_LUBP_GAS])) return(status);
 
   // Variable definitions
   int eqn, peqn, var, pvar;                       // Equation / variables
   int i, j, k ;                                 // Counter variables
-  dbl phi_i, grad_phi_i[DIM], gradII_phi_i[DIM];  // Basis funcitons (i)
+  dbl phi_i, grad_phi_i[DIM], gradII_phi_i[DIM];  // Basis functions (i)
   dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
-  dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM];  // Basis funcitons (j)
+  dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM];  // Basis functions (j)
   dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
-  dbl mass, diff, diff1, diff2;                           // Residual terms
+  dbl mass, diff, diff1, diff2, src;                           // Residual terms
 
   //Variables from lubrication for CONSTANT_SPEED height_function_model
   dbl H, dH_dtime; 
   dbl H_U, dH_U_dtime, H_L, dH_L_dtime, dH_U_dp, dH_U_ddh;
-  dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
+  dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE], dH_dX[DIM], gradII_H[DIM];
   H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
   dH_dtime = (dH_U_dtime - dH_L_dtime);
-
-  // Initialize output status function
-  int status = 0;
-
-  // Bail out of function if there is nothing to do
-  //eqn = R_LUBP_LIQ;
-  if (!(pd->e[R_LUBP_LIQ] || pd->e[R_LUBP_GAS])) return(status);
-  
+  if (dH_U_dX[0] != 0.0 || dH_U_dX[1] != 0.0 || dH_U_dX[2] != 0.0) {
+  	for( k=0; k<DIM; k++) {
+  		dH_dX[k] = dH_U_dX[k] - dH_L_dX[k];
+  	}
+  	Inn(dH_dX, gradII_H);
+  } else {
+  	for (k=0; k<DIM; k++) {
+  		gradII_H[k] = 0.0;
+  	}
+  }
   
   // Setup lubrication 
   /* Do I Need dependence on mesh and displacemtns to use lubrication_shell_initialize? - AMC 
@@ -11385,7 +11393,7 @@ assemble_porous_shell_two_phase(
     Plj_dot_over_Plj = (1.0+2.0*tt)/dt;
     for (k = 0; k<DIM; k++) {
       grad_Pl[k] = fv->grad_lubp_liq[k];
-      gradII_Pl[k] = fv->grad_lubp_liq[k];
+      //gradII_Pl[k] = fv->grad_lubp_liq[k];
     }
   } else {
     Pl = 0;                          // liquid phase pressure
@@ -11393,7 +11401,7 @@ assemble_porous_shell_two_phase(
     Plj_dot_over_Plj = 0;
     for (k = 0; k<DIM; k++) {
       grad_Pl[k] = 0;
-      gradII_Pl[k] = 0;
+      //gradII_Pl[k] = 0;
     }
   }
   dbl Pg, Pg_dot, Pgj_dot_over_Pgj, grad_Pg[DIM], gradII_Pg[DIM];
@@ -11403,7 +11411,7 @@ assemble_porous_shell_two_phase(
     Pgj_dot_over_Pgj = (1.0+2.0*tt)/dt;
     for (k = 0; k<DIM; k++) {
       grad_Pg[k] = fv->grad_lubp_gas[k];
-      gradII_Pg[k] = fv->grad_lubp_gas[k];
+      //gradII_Pg[k] = fv->grad_lubp_gas[k];
     }
   } else {
     Pg = 0;                         // gas phase pressure
@@ -11411,7 +11419,7 @@ assemble_porous_shell_two_phase(
     Pgj_dot_over_Pgj = 0;
     for (k = 0; k<DIM; k++) {
       grad_Pg[k] = 0;
-      gradII_Pg[k] = 0;
+      //gradII_Pg[k] = 0;
     }
   }
   dbl Pc = Pg-Pl;
@@ -11460,7 +11468,9 @@ assemble_porous_shell_two_phase(
   // Scale dS_dH wrt dS_dPc
   dbl dS_dPc_scale = 1.0;
   // Calculate lubrication permeability. probably impliment as a new kappa model.. later - AMC
-  dbl k_liq,dk_liq_dS,k_gas,dk_gas_dS;
+  dbl k_liq, dk_liq_dS, k_gas, dk_gas_dS;
+  dbl k_media = H*H/12.0;
+  dbl dk_dH = H/6.0;
   dbl n = 1; // for now 
   if (n == 1) {
     k_liq = saturation;
@@ -11500,21 +11510,33 @@ assemble_porous_shell_two_phase(
       mass = 0.0;
       if ( T_MASS ) {
 	//mass += (-(dS_dPc*H)*dPc_dPl*Pl_dot + (H*dS_dH + saturation)*dH_dtime) * phi_i; /* __Reduced_Order_Exp */
-	mass += (-dS_dPc*dPc_dPl*Pl_dot + (saturation/H + dS_dH)*dH_dtime) * phi_i;
+	//mass += (-dS_dPc*dPc_dPl*Pl_dot + (saturation/H + dS_dH)*dH_dtime) * phi_i;
+      	mass += ( H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
       }
       mass *= dA * etm_mass_eqn;
       
+      // Assemble source term
+      src = 0.0;
+      if (T_SOURCE) {
+      	src += saturation*dH_dtime*phi_i;
+      }
+
       // Assemble diffusion term
       diff = 0.0;
+      diff1 = 0.0;
+      diff2 = 0.0;
       if ( T_DIFFUSION ) {
       	for ( k = 0; k < DIM; k++) {
-      		diff += gradII_Pl[k] * gradII_phi_i[k];
+      		diff1 += gradII_Pl[k] * gradII_phi_i[k];
+      		diff2 += gradII_H[k] * gradII_phi_i[k];
       	}
-      	diff *= -k_liq*H*H/12.0/mu_l * dA * etm_diff_eqn;
+      	diff1 *= dS_dPc*dPc_dPl*H*k_media*(k_liq + saturation);
+      	diff2 *= saturation*k_liq*(k_media + H*dk_dH);
+      	diff += (diff1 + diff2)/mu_l * dA * etm_diff_eqn;
       }
 
       // Assemble full residual
-      lec->R[peqn][i] += mass + diff;
+      lec->R[peqn][i] += mass + src + diff;
       
     }  // End of loop over DOF (i)
 
@@ -11600,41 +11622,49 @@ assemble_porous_shell_two_phase(
 
       		if ( T_MASS ) {
       			//	    mass += phi_i * phi_j * (dH_dtime*(H*dPc_dPl*d2S_dPcdH + dS_dPc*dPc_dPl) - Pl_dot*dPc_dPl*(H*dPc_dPl*d2S_dPc2) - H*dPc_dPl*dS_dPc*Plj_dot_over_Plj);  /* __Reduced_Order_Exp */
-      			mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPl - dPc_dPl*d2S_dPcdH) - dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
+      			//mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPl - dPc_dPl*d2S_dPcdH) - dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
       			//	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
+
+      			mass +=H*dS_dPc*dPc_dPl*(1.0 + 2.0*tt)/dt*phi_i*phi_j;
       			mass *=  dA * etm_mass_eqn;// * etm_mass_var;
       		}
 
-	  
-	  // Assemble diffusion term
-	  diff = 0.0;
-	  if ( T_DIFFUSION ) {
-	    diff1 = 0.0;
-	    diff2 = 0.0;
-	    for ( k = 0; k < DIM ; k++) {
-	      diff1 += gradII_Pl[k]*gradII_phi_i[k];
-	      diff2 += gradII_phi_j[k]*gradII_phi_i[k];
-	    }
-		  diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
-		  diff *= -H*H/12.0/mu_l * dA * etm_diff_eqn;// * etm_diff_var;
-	  }
-	  
-	  // Assemble full Jacobian
-	  lec->J[peqn][pvar][i][j] += mass + diff;
-	  
-	} // End of loop over DOF (j)
+      		// Assemble source term
+      		src = 0.0;
+      		if (T_SOURCE) {
+      			src += dS_dPc*dPc_dPl*dPl_dPlj*dH_dtime*phi_i;
+      			src *= dA * etm_src_term;
+      		}
+      		// Assemble diffusion term
+      		diff = 0.0;
+      		if ( T_DIFFUSION ) {
+      			diff1 = 0.0;
+      			diff2 = 0.0;
+      			for ( k = 0; k < DIM ; k++) {
+      				diff1 += gradII_Pl[k]*gradII_phi_i[k];
+      				diff2 += gradII_phi_j[k]*gradII_phi_i[k];
+      			}
+      			//diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
+      			diff = 1/mu_l*(diff2*dS_dPc*dPc_dPl*h*k_media*(k_liq + saturation) + diff1*dS_dPc*dPc_dPl*h*k*(dkl_dPl + dS_dPc*dPc_dPl)*dPl_dPlj);
+      			diff *= dA * etm_diff_eqn;// * etm_diff_var;
+      		}
+
+      		// Assemble full Jacobian
+      		lec->J[peqn][pvar][i][j] += mass + src + diff;
+
+      	} // End of loop over DOF (j)
 	
       } // End of R_LUBP_LIQ sensitivities to LUBP_LIQ
 
       // Assemble sensitivities of R_LUBP_LIQ to LUBP_GAS ********************************************************************
       var = LUBP_GAS;
       if (pd->v[var]) {
-	etm_mass_var = pd->etm[var][(LOG2_MASS)];
-	etm_diff_var = pd->etm[var][(LOG2_DIFFUSION)];
-  	pvar = upd->vp[var];
+      	etm_mass_var = pd->etm[var][(LOG2_MASS)];
+      	etm_diff_var = pd->etm[var][(LOG2_DIFFUSION)];
+      	pvar = upd->vp[var];
 
-  	// Loop over DOF (j)
-  	for ( j = 0; j < ei->dof[var]; j++) {
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
 
 	  // Load basis functions
 	  /* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
