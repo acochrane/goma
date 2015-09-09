@@ -11370,7 +11370,7 @@ assemble_porous_shell_two_phase(
   dbl h3 = fv->h3;                                // Differential volume element (What is this? - AMC)
   dbl det_J = fv->sdet;                           // Jacobian of transformation
   dbl dA = det_J * wt * h3;
-  dbl etm_mass_eqn, etm_diff_eqn, etm_mass_var, etm_diff_var;
+  dbl etm_mass_eqn, etm_diff_eqn, etm_mass_var, etm_diff_var, etm_src_eqn, etm_src_var;
 
   
   // Load liquid material properties
@@ -11471,6 +11471,7 @@ assemble_porous_shell_two_phase(
   dbl k_liq, dk_liq_dS, k_gas, dk_gas_dS;
   dbl k_media = H*H/12.0;
   dbl dk_dH = H/6.0;
+  dbl dkl_dPl = dS_dPc*dPc_dPl;
   dbl n = 1; // for now 
   if (n == 1) {
     k_liq = saturation;
@@ -11494,7 +11495,7 @@ assemble_porous_shell_two_phase(
     peqn = upd->ep[eqn];
     etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
     etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
-
+    etm_src_eqn =  pd->etm[eqn][(LOG2_SOURCE)];
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) {         
       
@@ -11514,12 +11515,6 @@ assemble_porous_shell_two_phase(
       	mass += ( H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
       }
       mass *= dA * etm_mass_eqn;
-      
-      // Assemble source term
-      src = 0.0;
-      if (T_SOURCE) {
-      	src += saturation*dH_dtime*phi_i;
-      }
 
       // Assemble diffusion term
       diff = 0.0;
@@ -11534,6 +11529,14 @@ assemble_porous_shell_two_phase(
       	diff2 *= saturation*k_liq*(k_media + H*dk_dH);
       	diff += (diff1 + diff2)/mu_l * dA * etm_diff_eqn;
       }
+
+      // Assemble source term
+      src = 0.0;
+      if (T_SOURCE) {
+      	src += (saturation + H*dS_dH)*dH_dtime*phi_i;
+      }
+
+      src *= dA * etm_src_eqn;
 
       // Assemble full residual
       lec->R[peqn][i] += mass + src + diff;
@@ -11589,6 +11592,7 @@ assemble_porous_shell_two_phase(
     peqn = upd->ep[eqn];    
     etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
     etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    etm_src_eqn	 = pd->etm[eqn][(LOG2_SOURCE)];
 
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) /* The sensitivites of R_LUBP_LIQ to LUBP_LIQ and LUBP_GAS */ {
@@ -11604,6 +11608,8 @@ assemble_porous_shell_two_phase(
       if (pd->v[var]) {
       	etm_mass_var = pd->etm[var][(LOG2_MASS)];
       	etm_diff_var = pd->etm[var][(LOG2_DIFFUSION)];
+      	etm_src_var =  pd->etm[var][(LOG2_SOURCE)];
+
       	pvar = upd->vp[var];
 
       	// Loop over DOF (j)
@@ -11617,24 +11623,18 @@ assemble_porous_shell_two_phase(
       		//gradII_phi_j[k] = bf[var]->grad_phi[j][k];
       		//}
       		dbl dPl_dPlj = phi_j;
+
       		// Assemble mass term
       		mass = 0.0;
-
       		if ( T_MASS ) {
       			//	    mass += phi_i * phi_j * (dH_dtime*(H*dPc_dPl*d2S_dPcdH + dS_dPc*dPc_dPl) - Pl_dot*dPc_dPl*(H*dPc_dPl*d2S_dPc2) - H*dPc_dPl*dS_dPc*Plj_dot_over_Plj);  /* __Reduced_Order_Exp */
       			//mass += phi_i*phi_j * (dH_dtime*(1/H*dS_dPc*dPc_dPl - dPc_dPl*d2S_dPcdH) - dPc_dPl*(dS_dPc*Plj_dot_over_Plj + Pl_dot*dPc_dPl*d2S_dPc2));
       			//	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 
-      			mass +=H*dS_dPc*dPc_dPl*(1.0 + 2.0*tt)/dt*phi_i*phi_j;
+      			mass += H*dS_dPc*dPc_dPl*(1.0 + 2.0*tt)/dt*phi_i*phi_j;
       			mass *=  dA * etm_mass_eqn;// * etm_mass_var;
       		}
 
-      		// Assemble source term
-      		src = 0.0;
-      		if (T_SOURCE) {
-      			src += dS_dPc*dPc_dPl*dPl_dPlj*dH_dtime*phi_i;
-      			src *= dA * etm_src_term;
-      		}
       		// Assemble diffusion term
       		diff = 0.0;
       		if ( T_DIFFUSION ) {
@@ -11645,10 +11645,16 @@ assemble_porous_shell_two_phase(
       				diff2 += gradII_phi_j[k]*gradII_phi_i[k];
       			}
       			//diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
-      			diff = 1/mu_l*(diff2*dS_dPc*dPc_dPl*h*k_media*(k_liq + saturation) + diff1*dS_dPc*dPc_dPl*h*k*(dkl_dPl + dS_dPc*dPc_dPl)*dPl_dPlj);
+      			diff = 1/mu_l*(diff2*dS_dPc*dPc_dPl*H*k_media*(k_liq + saturation) + diff1*dS_dPc*dPc_dPl*H*k*(dkl_dPl + dS_dPc*dPc_dPl)*dPl_dPlj);
       			diff *= dA * etm_diff_eqn;// * etm_diff_var;
       		}
 
+      		// Assemble source term
+      		src = 0.0;
+      		if ( T_SOURCE ) {
+      			src += (dS_dPc*dPc_dPl*dPl_dPlj + H*d2S_dPcdH*dPc_dPl*dPl_dPlj)*dH_dtime*phi_i;
+      			src *= dA * etm_src_eqn;
+      		}
       		// Assemble full Jacobian
       		lec->J[peqn][pvar][i][j] += mass + src + diff;
 

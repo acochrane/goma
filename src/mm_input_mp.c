@@ -8756,7 +8756,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       //      mat_ptr->lub_sat_const = calloc(4, sizeof(double));
 
       a = 0.5;
-      b = -a;
+      b = a;
       gamma = mat_ptr->surface_tension;
 
       S1 = 1.0 - beta1y;
