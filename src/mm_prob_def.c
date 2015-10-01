@@ -374,14 +374,15 @@ setup_pd()
 	  else if((ce == R_LUBP_LIQ) ||
 		  (ce == R_LUBP_GAS))
 	    {
-	      if ( pd_glob[mn]->etm[ce][(LOG2_MASS)] != 0. )
-		{
-		  pd_glob[mn]->e[ce] |= T_MASS;
-		}
-	      if ( pd_glob[mn]->etm[ce][(LOG2_DIFFUSION)] != 0. )
-		{
-		  pd_glob[mn]->e[ce] |= T_DIFFUSION;
-		}
+	      if ( pd_glob[mn]->etm[ce][(LOG2_MASS)] != 0. ) {
+	      	pd_glob[mn]->e[ce] |= T_MASS;
+	      }
+	      if ( pd_glob[mn]->etm[ce][(LOG2_DIFFUSION)] != 0. ) {
+	      	pd_glob[mn]->e[ce] |= T_DIFFUSION;
+	      }
+	      if ( pd_glob[mn]->etm[ce][(LOG2_SOURCE)] != 0. ) {
+	      	pd_glob[mn]->e[ce] |= T_SOURCE;
+	      }
 	    }
 	  else if((ce == R_ENERGY )||
 		  (ce == R_MASS)||

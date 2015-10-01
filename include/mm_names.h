@@ -1501,8 +1501,8 @@ struct Equation_Names Exo_Var_Names[] =
   { "Plus Propagating Intensity", "INTP", LIGHT_INTP },
   { "Minus Propagating Intensity", "INTM", LIGHT_INTM },
   { "Dispersive Scattering Intensity", "INTD", LIGHT_INTD },
-  { "Liquid Phase Capillary Pressure", "LPL", LUBP_LIQ }, /* 183 - AMC */
-  { "Gas Phase Capillary Pressure", "LPG", LUBP_GAS }, /* 184 - AMC */
+  { "Liquid Phase Capillary Pressure", "LUBP_LIQ", LUBP_LIQ }, /* 183 - AMC */
+  { "Gas Phase Capillary Pressure", "LUBP_GAS", LUBP_GAS }, /* 184 - AMC */
 };
 
 int Num_Exo_Var_Names = sizeof(Exo_Var_Names) / sizeof(struct Equation_Names);  

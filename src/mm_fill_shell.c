@@ -11362,8 +11362,8 @@ assemble_porous_shell_two_phase(
   int *n_dof = NULL;
   int dof_map[MDE];
   dbl wt_old = fv->wt;
-  //  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-  //  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
   // Unpack FEM variables from global structures
   dbl wt = fv->wt;                                // Gauss point weight
@@ -11436,7 +11436,7 @@ assemble_porous_shell_two_phase(
   // Build Saturation Function, should be implemented elsewhere, no?  yes. -AMC
 
   dbl Theta, sechTheta, tanhTheta, saturation;
-  Theta = c + d/(Pc*H);                               // abscissa of hyperbolic trig functions
+  Theta = c + d*(Pc*H);                               // abscissa of hyperbolic trig functions
   sechTheta = 1.0/cosh(Theta);
   tanhTheta = tanh(Theta);
   saturation = a + b*tanhTheta;
@@ -11472,6 +11472,7 @@ assemble_porous_shell_two_phase(
   dbl k_media = H*H/12.0;
   dbl dk_dH = H/6.0;
   dbl dkl_dPl = dS_dPc*dPc_dPl;
+
   dbl n = 1; // for now 
   if (n == 1) {
     k_liq = saturation;
@@ -11500,9 +11501,9 @@ assemble_porous_shell_two_phase(
     for ( i = 0; i < ei->dof[eqn]; i++) {         
       
       // Load basis functions
-      /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
-      phi_i = bf[eqn]->phi[i];      
-      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);      
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      //phi_i = bf[eqn]->phi[i];
+      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
       /* i think not using Inn makes elliptic drops
       for (k = 0; k<DIM; k++) {      
 	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
@@ -11523,10 +11524,10 @@ assemble_porous_shell_two_phase(
       if ( T_DIFFUSION ) {
       	for ( k = 0; k < DIM; k++) {
       		diff1 += gradII_Pl[k] * gradII_phi_i[k];
-      		diff2 += gradII_H[k] * gradII_phi_i[k];
+      		//diff2 += gradII_H[k] * gradII_phi_i[k];
       	}
-      	diff1 *= dS_dPc*dPc_dPl*H*k_media*(k_liq + saturation);
-      	diff2 *= saturation*k_liq*(k_media + H*dk_dH);
+      	diff1 *= saturation*H*k_media*k_liq;
+      	//diff2 *= saturation*k_liq*(k_media + H*dk_dH);
       	diff += (diff1 + diff2)/mu_l * dA * etm_diff_eqn;
       }
 
@@ -11539,7 +11540,7 @@ assemble_porous_shell_two_phase(
       src *= dA * etm_src_eqn;
 
       // Assemble full residual
-      lec->R[peqn][i] += mass + src + diff;
+      lec->R[peqn][i] += mass + src - diff;
       
     }  // End of loop over DOF (i)
 
@@ -11597,9 +11598,9 @@ assemble_porous_shell_two_phase(
     // Loop over DOF (i)
     for ( i = 0; i < ei->dof[eqn]; i++) /* The sensitivites of R_LUBP_LIQ to LUBP_LIQ and LUBP_GAS */ {
       // Load i basis functions
-      /* ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
-      phi_i = bf[eqn]->phi[i];
-      Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
+      ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      //phi_i = bf[eqn]->phi[i];
+      //Inn(bf[eqn]->grad_phi[i], gradII_phi_i);
       //for (k = 0; k<DIM; k++) {      
       //gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
       //}
@@ -11616,9 +11617,9 @@ assemble_porous_shell_two_phase(
       	for ( j = 0; j < ei->dof[var]; j++) {
 
       		// Load j basis functions
-      		/* ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map ); */
-      		phi_j = bf[var]->phi[j];
-      		Inn(bf[var]->grad_phi[j], gradII_phi_j);
+      		ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      		//phi_j = bf[var]->phi[j];
+      		//Inn(bf[var]->grad_phi[j], gradII_phi_j);
       		//for (k = 0; k<DIM; k++) {
       		//gradII_phi_j[k] = bf[var]->grad_phi[j][k];
       		//}
@@ -11645,7 +11646,7 @@ assemble_porous_shell_two_phase(
       				diff2 += gradII_phi_j[k]*gradII_phi_i[k];
       			}
       			//diff = diff1*dk_liq_dS*dPl_dPlj*dPc_dPl*dS_dPc + diff2*k_liq; /*the liquid phase pressure is not sensitive to the gas phase pressure*/
-      			diff = 1/mu_l*(diff2*dS_dPc*dPc_dPl*H*k_media*(k_liq + saturation) + diff1*dS_dPc*dPc_dPl*H*k*(dkl_dPl + dS_dPc*dPc_dPl)*dPl_dPlj);
+      			diff = 1./mu_l*(diff2*(saturation*H*k_media*k_liq) + diff1*H*k_media*(saturation*dkl_dPl + k_liq*dS_dPc*dPc_dPl)*dPl_dPlj);
       			diff *= dA * etm_diff_eqn;// * etm_diff_var;
       		}
 
@@ -11656,7 +11657,7 @@ assemble_porous_shell_two_phase(
       			src *= dA * etm_src_eqn;
       		}
       		// Assemble full Jacobian
-      		lec->J[peqn][pvar][i][j] += mass + src + diff;
+      		lec->J[peqn][pvar][i][j] += mass + src - diff;
 
       	} // End of loop over DOF (j)
 	

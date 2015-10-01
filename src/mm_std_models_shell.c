@@ -1444,12 +1444,16 @@ double two_phase_lubrication_saturation_model(double delta_t,
   *****************************************************************************/
 {
   
-  dbl *a, *b, *c, *d, S, Pc;
-  a = &mp->u_lub_sat_const[0];
-  b = &mp->u_lub_sat_const[1];
-  c = &mp->u_lub_sat_const[2];
-  d = &mp->u_lub_sat_const[3];
-  Pc = fv->lubp_gas - fv->lubp_liq;
+  dbl a, b, c, d, S, Pc;
+  a = mp->u_lub_sat_const[0];
+  b = mp->u_lub_sat_const[1];
+  c = mp->u_lub_sat_const[2];
+  d = mp->u_lub_sat_const[3];
+  if (pd->e[R_LUBP_LIQ] && pd->e[R_LUBP_GAS]) {
+  	Pc = fv->lubp_gas - fv->lubp_liq;
+  } else if (pd->e[R_LUBP_LIQ]) {
+  	Pc = -fv->lubp_liq;
+  }
 
   dbl H, dH_dtime, dt;
   dt = delta_t;
@@ -1457,7 +1461,7 @@ double two_phase_lubrication_saturation_model(double delta_t,
   dbl dH_U_dX[DIM],dH_L_dX[DIM], dH_dtime_dmesh[DIM][MDE];
   H = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime, dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time , dt); 
 
-  S = *a + *b*tanh( *c + *d/(Pc * H));
+  S = a + b*tanh( c + d*(Pc * H));
 
 
   return S;

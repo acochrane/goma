@@ -614,7 +614,7 @@ modify_fv_mesh_derivs_for_LSA_3D_of_2D(void)
           }
       }
     }
-
+/* with no mesh motion this is superfluous
  v = LUBP_LIQ;
   if (pd->v[v])
     {
@@ -622,8 +622,8 @@ modify_fv_mesh_derivs_for_LSA_3D_of_2D(void)
       {
         for (j=0; j<mdof; j++)
           {
-            fv->d_grad_lubp_2_dmesh[p][b][j] =
-                - fv->grad_lubp_2[b] * bfx->grad_phi[j][2];
+            fv->d_grad_lubp_liq_dmesh[p][b][j] =
+                - fv->grad_lubp_liq[b] * bfx->grad_phi[j][2];
           }
       }
     }
@@ -634,12 +634,12 @@ modify_fv_mesh_derivs_for_LSA_3D_of_2D(void)
       {
         for (j=0; j<mdof; j++)
           {
-            fv->d_grad_lubp_2_dmesh[p][b][j] =
-                - fv->grad_lubp_2[b] * bfx->grad_phi[j][2];
+            fv->d_grad_lubp_gas_dmesh[p][b][j] =
+                - fv->grad_lubp_gas[b] * bfx->grad_phi[j][2];
           }
       }
     }
-
+*/
   v = SHELL_TEMPERATURE;
   if (pd->v[v])
     {
