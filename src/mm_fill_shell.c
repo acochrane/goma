@@ -11513,7 +11513,7 @@ assemble_porous_shell_two_phase(
       if ( T_MASS ) {
 	//mass += (-(dS_dPc*H)*dPc_dPl*Pl_dot + (H*dS_dH + saturation)*dH_dtime) * phi_i; /* __Reduced_Order_Exp */
 	//mass += (-dS_dPc*dPc_dPl*Pl_dot + (saturation/H + dS_dH)*dH_dtime) * phi_i;
-      	mass += ( H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
+      	mass += ( -H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
       }
       mass *= dA * etm_mass_eqn;
 
@@ -11633,7 +11633,7 @@ assemble_porous_shell_two_phase(
       			//	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 
       			mass += H*dS_dPc*dPc_dPl*(1.0 + 2.0*tt)/dt*phi_i*phi_j;
-      			mass *=  dA * etm_mass_eqn;// * etm_mass_var;
+      			mass *=  -dA * etm_mass_eqn;// * etm_mass_var;
       		}
 
       		// Assemble diffusion term
