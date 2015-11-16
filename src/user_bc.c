@@ -927,7 +927,9 @@ lubp_liq_sat (double *func,
 	      const double time)
 /******************************************************************************
 *
-*  Function which sets liquid phase pressure over a sideset
+*  Function which sets the pressure, based on the current height and user
+*  defined saturation in the SH_LUBP_SAT
+*  Pc = Pg - Pl =
 *
 ******************************************************************************/
 {
@@ -957,13 +959,14 @@ lubp_liq_sat (double *func,
 
 /* Add your function and sensitivities here */
   set_saturation = u_bc[0];
-  Pg = fv->lubp_gas ;
+  //Pg = fv->lubp_gas ;
+  Pg = 0;
 
   Pc = two_phase_lubrication_Pc_f_of_S( set_saturation, delta_t, time);
   *func = Pg  - fv->lubp_liq - Pc;
   //for (var = 0; var < MAX_VARIABLE_TYPES + MAX_CONC; var++) {
-  d_func[0] = 1.;
-  d_func[1] = 1.;
+  d_func[LUBP_LIQ] = -1.;
+  d_func[LUBP_GAS] = 1.;
     //}
   return;
 } /* END of routine lubp_liq_sat */

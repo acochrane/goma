@@ -11376,7 +11376,7 @@ assemble_porous_shell_two_phase(
   // Load liquid material properties
   dbl mu_l = mp->viscosity;                         // Viscosity
   /************************************************************************************************************************/
-  dbl mu_g = 0.0186;                                     // Must incorperate this into material file
+  dbl mu_g = 0.0000186;                                     // Must incorperate this into material file
   /************************************************************************************************************************/
 
   //  dbl rho = mp->density;                          // Density unused, remove?
@@ -11513,7 +11513,7 @@ assemble_porous_shell_two_phase(
       if ( T_MASS ) {
 	//mass += (-(dS_dPc*H)*dPc_dPl*Pl_dot + (H*dS_dH + saturation)*dH_dtime) * phi_i; /* __Reduced_Order_Exp */
 	//mass += (-dS_dPc*dPc_dPl*Pl_dot + (saturation/H + dS_dH)*dH_dtime) * phi_i;
-      	mass += ( -H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
+      	mass += ( H*dS_dPc*dPc_dPl*Pl_dot )*phi_i;
       }
       mass *= dA * etm_mass_eqn;
 
@@ -11535,6 +11535,7 @@ assemble_porous_shell_two_phase(
       src = 0.0;
       if (T_SOURCE) {
       	src += (saturation + H*dS_dH)*dH_dtime*phi_i;
+      	//src += (saturation)*dH_dtime*phi_i;
       }
 
       src *= dA * etm_src_eqn;
@@ -11633,7 +11634,7 @@ assemble_porous_shell_two_phase(
       			//	    mass += phi_i * phi_j * ( dS_dPc*Plj_dot_over_Plj + -Pl_dot*d2S_dPc2 + 1.0*dH_dtime*d2S_dPldH);
 
       			mass += H*dS_dPc*dPc_dPl*(1.0 + 2.0*tt)/dt*phi_i*phi_j;
-      			mass *=  -dA * etm_mass_eqn;// * etm_mass_var;
+      			mass *=  dA * etm_mass_eqn;// * etm_mass_var;
       		}
 
       		// Assemble diffusion term
@@ -11654,6 +11655,7 @@ assemble_porous_shell_two_phase(
       		src = 0.0;
       		if ( T_SOURCE ) {
       			src += (dS_dPc*dPc_dPl*dPl_dPlj + H*d2S_dPcdH*dPc_dPl*dPl_dPlj)*dH_dtime*phi_i;
+      			//src += (dS_dPc*dPc_dPl*dPl_dPlj )*dH_dtime*phi_i;
       			src *= dA * etm_src_eqn;
       		}
       		// Assemble full Jacobian
