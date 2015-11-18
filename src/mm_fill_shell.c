@@ -14391,6 +14391,9 @@ assemble_shell_tfmp(double time,   /* Time */
     dv_dS[k] = dv_dS_constant*gradII_P[k];
     gradII_rho[k] = drho_dS*gradII_S[k];
   }
+  
+  //temp mass lumping switch
+  bool mass_lumping = FALSE;
 
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
@@ -14405,8 +14408,12 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
-      	mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
-      	mass *= dA * etm_mass_eqn;
+      	if (mass_lumping) {
+	  mass += phi_i*(h*(drho_dS)* *esp_dot->tfmp_sat[i] + rho*dh_dtime);
+      	} else {
+	  mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	}
+        mass *= dA * etm_mass_eqn;
       }
       /* Assemble advection term */
       adv = 0.0;
@@ -14441,9 +14448,14 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
-      	mass += phi_i*fv_dot->tfmp_sat;
+      	if (mass_lumping) {
+	  mass += phi_i* (*esp_dot->tfmp_sat[i]);
+      	} else {
+	  mass += phi_i*fv_dot->tfmp_sat;
+      	}
       	mass *= dA * etm_mass_eqn;
       }
+
       /* Assemble advection term */
       adv = 0;
       v_dot_gradII_phi_i = 0.0;
@@ -14539,12 +14551,20 @@ assemble_shell_tfmp(double time,   /* Time */
       		ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
       		// Assemble mass term
       		mass = 0.0;
-
-      		if( T_MASS ) {
-      			mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
-      			mass *= etm_mass_eqn;
+		if( T_MASS ) {
+		  if (mass_lumping) {
+		    if (i == j) {
+		      mass += phi_i*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+		    } else {
+		      mass += phi_i*drho_dS*dh_dtime;
+		    }
+		  } else {
+		    mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+		  }
+		  mass *= etm_mass_eqn;
       		}
-      		// Assemble advection term
+		
+		// Assemble advection term
       		adv = 0.0;
       		if ( T_ADVECTION ) {
       			for( k=0; k<DIM; k++) {
@@ -14637,9 +14657,16 @@ assemble_shell_tfmp(double time,   /* Time */
       		// Assemble mass term
       		mass = 0.0;
       		if( T_MASS ) {
-      			mass = phi_i*phi_j*((1+2*tt)/delta_t);
+		  if (mass_lumping) {
+		    if (i == j) {
+		      mass += phi_i*(1+2*tt)/delta_t;
+		    }
+		  } else {
+		    mass += phi_i*phi_j*((1+2*tt)/delta_t);
+		  }
+		  //mass += phi_i*phi_j*((1+2*tt)/delta_t);
+		  mass *= etm_mass_eqn;
       		}
-      		mass *= etm_mass_eqn;
       		// Assemble advection term
       		adv = 0.0;
       		adv1 = 0.0;
