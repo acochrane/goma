@@ -3600,9 +3600,13 @@ assemble_momentum(dbl time,       /* current time */
 
 		  /* Need a few more basis functions */
 		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
-		  
+		  int k;
 		  for ( j=0; j<ei->dof[var]; j++) {
-		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    phi_j = bf[eqn]->phi[j];
+		    for (k = 0; k<DIM; k++) {
+		      grad_II_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		    }
+		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 		    porous = 0.;
 		    /* Assemble */
 		    porous += -phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
@@ -3625,9 +3629,13 @@ assemble_momentum(dbl time,       /* current time */
 
 		  /* Need a few more basis functions */
 		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
-		  
+		  int k;
 		  for ( j=0; j<ei->dof[var]; j++) {
-		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    phi_j = bf[eqn]->phi[j];
+		    for (k = 0; k<DIM; k++) {
+		      grad_II_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		    }
+		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 		    porous = 0.0;
 		    /* Assemble */
 		    porous += -phi_i*( LubAux->dv_avg_dc[a][j] )*phi_j;

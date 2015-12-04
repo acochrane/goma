@@ -3437,9 +3437,9 @@ calculate_lub_q_v (
 
     dbl grad_P[DIM], gradII_P[DIM];
     for (k = 0; k<DIM; k++) {
-      grad_P[k] = fv->grad_tfmp_pres[k];
+      gradII_P[k] = fv->grad_tfmp_pres[k];
     }
-    Inn(grad_P, gradII_P);
+    //Inn(grad_P, gradII_P);
 
     /* Load Saturation */
 
@@ -3484,13 +3484,13 @@ calculate_lub_q_v (
     /* Need gradII_(Sh) */
     double grad_h[DIM], gradII_h[DIM];
     for (k=0; k<DIM; k++) {
-      grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+      gradII_h[k] = dH_U_dX[k] - dH_L_dX[k];
     }
       
 
 
     /* Perfrom I - nn gradient */
-    Inn(grad_h, gradII_h);
+    //Inn(grad_h, gradII_h);
       
       /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
       
