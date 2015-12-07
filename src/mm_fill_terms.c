@@ -2853,7 +2853,7 @@ assemble_momentum(dbl time,       /* current time */
 		  else if ( mp->FSIModel > 0 )
 		    {	      
 		      porous = v[a] - LubAux->v_avg[a];
-		      porous *= bf[eqn]->phi_i[i] * wt * fv->sdet * h3;
+		      porous *= bf[eqn]->phi[i] * wt * fv->sdet * h3;
 		      porous *= porous_brinkman_etm;
 		    }
 		  else if (vis == 0. && mp->viscosity == 0.)
@@ -3604,8 +3604,9 @@ assemble_momentum(dbl time,       /* current time */
 		  for ( j=0; j<ei->dof[var]; j++) {
 		    phi_j = bf[eqn]->phi[j]; // this might fix strange vz jacobian bug
 		    for (k = 0; k<DIM; k++) {
-		      grad_II_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 		    }
+		    Inn(grad_phi_j, grad_II_phi_j);
 		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 		    porous = 0.;
 		    /* Assemble */
@@ -3633,8 +3634,9 @@ assemble_momentum(dbl time,       /* current time */
 		  for ( j=0; j<ei->dof[var]; j++) {
 		    phi_j = bf[eqn]->phi[j];
 		    for (k = 0; k<DIM; k++) {
-		      grad_II_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 		    }
+		    Inn(grad_phi_j, grad_II_phi_j);
 		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
 		    porous = 0.0;
 		    /* Assemble */

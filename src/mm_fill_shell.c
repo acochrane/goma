@@ -14278,11 +14278,11 @@ assemble_shell_tfmp(double time,   /* Time */
 
   dbl grad_P[DIM], gradII_P[DIM], grad_S[DIM], gradII_S[DIM];
   for (k = 0; k<DIM; k++) {
-    gradII_P[k] = fv->grad_tfmp_pres[k];
-    gradII_S[k] = fv->grad_tfmp_sat[k];
+    grad_P[k] = fv->grad_tfmp_pres[k];
+    grad_S[k] = fv->grad_tfmp_sat[k];
   }
-  //Inn(grad_P, gradII_P);
-  //Inn(grad_S, gradII_S);
+  Inn(grad_P, gradII_P);
+  Inn(grad_S, gradII_S);
 
   double S = fv->tfmp_sat;
 
@@ -14330,12 +14330,16 @@ assemble_shell_tfmp(double time,   /* Time */
 
   double dh_dtime = dH_U_dtime - dH_L_dtime;
   /* Need gradII_(Sh) */
-  double gradII_Sh[DIM], gradII_h[DIM];
+  double grad_h[DIM], gradII_Sh[DIM], gradII_h[DIM];
   for (k=0; k<DIM; k++) {
-    gradII_h[k] = dH_U_dX[k] - dH_L_dX[k];
+    grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+  }
+
+  Inn(grad_h, gradII_h);
+  for (k=0; k<DIM; k++) {
     gradII_Sh[k] = S*gradII_h[k] + h*gradII_S[k];
   }
-  
+
   double h_elem;
   double h_elem_inv;
   double *v_cent;
@@ -14406,8 +14410,9 @@ assemble_shell_tfmp(double time,   /* Time */
     for(i = 0; i < ei->dof[eqn]; i++) {
       phi_i = bf[eqn]->phi[i];
       for (k = 0; k<DIM; k++) {
-       	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
       }
+      Inn(grad_phi_i, gradII_phi_i);
       //ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
       /* Assemble mass term */
       mass = 0.0;
@@ -14450,8 +14455,9 @@ assemble_shell_tfmp(double time,   /* Time */
     for(i = 0; i < ei->dof[eqn]; i++) {
             phi_i = bf[eqn]->phi[i];
       for (k = 0; k<DIM; k++) {
-       	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
       }
+      Inn(grad_phi_i, gradII_phi_i);
       //ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
       /* Assemble mass term */
       mass = 0.0;
@@ -14511,8 +14517,9 @@ assemble_shell_tfmp(double time,   /* Time */
       // Load basis functions
       phi_i = bf[eqn]->phi[i];
       for (k = 0; k<DIM; k++) {
-       	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
       }
+      Inn(grad_phi_i, gradII_phi_i);
       //ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
       // Assemble sensitivities for TFMP_PRES
       var = TFMP_PRES;
@@ -14523,8 +14530,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Load basis functions
 	  phi_j = bf[eqn]->phi[j];
 	  for (k = 0; k<DIM; k++) {
-	    gradII_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 	  }
+	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	  // Assemble mass term
 	  mass = 0.0;
@@ -14566,8 +14574,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Load basis functions
 	  phi_j = bf[eqn]->phi[j];
 	  for (k = 0; k<DIM; k++) {
-	    gradII_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 	  }
+	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	  // Assemble mass term
 	  mass = 0.0;
@@ -14622,8 +14631,9 @@ assemble_shell_tfmp(double time,   /* Time */
       // Load basis functions
       phi_i = bf[eqn]->phi[i];
       for (k = 0; k<DIM; k++) {
-       	gradII_phi_i[k] = bf[eqn]->grad_phi[i][k];
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
       }
+      Inn(grad_phi_i, gradII_phi_i);
       //ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
       // Assemble sensitivities for TFMP_PRES
       var = TFMP_PRES;
@@ -14634,8 +14644,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Load basis functions
 	  phi_j = bf[eqn]->phi[j];
 	  for (k = 0; k<DIM; k++) {
-	    gradII_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 	  }
+	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	  // Assemble mass term ** mass term has no sensitivity to pressure
 	  mass = 0.0;
@@ -14683,8 +14694,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Load basis functions
 	  phi_j = bf[eqn]->phi[j];
 	  for (k = 0; k<DIM; k++) {
-	    gradII_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 	  }
+	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	  // Assemble mass term
 	  mass = 0.0;
@@ -14755,8 +14767,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	    // Load basis functions
 	    phi_j = bf[eqn]->phi[j];
 	    for (k = 0; k<DIM; k++) {
-	      gradII_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
 	    }
+	    Inn(grad_phi_j, gradII_phi_j);
 	    //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	    // Assemble SU/PG term sensitivity to VELOCITY1
 	    adv = 0.0;
