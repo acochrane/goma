@@ -14397,7 +14397,7 @@ assemble_shell_tfmp(double time,   /* Time */
   }
   
   //temp mass lumping switch
-  bool mass_lumping = FALSE;
+  bool mass_lumping = TRUE;
 
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
