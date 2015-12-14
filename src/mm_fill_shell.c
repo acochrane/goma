@@ -14346,6 +14346,10 @@ assemble_shell_tfmp(double time,   /* Time */
   double *hsquared;
   double hsq[DIM];
   double dh_elem_dv_cent[DIM];
+  double supg_ramptime, supg_init, supg_final;
+  supg_ramptime = 1e-6;
+  supg_init = 0.1;
+  supg_final = 0.2;
   if (mp->Ewt_funcModel == GALERKIN) {
     supg = 0;
     h_elem = h_elem_inv = 0;
@@ -14362,7 +14366,11 @@ assemble_shell_tfmp(double time,   /* Time */
       if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
     }
     h_elem = sqrt(h_elem)/2;
-    supg = mp->Ewt_func;
+    if (time < supg_ramptime) {
+      supg = supg_init + (supg_final - supg_init)/supg_ramptime*time;
+    } else {
+      supg = supg_final;
+    }
     if(h_elem == 0.) {
       h_elem_inv=0.;
     }
