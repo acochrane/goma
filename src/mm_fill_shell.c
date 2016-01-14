@@ -14285,7 +14285,7 @@ assemble_shell_tfmp(double time,   /* Time */
   Inn(grad_S, gradII_S);
 
   double S = fv->tfmp_sat;
-
+  if ( S < 0 ) S = 0;
   double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
 
   a_rho = mp->u_tfmp_const[0];
@@ -14347,7 +14347,7 @@ assemble_shell_tfmp(double time,   /* Time */
   double hsq[DIM];
   double dh_elem_dv_cent[DIM];
   double supg_ramptime, supg_init, supg_final;
-  supg_ramptime = 1e-6;
+  supg_ramptime = 1e-3;
   supg_init = 0.1;
   supg_final = 0.2;
   if (mp->Ewt_funcModel == GALERKIN) {
@@ -14366,10 +14366,12 @@ assemble_shell_tfmp(double time,   /* Time */
       if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
     }
     h_elem = sqrt(h_elem)/2;
-    if (time < supg_ramptime) {
+    //    if (time < supg_ramptime) {
+    if (time < 0 ) {
       supg = supg_init + (supg_final - supg_init)/supg_ramptime*time;
     } else {
-      supg = supg_final;
+    //supg = supg_final;
+      supg = mp->Ewt_func;
     }
     if(h_elem == 0.) {
       h_elem_inv=0.;
@@ -14405,7 +14407,7 @@ assemble_shell_tfmp(double time,   /* Time */
   }
   
   //temp mass lumping switch
-  bool mass_lumping = TRUE;
+  bool mass_lumping = FALSE;
 
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
