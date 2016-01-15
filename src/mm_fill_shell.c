@@ -14381,7 +14381,7 @@ assemble_shell_tfmp(double time,   /* Time */
       h_elem_inv=1./h_elem;
     }
     for ( k=0; k<DIM; k++ ) {
-      if (hsquared[k] != 0. && Ewt_funcModel == SUPG) {
+      if (hsquared[k] != 0. && mp->Ewt_funcModel == SUPG) {
       	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
       }
       else {
