@@ -3436,14 +3436,23 @@ calculate_lub_q_v (
     /* Load the pressure gradient */
 
     dbl grad_P[DIM], gradII_P[DIM];
-    for (k = 0; k<DIM; k++) {
-      grad_P[k] = fv->grad_tfmp_pres[k];
-    }
-    Inn(grad_P, gradII_P);
 
     /* Load Saturation */
 
-    double S = fv->tfmp_sat;
+    dbl S;
+
+    if (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) {
+      for (k = 0; k<DIM; k++) {
+	grad_P[k] = fv->grad_tfmp_pres[k];
+      }
+      S = fv->tfmp_sat;
+    } else {
+      for (k = 0; k<DIM; k++) {
+	grad_P[k] = fv_old->grad_tfmp_pres[k];
+      }
+      S = fv_old->tfmp_sat;
+    }
+    Inn(grad_P, gradII_P);
 
 
     /* Load density and viscosity */
@@ -3503,12 +3512,14 @@ calculate_lub_q_v (
     dbl dv_dP[DIM][MDE];
     memset(dv_dP, 0.0, sizeof(double)*DIM*MDE);
       
-    for (i = 0; i < DIM; i++) {
-      for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
-	dv_dP[i][j] += (-h*h/12./mu);
+    if (TRUE) {
+      for (i = 0; i < DIM; i++) {
+	for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
+	  dv_dP[i][j] += (-h*h/12./mu);
+	}
       }
     }
-      
+ 
     /*Evaluate average velocity sensitivity w.r.t. saturation */
     dbl dv_dS[DIM][MDE];
     memset(dv_dS, 0.0, sizeof(double)*DIM*MDE);

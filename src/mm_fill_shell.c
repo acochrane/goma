@@ -14354,7 +14354,8 @@ assemble_shell_tfmp(double time,   /* Time */
     supg = 0;
     h_elem = h_elem_inv = 0;
   }
-  else if(mp->Ewt_funcModel == SUPG) {
+  else if(mp->Ewt_funcModel == SUPG ||
+	  mp->Ewt_funcModel == LAGGED_SUPG ) {
     if( !pd->e[R_MOMENTUM1]) 
 	EH(-1, " must have momentum equation velocity field for shell_tfmp upwinding");
     v_cent = pg_data->v_avg;
@@ -14380,8 +14381,8 @@ assemble_shell_tfmp(double time,   /* Time */
       h_elem_inv=1./h_elem;
     }
     for ( k=0; k<DIM; k++ ) {
-      if (hsquared[k] != 0.) {
-	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
+      if (hsquared[k] != 0. && Ewt_funcModel == SUPG) {
+      	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
       }
       else {
 	dh_elem_dv_cent[k] = 0.0;
@@ -14408,6 +14409,17 @@ assemble_shell_tfmp(double time,   /* Time */
   
   //temp mass lumping switch
   bool mass_lumping = FALSE;
+
+  // lagging the velocity calculation
+  // collect the old velocity and pressure and saturation
+  dbl v_old[DIM], S_old, P_old;
+  for (k = 0; k<DIM; k++) {
+    v_old[k] = fv_old->v[k];
+  }
+  S_old = fv_old->tfmp_sat;
+  P_old = fv_old->tfmp_pres;
+  
+  bool lag_velo = FALSE;
 
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
@@ -14437,9 +14449,15 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble advection term */
       adv = 0.0;
       if ( T_ADVECTION ) {
-      	for ( k = 0; k<DIM; k++ ) {
-      		adv += v[k]*gradII_h[k];
-      	}
+	if (lag_velo == TRUE) {
+	  for ( k = 0; k<DIM; k++ ) {
+	    adv += v_old[k]*gradII_h[k];
+	  }
+	} else {
+	  for ( k = 0; k<DIM; k++ ) {
+	    adv += v[k]*gradII_h[k];
+	  }
+	}
       	adv *= phi_i*rho;
       	adv *= dA * etm_adv_eqn;
       }
@@ -14485,13 +14503,22 @@ assemble_shell_tfmp(double time,   /* Time */
       v_dot_gradII_phi_i = 0.0;
       v_dot_gradII_h = 0.0;
       if ( T_ADVECTION ) {
-      	for ( k = 0; k<DIM; k++ ) {
-      		v_dot_gradII_h += v[k]*gradII_h[k];
-      		adv += v[k]*gradII_S[k];
-      		if (supg != 0.0) v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
-      	}
+	if (lag_velo == TRUE ) {
+	  for ( k = 0; k<DIM; k++ ) {
+	    v_dot_gradII_h += v_old[k]*gradII_h[k];
+	    adv += v_old[k]*gradII_S[k];
+	    if (supg != 0.0) v_dot_gradII_phi_i += v_old[k]*gradII_phi_i[k];
+	  }
+	} else {
+	  for ( k = 0; k<DIM; k++ ) {
+	    v_dot_gradII_h += v[k]*gradII_h[k];
+	    adv += v[k]*gradII_S[k];
+	    if (supg != 0.0) v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
+	  }
+	}
       	wt_func = phi_i;
-      	if(mp->Ewt_funcModel == SUPG && supg != 0.0) {
+      	if((mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) 
+	   && supg != 0.0) {
       		wt_func += supg*h_elem_inv*v_dot_gradII_phi_i;
       	}
       	adv *= wt_func;
@@ -14679,7 +14706,8 @@ assemble_shell_tfmp(double time,   /* Time */
 	      gradP_dot_gradS 					+=	gradII_P[k]*gradII_S[k];
 	    }
 	    adv += phi_i*(dv_dgradP)*gradS_dot_gradphi_j;
-	    if(mp->Ewt_funcModel == SUPG) {
+	    if( (mp->Ewt_funcModel == SUPG) ||
+		(mp->Ewt_funcModel == LAGGED_SUPG) )  {
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradphi_i_dot_gradphi_j*(dv_dgradP)*gradP_dot_gradS;
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradS_dot_gradphi_j;
 	    }
@@ -14743,7 +14771,8 @@ assemble_shell_tfmp(double time,   /* Time */
 	    }
 	    
 	    adv += phi_i*( (dv_dgradP)*(gradP_dot_gradphi_j + gradP_dot_gradS/mu*phi_j*dmu_dS) );
-	    if(mp->Ewt_funcModel == SUPG && supg != 0.0) {
+	    if((mp->Ewt_funcModel == SUPG) || (mp->Ewt_funcModel == SUPG)
+	       && supg != 0.0) {
 	      adv += supg*h_elem_inv*(dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradphi_i * (dv_dgradP)*gradP_dot_gradS;
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i * ( (dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradS + (dv_dgradP)*gradP_dot_gradphi_j );
 	    }
@@ -14770,7 +14799,7 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Begin sensitivities of element average velocities to nodal velocities */
       for (l = 0; l<DIM; l++) {
       	var = VELOCITY1 + l;
-      	if (pd->v[var] && mp->Ewt_funcModel == SUPG) {
+      	if (pd->v[var] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG ) ) {
 	  pvar = upd->vp[var];
 	  // Loop over DOF (j)
 	  for ( j = 0; j < ei->dof[var]; j++) {

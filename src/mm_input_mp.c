@@ -3136,6 +3136,12 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
 	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
 	} 
+      else if ( !strcmp(model_name, "LAGGED_SUPG") )
+	{
+	  mat_ptr->Ewt_funcModel = LAGGED_SUPG;
+	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
+	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
+	} 
       else  
 	{
 	  SPF(err_msg,"Syntax error or invalid model for %s\n", search_string);

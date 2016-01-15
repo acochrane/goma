@@ -2602,7 +2602,7 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	if (pd->e[R_TFMP_BOUND] && mp->Ewt_funcModel == SUPG ) {
+	if (pd->e[R_TFMP_BOUND] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG)  ) {
 	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
 	} else {
 	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
