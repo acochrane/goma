@@ -162,6 +162,10 @@ noahs_raven()
   ddd_add_member(n, &TFMP_RHO, 1, MPI_INT);
   ddd_add_member(n, &TFMP_MU, 1, MPI_INT);
   ddd_add_member(n, &TFMP_RHO_MU, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_X, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_Y, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_Z, 1, MPI_INT);
+
 #ifdef USE_CGM
   ddd_add_member(n, &cgm_input_string_length, 1, MPI_INT);
 #endif

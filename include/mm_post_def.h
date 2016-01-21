@@ -537,6 +537,9 @@ extern int NON_VOLFRAC;		/*Nonvolatile species Volume Fraction */
 extern int TFMP_RHO;
 extern int TFMP_MU;
 extern int TFMP_RHO_MU;
+extern int TFMP_GRADP_X;
+extern int TFMP_GRADP_Y;
+extern int TFMP_GRADP_Z;
 
 /*
  *  Post-processing Step 1: add a new variable flag to end of mm_post_proc.h

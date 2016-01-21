@@ -258,6 +258,9 @@ int NON_VOLFRAC = -1;
 int TFMP_RHO = -1;
 int TFMP_MU = -1;
 int TFMP_RHO_MU = -1;
+int TFMP_GRADP_X = -1;
+int TFMP_GRADP_Y = -1;
+int TFMP_GRADP_Z = -1;
 
 int len_u_post_proc = 0;	/* size of dynamically allocated u_post_proc
 				 * actually is */
@@ -1527,6 +1530,22 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
       local_lumped[TFMP_RHO_MU] = 1;
     }
   }
+ if ((TFMP_GRADP_X != -1 || TFMP_GRADP_Y != -1 || TFMP_GRADP_Z != -1) && (pd->e[R_TFMP_MASS] || pd->e[R_TFMP_BOUND]) ) {
+   if (TFMP_GRADP_X != -1) {
+     local_post[TFMP_GRADP_X] = fv->grad_tfmp_pres[0];
+     local_lumped[TFMP_GRADP_X] = 1;
+   }
+   if (TFMP_GRADP_Y != -1) {
+     local_post[TFMP_GRADP_Y] = fv->grad_tfmp_pres[1];
+     local_lumped[TFMP_GRADP_Y] = 1;
+   }
+   if (TFMP_GRADP_Z != -1) {
+     local_post[TFMP_GRADP_Z] = fv->grad_tfmp_pres[2];
+     local_lumped[TFMP_GRADP_Z] = 1;
+   }
+
+ }
+
 
 /*  EXTERNAL tables	*/
    if (efv->ev) {
@@ -6255,6 +6274,10 @@ rd_post_process_specs(FILE *ifp,
   iread = look_for_post_proc(ifp, "TFMP_rho", &TFMP_RHO);
   iread = look_for_post_proc(ifp, "TFMP_mu", &TFMP_MU);
   iread = look_for_post_proc(ifp, "TFMP_rho_mu", &TFMP_RHO_MU);
+  iread = look_for_post_proc(ifp, "TFMP_GradP_X", &TFMP_GRADP_X);
+  iread = look_for_post_proc(ifp, "TFMP_GradP_Y", &TFMP_GRADP_Y);
+  iread = look_for_post_proc(ifp, "TFMP_GradP_Z", &TFMP_GRADP_Z);
+
 
   /* Report count of post-proc vars to be exported */
   /*
@@ -9544,6 +9567,46 @@ index_post, index_post_export);
     index_post++;
   } else {
     TFMP_RHO_MU = -1;
+  }
+
+  if (TFMP_GRADP_X != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "GRADP_X", "[1]", "GradP_X", FALSE);
+    index++;
+    if (TFMP_GRADP_X == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_GRADP_X = index_post;
+    index_post++;
+  } else {
+    TFMP_GRADP_X = -1;
+  } 
+  if (TFMP_GRADP_Y != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "GRADP_Y", "[1]", "GradP_Y", FALSE);
+    index++;
+    if (TFMP_GRADP_Y == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_GRADP_Y = index_post;
+    index_post++;
+  } else {
+    TFMP_GRADP_Y = -1;
+  } 
+  if (TFMP_GRADP_Z != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "GRADP_Z", "[1]", "GradP_Z", FALSE);
+    index++;
+    if (TFMP_GRADP_Z == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_GRADP_Z = index_post;
+    index_post++;
+  } else {
+    TFMP_GRADP_Z = -1;
   } 
 
   
