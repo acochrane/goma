@@ -522,7 +522,7 @@ struct Material_Properties
      *                     inventory terms is carried out. 
      */
   int Porous_Mass_Lump;
-
+  int tfmp_mass_lump;
   dbl porous_diffusivity[MAX_PMV];
   int PorousDiffusivityModel[MAX_PMV];
   int PorousTimeIntegration[MAX_PMV];         /* STANDARD or TAYLOR_GALERKIN */
@@ -837,6 +837,8 @@ struct Material_Properties
   // TFMP indicators for the backwards diffusivity corrector experiment
   int tfmp_diff_model;
   dbl tfmp_diff_const;
+
+  
 
   int table_index;
 

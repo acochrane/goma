@@ -14408,7 +14408,12 @@ assemble_shell_tfmp(double time,   /* Time */
   }
   
   //temp mass lumping switch
-  bool mass_lumping = FALSE;
+  bool mass_lumping;
+  if (mp->tfmp_mass_lump) {
+    mass_lumping = TRUE;
+  } else {
+    mass_lumping = FALSE;
+  }
 
   // lagging the velocity calculation
   // collect the old velocity and pressure and saturation

@@ -3142,6 +3142,13 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
 	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
 	} 
+      else if ( !strcmp(model_name, "MASS_LUMPED_SUPG") )
+	{
+	  mat_ptr->Ewt_funcModel = SUPG;
+	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
+	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
+	  mat_ptr->tfmp_mass_lump = TRUE;
+	} 
       else  
 	{
 	  SPF(err_msg,"Syntax error or invalid model for %s\n", search_string);
