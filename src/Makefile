@@ -449,7 +449,8 @@ SL_INC= spConfig.h\
         sl_rcm.h \
         sl_epetra_interface.h \
         sl_epetra_util.h \
-        sl_aztecoo_interface.h
+        sl_aztecoo_interface.h \
+        sl_stratimikos_interface.h
 
 
 # _____	Machine dependent routines "md_" prefix _______________________________

@@ -5641,13 +5641,27 @@ compute_volume_integrand(const int quantity, const int elem,
 	    n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
 	    lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
-	    det = fv->sdet; //Different determinant since this is a shell 
+
 
 	    /* clean-up */
 	    safe_free((void *) n_dof);
+	    *sum += weight*det*pmv->bulk_density[0];
 	  }
 
-	*sum += weight*det*pmv->bulk_density[0];
+	if(pd->e[R_TFMP_MASS]) {
+	  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+	  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+	  det = fv->sdet; //Different determinant since this is a shell
+	  dbl saturation, height;
+	  double H_U, dH_U_dtime, H_L, dH_L_dtime;
+	  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+	  height = height_function_model(
+					 &H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+					 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
+	  saturation = fv->tfmp_sat;
+	  safe_free((void *) n_dof);
+	  *sum += weight*det*saturation*height;
+	}
 
 	if ( J_AC != NULL)
 	  {
@@ -8414,7 +8428,30 @@ load_fv_sens(void)
       fv_sens->c[w] = 0.0;
     }
   }
-	
+
+  /*
+   * Thin-Film Multi-Phase Flows
+   */
+
+  v = TFMP_PRES;
+  fv_sens->tfmp_pres = 0.;
+  if ( pd->v[v] ) {
+    dofs  = ei->dof[v];
+    for ( i=0; i<dofs; i++) {
+      fv_sens->tfmp_pres += *esp_old->tfmp_pres[i] * bf[v]->phi[i];
+    }
+  }
+
+  v = TFMP_SAT;
+  fv_sens->tfmp_sat = 0.;
+  if ( pd->v[v] ) {
+    dofs  = ei->dof[v];
+    for ( i=0; i<dofs; i++) {
+      fv_sens->tfmp_sat += *esp_old->tfmp_sat[i] * bf[v]->phi[i];
+    }
+  }
+
+
   /*
    * External...
    */

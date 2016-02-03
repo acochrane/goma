@@ -522,7 +522,7 @@ struct Material_Properties
      *                     inventory terms is carried out. 
      */
   int Porous_Mass_Lump;
-
+  int tfmp_mass_lump;
   dbl porous_diffusivity[MAX_PMV];
   int PorousDiffusivityModel[MAX_PMV];
   int PorousTimeIntegration[MAX_PMV];         /* STANDARD or TAYLOR_GALERKIN */
@@ -828,6 +828,19 @@ struct Material_Properties
   dbl Inertia_coefficient;
   dbl d_Inertia_coefficient[MAX_VARIABLE_TYPES + MAX_CONC];
   int InertiaCoefficientModel;
+
+  // TFMP structure for hyperbolic density and viscosity function constants
+  int tfmp_model;
+  int len_u_tfmp_const;
+  dbl *u_tfmp_const;
+
+  // TFMP indicators for the backwards diffusivity corrector experiment
+  int tfmp_diff_model;
+  dbl tfmp_diff_const;
+
+  // TFMP variables for stabilizing pressure in velocity equations
+  int tfmp_pspg_model;
+  dbl tfmp_pspg_const;
 
   int table_index;
 

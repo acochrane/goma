@@ -313,7 +313,8 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
   int have_shell_energy;
   int have_shell_sat_closed;
   int have_shell_sat_gasn;
-
+  int have_tfmp_mass;
+  int have_tfmp_bound;
   /*
    *  Pointers to Material property structures. "matr_ptr" points to the
    *  current structure that we will be filling up in this routine.
@@ -3155,6 +3156,19 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 	  mat_ptr->Ewt_funcModel = SUPG;
 	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
 	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
+	} 
+      else if ( !strcmp(model_name, "LAGGED_SUPG") )
+	{
+	  mat_ptr->Ewt_funcModel = LAGGED_SUPG;
+	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
+	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
+	} 
+      else if ( !strcmp(model_name, "MASS_LUMPED_SUPG") )
+	{
+	  mat_ptr->Ewt_funcModel = SUPG;
+	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
+	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
+	  mat_ptr->tfmp_mass_lump = TRUE;
 	} 
       else  
 	{
@@ -8062,6 +8076,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   have_shell_energy = 0;
   have_shell_sat_closed = 0;
   have_shell_sat_gasn = 0;
+  have_tfmp_mass = 0;
+  have_tfmp_bound = 0;
 
   for (imtrx = 0; imtrx < upd->Total_Num_Matrices; imtrx++)
      {
@@ -8097,9 +8113,18 @@ ECHO("\n----Acoustic Properties\n", echo_file);
         {
          have_shell_sat_gasn = 1;
         }
+      if (pd_glob[mn]->e[imtrx][R_TFMP_MASS])
+        {
+         have_tfmp_mass = 1;
+        }
+      if (pd_glob[mn]->e[imtrx][R_TFMP_BOUND])
+        {
+         have_tfmp_bound = 1;
+        }
      } 
 
-  if( (have_lubp == 1) || (have_lubp2 == 1) )
+  if( (have_lubp == 1) || (have_lubp2 == 1) 
+      || (have_tfmp_mass) || (have_tfmp_bound) )
     {
       model_read = look_for_mat_prop(imp, "Upper Height Function Constants", 
 				     &(mat_ptr->HeightUFunctionModel), 
@@ -9127,8 +9152,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   if ( (have_lubp == 1) || (have_lubp2 == 1) ||
        (have_shell_filmp == 1) ||
-       (have_shell_sat_open == 1) || (have_shell_sat_open2 == 1) ) {
-
+       (have_shell_sat_open == 1) || (have_shell_sat_open2 == 1) 
+       || (have_tfmp_mass) || (have_tfmp_bound)) {
     model_read = look_for_mat_prop(imp, "FSI Deformation Model",
 				   &(mat_ptr->FSIModel),
 				   &(a0), NO_USER, NULL, model_name, 
@@ -9497,7 +9522,88 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
   } // End of porous shell gas diffusion constants
   
-  
+  /*
+   * Inputs specific to thin film multiphase flow hyperbolic density and viscosity calculations
+   */
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Properties", 
+				   &(mat_ptr->tfmp_model), 
+				   mat_ptr->u_tfmp_const, 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+
+    //int stuff = strcmp(model_name, "TANH");
+    //    printf("%s, %d", model_name, strcmp(model_name, "TANH"));
+    
+    if (model_read == -1 && !strcmp(model_name, "TANH") ) {
+      model_read = 1;
+      mat_ptr->tfmp_model = TANH;
+      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+				     NO_SPECIES);
+
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+
+      /* Need to read in 6 parameters as in
+       *  Thin Film Multiphase Properties = TANH 1.0 2.0 3.0 1.0 2.0 3.0
+       */
+      double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu, beta_rho, beta_mu;
+      double rho_g = mat_ptr->u_tfmp_const[0];
+      double rho_l = mat_ptr->u_tfmp_const[1];
+      beta_rho = mat_ptr->u_tfmp_const[2];
+      double mu_g = mat_ptr->u_tfmp_const[3];
+      double mu_l = mat_ptr->u_tfmp_const[4];
+      beta_mu = mat_ptr->u_tfmp_const[5];
+      
+      safe_free(mat_ptr->u_tfmp_const);
+      
+      a_rho = (rho_l+rho_g)/2;
+      b_rho = (rho_l-rho_g)/2;
+      beta_rho *= b_rho;
+      c_rho = atanh((rho_g*(1 + beta_rho) - a_rho)/b_rho);
+      d_rho = atanh((rho_l*(1 - beta_rho) - a_rho)/b_rho) - c_rho;
+      
+      a_mu = (mu_l+mu_g)/2;
+      b_mu = (mu_l-mu_g)/2;
+      beta_mu *= b_mu;
+      c_mu = atanh((mu_g*(1 + beta_mu) - a_mu)/b_mu);
+      d_mu = atanh((mu_l*(1 - beta_mu) - a_mu)/b_mu) - c_mu;
+      //printf("we have done something in the mp_read\n");
+      mat_ptr->u_tfmp_const = alloc_dbl_1(8, 0.0);
+      
+      mat_ptr->u_tfmp_const[0] = a_rho;
+      mat_ptr->u_tfmp_const[1] = b_rho;
+      mat_ptr->u_tfmp_const[2] = c_rho;
+      mat_ptr->u_tfmp_const[3] = d_rho;
+      mat_ptr->u_tfmp_const[4] = a_mu;
+      mat_ptr->u_tfmp_const[5] = b_mu;
+      mat_ptr->u_tfmp_const[6] = c_mu;
+      mat_ptr->u_tfmp_const[7] = d_mu;
+      
+      mat_ptr->len_u_tfmp_const = 8;
+    }
+  }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Backwards Diffusivity", 
+				   &(mat_ptr->tfmp_diff_model), 
+				   &(mat_ptr->tfmp_diff_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+
+    /*if(model_read == -1 && !strcmp(model_name, "CONSTANT") ) {
+      model_read = 1;
+      mat_ptr->tfmp_diff_model = CONSTANT;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_diff_const), NO_SPECIES);
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_diff_const );
+      
+      }*/
+  }  
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Pressure Stabilization", 
+				   &(mat_ptr->tfmp_pspg_model), 
+				   &(mat_ptr->tfmp_pspg_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+  }
   /*********************************************************************/
 
 

@@ -160,6 +160,13 @@ noahs_raven()
   ddd_add_member(n, &Particle_Number_Sample_Types, 1, MPI_INT);
   ddd_add_member(n, &Particle_Number_PBCs, 1, MPI_INT);
   ddd_add_member(n, &Num_Var_LS_Init, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_RHO, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_MU, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_RHO_MU, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_X, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_Y, 1, MPI_INT);
+  ddd_add_member(n, &TFMP_GRADP_Z, 1, MPI_INT);
+
 #ifdef USE_CGM
   ddd_add_member(n, &cgm_input_string_length, 1, MPI_INT);
 #endif
@@ -777,7 +784,6 @@ noahs_ark()
   ddd_add_member(n, Matrix_Absolute_Threshold, MAX_CHAR_IN_INPUT, MPI_CHAR);
   ddd_add_member(n, Amesos_Package, MAX_CHAR_IN_INPUT, MPI_CHAR);
   ddd_add_member(n, Stratimikos_File, MAX_CHAR_IN_INPUT*MAX_NUM_MATRICES, MPI_CHAR);
-
   ddd_add_member(n, &Linear_Solver, 1, MPI_INT);
 
   ddd_add_member(n, &Max_Newton_Steps, 1, MPI_INT);
@@ -1823,6 +1829,17 @@ noahs_ark()
 		     (MAX_VARIABLE_TYPES + MAX_CONC)*
 		     (MAX_VARIABLE_TYPES + MAX_CONC),
 		     MPI_DOUBLE);
+      /*
+       * TFMP backward diffusivity model 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_diff_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_diff_const, 1, MPI_DOUBLE);
+      /*
+       * TFMP pspg model 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_pspg_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_pspg_const, 1, MPI_DOUBLE);
+		     
 
       /*
        * Loop over user-defined constants lists of lengths.
@@ -1883,6 +1900,8 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->heat_capacity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->diffusivity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->saturation_tableid, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
+
       /*
        * Material property constants that are vectors over the concentration
        * index.
@@ -2920,6 +2939,11 @@ ark_landing()
       dalloc( m->len_u_light_absorption,
               m->    u_light_absorption);
 
+      dalloc( m->len_u_tfmp_const,
+              m->    u_tfmp_const);
+
+
+
       /*
        * User defined material property lists for each species...
        *     HKM -> Changed this to number of species, not
@@ -3284,6 +3308,9 @@ noahs_dove()
 
     crdv( m->len_u_light_absorption,
 	  m->    u_light_absorption);
+
+    crdv( m->len_u_tfmp_const,
+	  m->    u_tfmp_const);
 
     /*
      *  Add species names

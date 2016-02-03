@@ -47,6 +47,8 @@ export GOMA_LIB
 
 OWNER=$USER
 
+ACCESS=/home/acochrane/usr/local/gomalib_seastrat/seacas
+
 function continue_check {
     echo "Enter \"c\" to continue (any other letter to exit):"
 
@@ -129,6 +131,27 @@ ARCHIVE_URLS=("http://www.caam.rice.edu/software/ARPACK/SRC/arpack96.tar.gz" \
 "http://mumps.enseeiht.fr/MUMPS_4.10.0.tar.gz" \
 "http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.4.4.tar.gz" \
 "http://downloads.sourceforge.net/project/matio/matio/1.5.2/matio-1.5.2.tar.gz")
+
+ARCHIVE_DIR_NAMES=("ARPACK" \
+"ARPACK" \
+"BLAS" \
+"cmake-2.8.12.2" \
+"hdf5-1.8.15" \
+"lapack-3.2.1" \
+"netcdf-4.3.3.1" \
+"openmpi_1.6.4" \
+"ParMetis-3.1.1" \
+"sparse" \
+"SuperLU_DIST_2.3" \
+"y12m-1.0" \
+"trilinos-12.2.1-Source" \
+"scalapack-2.0.2" \
+"MUMPS_4.10.0" \
+"SuiteSparse" \
+"matio-1.5.2")
+
+
+
 
 SEACAS_LINUX_PATCH="14c14
 < /* #define GCC4GFORTRAN 1 */
@@ -376,6 +399,28 @@ read -d '' SUPERLU_PATCH << "EOF"
 EOF
 SUPERLU_PATCH=${SUPERLU_PATCH/__GOMA_LIB2__/$GOMA_LIB}
 
+SEACAS_PATCH="19c19
+< MPI=OFF
+---
+> MPI=ON
+24,26c24,26
+<   CXX=mpicxx
+<   CC=mpicc
+<   FC=mpif77
+---
+>   CXX=${ACCESS}/../openmpi-1.6.4/bin/mpicxx
+>   CC=${ACCESS}/../openmpi-1.6.4/bin/mpicc
+>   FC=${ACCESS}/../openmpi-1.6.4/bin/mpif77
+46c46
+< -D BUILD_SHARED_LIBS:BOOL=ON \\
+---
+> -D BUILD_SHARED_LIBS:BOOL=OFF \\
+62c62
+< -D TPL_ENABLE_CGNS:BOOL=ON \\
+---
+> -D TPL_ENABLE_CGNS:BOOL=OFF \\
+"
+
 mkdir -p $GOMA_LIB
 cd $GOMA_LIB
 
@@ -408,8 +453,13 @@ for i in ${ARCHIVE_NAMES[@]}; do
     cd ..
     count=$(( $count + 1 ))
 
-    if ! tar tf $i &> /dev/null; then
-      tar -xf tars/$i
+    if [ -d ${ARCHIVE_DIR_NAMES[count]} ]
+    then
+	echo "already extracted ${i}"
+    else
+	if ! tar tf $i &> /dev/null; then
+	    tar -xf tars/$i
+	fi
     fi
     cd tars
 done
@@ -453,9 +503,10 @@ done
 # mv AMD UMFPACK-5.4
 # fi
 
-#continue_check
+continue_check
 # make
 # make cmake
+export CC=gcc
 export CXX=g++
 cd $GOMA_LIB/cmake-2.8.12.2
 if [ -f bin/cmake ]
@@ -466,9 +517,10 @@ else
     make -j$MAKE_JOBS
     make install
 fi
+export CMAKE=$GOMA_LIB/cmake-2.8.12.2/bin/cmake
+continue_check
 
-
-#continue_check
+continue_check
 #make openmpi
 cd $GOMA_LIB/openmpi-1.6.4
 if [ -f bin/ompi_info ]
@@ -476,98 +528,103 @@ then
     echo "openmpi is already built"
 else
     ./configure --prefix=$GOMA_LIB/openmpi-1.6.4
+    continue_check
     make -j$MAKE_JOBS
+    continue_check
     make install
 fi
 cd ..
 
+#seacas tpls
+if [ -d seacas ] 
+then
+    echo "already cloned seacas git repo"
+else
+    git clone https://github.com/gsjaardema/seacas.git seacas
+fi
+
+cd seacas/TPL
+if [ -d hdf5/hdf5-1.8.15 ]
+then
+    echo "already moved hdf5 source"
+else
+    mv ../../hdf5-1.8.15 hdf5/hdf5-1.8.15
+fi
+if [ -d matio/matio-1.5.2 ]
+then
+    echo "already moved matio source"
+else
+    mv ../../matio-1.5.2 matio/matio-1.5.2
+fi
+
+if [ -d netcdf/netcdf-4.3.3.1 ]
+then
+    echo "already moved netcdf source"
+else
+    mv ../../netcdf-4.3.3.1 netcdf/netcdf-4.3.3.1
+fi
 #hdf5
-if [ -d hdf5-1.8.15/lib ]
+
+if [ -e ../lib/libhdf5.a ]
 then
     echo "hdf5 already built"
 else
-    mv hdf5-1.8.15 tmpdir
-    mkdir hdf5-1.8.15
-    mv tmpdir hdf5-1.8.15/src
-    cd hdf5-1.8.15/src
-    CC=$OPENMPI_TOP/bin/mpicc ./configure --enable-parallel --enable-shared=off --prefix=$GOMA_LIB/hdf5-1.8.15
+    cd hdf5/hdf5-1.8.15
+    CC=$OPENMPI_TOP/bin/mpicc ./configure --enable-parallel --enable-shared=off --prefix=$ACCESS --enable-production --enable-debug=no --enable-static-exec
     make -j$MAKE_JOBS
     make install
     cd ../..
 fi
-
+continue_check
 #matio
-if [ -d matio-1.5.2/lib ]
+if [ -e ../lib/libmatio.a ]
 then
     echo "matio already built"
 else
-    mv matio-1.5.2 tmpdir
-    mkdir matio-1.5.2
-    mv tmpdir matio-1.5.2/src
-    cd matio-1.5.2/src
-    ./configure --with-hdf5=$GOMA_LIB/hdf5-1.8.15 --prefix=$GOMA_LIB/matio-1.5.2 --enable-shared=off
+    cd matio
+    patch -p3 < MATIO-fix-issue-reading-version-7.3-files.patch
+    cd matio-1.5.2
+    export LDFLAGS="-L${ACCESS}/lib"
+    CC=$OPENMPI_TOP/bin/mpicc ./configure --with-hdf5=$ACCESS --prefix=$ACCESS --enable-shared=off --enable-mat73 
     make -j$MAKE_JOBS
     make install
     cd ../..
 fi
-
+continue_check
 #netcdf
-if [ -d netcdf-4.3.3.1/lib ]
+if [ -e ../lib/libnetcdf.a ]
 then
     echo "netcdf already built"
 else
-    mv netcdf-4.3.3.1 tmpdir
-    mkdir netcdf-4.3.3.1
-    mv tmpdir netcdf-4.3.3.1/src
-    cd $GOMA_LIB/netcdf-4.3.3.1/src
+    cd netcdf/netcdf-4.3.3.1
     cd include
     echo "$NETCDF_PATCH" > netcdf.patch
     patch -f --ignore-whitespace netcdf.h < netcdf.patch
     cd ..
-    export CPPFLAGS=-I$GOMA_LIB/hdf5-1.8.15/include
-    export LDFLAGS=-L$GOMA_LIB/hdf5-1.8.15/lib 
+    export CPPFLAGS=-I$ACCESS/include
+    export LDFLAGS=-L$ACCESS/lib 
     echo $CPPFLAGS
     echo $LDFLAGS
-    CC=mpicc ./configure --prefix=$GOMA_LIB/netcdf-4.3.3.1 --enable-shared=off --disable-dap --enable-parallel-tests
+    CC=$OPENMPI_TOP/bin/mpicc ./configure --prefix=$ACCESS --enable-shared=off --disable-dap --enable-parallel-tests --enable-netcdf-4 --disable-fsync --disable-cdmremote
     make -j$MAKE_JOBS
     make install
     cd ../..
 fi
+continue_check
+#now for seacas
+cd $ACCESS
+mkdir build
+echo "$SEACAS_PATCH" > seacas.patch
+patch -f --ignore-whitespace cmake-config < seacas.patch
+continue_check
+cd build
+../cmake-config
+continue_check
+make -j$MAKE_JOBS
+continue_check
+make install
 
-    # CXXFLAGS=-I$GOMA_LIB/hdf5-1.8.12/hdf5/include \
-    # FFFLAGS=-I$GOMA_LIB/hdf5-1.8.12/hdf5/include \
-    # FCFLAGS=-I$GOMA_LIB/hdf5-1.8.12/hdf5/include \
-    # FC=$GOMA_LIB/openmpi-1.6.4/bin/mpif90 \
-    # CXX=$GOMA_LIB/openmpi-1.6.4/bin/mpicxx \
-    # CC=$GOMA_LIB/openmpi-1.6.4/bin/mpicc \
-
-
-#continue_check
-#make Seacas
-
-# cd $GOMA_LIB/SEACAS-2013-12-03
-# if [ -f bin/aprepro ]
-# then
-#     echo "SEACAS already built"
-# else
-#     cd TPL/netcdf/netcdf-4.3.2/include
-#     echo "$NETCDF_PATCH" > netcdf.patch
-#     patch -f --ignore-whitespace netcdf.h < netcdf.patch
-#     cd ../../
-#     echo "$IMAKE_PATCH" > Imake.patch
-#     patch -f Imakefile < Imake.patch
-#     cd ../../
-#     export ACCESS=$GOMA_LIB/SEACAS-2013-12-03
-#     cd ACCESS/itools/config/cf
-#     echo "$SITE_PATCH" > site.patch
-#     patch -f site.def < site.patch
-#     echo "$SEACAS_LINUX_PATCH" > linux.patch
-#     patch -f linux.cf < linux.patch
-#     cd ../../../../
-#     ACCESS/scripts/buildSEACAS -auto
-# fi
-
-#continue_check
+continue_check
  #make BLAS
 cd $GOMA_LIB/BLAS
 if [ -f libblas.a ]
@@ -751,7 +808,6 @@ export LD_LIBRARY_PATH=$MPI_BASE_DIR/lib:$LD_LIBRARY_PATH
 export PATH=$GOMA_LIB/cmake-2.8.12.2/bin:$PATH
 
 MPI_LIBS="-LMPI_BASE_DIR/lib -lmpi_f90 -lmpi_f77 -lmpi"
-SEACAS_LIBS="-L${GOMA_LIB}/hdf5-1.8.15/lib -lhdf5_hl -lhdf5 -lz -lm"
 # Install directory
 TRILINOS_INSTALL=$GOMA_LIB/trilinos-12.2.1-Built
 #continue_check
@@ -761,31 +817,34 @@ cmake \
 -D CMAKE_AR=/usr/bin/ar \
 -D CMAKE_RANLIB=/usr/bin/ranlib \
 -D CMAKE_BUILD_TYPE:STRING=RELEASE \
--D CMAKE_CXX_COMPILER:FILEPATH=$MPI_BASE_DIR/bin/mpiCC \
+-D CMAKE_CXX_COMPILER:FILEPATH=$MPI_BASE_DIR/bin/mpic++ \
 -D CMAKE_C_COMPILER:FILEPATH=$MPI_BASE_DIR/bin/mpicc \
 -D CMAKE_Fortran_COMPILER:FILEPATH=$MPI_BASE_DIR/bin/mpif90 \
 -D CMAKE_VERBOSE_MAKEFILE:BOOL=TRUE \
 -D Trilinos_ENABLE_Triutils:BOOL=ON \
--D Trilinos_ENABLE_SEACAS:BOOL=ON \
+-D Trilinos_ENABLE_SEACAS:BOOL=OFF \
 -D Trilinos_ENABLE_Amesos:BOOL=ON \
 -D Trilinos_ENABLE_Epetra:BOOL=ON \
 -D Trilinos_ENABLE_Xpetra:BOOL=OFF \
 -D Trilinos_ENABLE_Ifpack:BOOL=ON \
 -D Trilinos_ENABLE_Teuchos:BOOL=ON \
+-D Trilinos_ENABLE_ML:BOOL=ON \
 -D Trilinos_ENABLE_AztecOO:BOOL=ON \
 -D Trilinos_ENABLE_KokkosClassic:BOOL=OFF \
 -D Trilinos_ENABLE_STK:BOOL=OFF \
 -D Trilinos_ENABLE_Amesos2:BOOL=OFF \
 -D Trilinos_ENABLE_Zoltan2:BOOL=OFF \
+-D Trilinos_ENABLE_Belos:BOOL=ON \
+-D Trilinos_ENABLE_Sacado:BOOL=ON \
+-D Trilinos_ENABLE_EpetraExt:BOOL=ON \
+-D Trilinos_ENABLE_Thyra:BOOL=ON \
+-D Trilinos_ENABLE_ThyraTpetraAdapters:BOOL=ON \
+-D Trilinos_ENABLE_Tpetra:BOOL=ON \
+-D Trilinos_ENABLE_Stratimikos:BOOL=ON \
 -D Trilinos_ENABLE_TESTS:BOOL=ON \
 -D Trilinos_ENABLE_EXPLICIT_INSTANTIATION:BOOL=ON \
 -D Trilinos_ENABLE_SECONDARY_STABLE_CODE:BOOL=ON \
-      -D Netcdf_LIBRARY_DIRS:PATH="$GOMA_LIB/netcdf-4.3.3.1/lib" \
-      -D TPL_ENABLE_Netcdf:BOOL=ON \
-      -D TPL_Netcdf_INCLUDE_DIRS:PATH="$GOMA_LIB/netcdf-4.3.3.1/include" \
-      -D Matio_LIBRARY_DIRS:PATH=$GOMA_LIB/matio-1.5.2/lib \
-      -D Matio_INCLUDE_DIRS:PATH=$GOMA_LIB/matio-1.5.2/include \
--D TPL_ENABLE_MPI:BOOL=ON \
+ -D TPL_ENABLE_MPI:BOOL=ON \
   -D MPI_COMPILER:FILEPATH=$MPI_BASE_DIR/bin/mpiCC \
   -D MPI_EXECUTABLE:FILEPATH=$MPI_BASE_DIR/bin/mpirun \
   -D MPI_BASE_DIR:PATH=$MPI_BASE_DIR \
@@ -799,7 +858,7 @@ cmake \
 -D BLAS_LIBRARY_DIRS=$GOMA_LIB/BLAS \
 -D BLAS_LIBRARY_NAMES="blas" \
 -D CMAKE_INSTALL_PREFIX:PATH=$TRILINOS_INSTALL \
--D Trilinos_EXTRA_LINK_FLAGS:STRING="$FORTRAN_LIBS $SEACAS_LIBS $MPI_LIBS" \
+-D Trilinos_EXTRA_LINK_FLAGS:STRING="$FORTRAN_LIBS $MPI_LIBS" \
 -D TPL_ENABLE_UMFPACK:BOOL=ON \
   -D UMFPACK_LIBRARY_NAMES:STRING="umfpack;amd;suitesparseconfig" \
   -D UMFPACK_LIBRARY_DIRS:PATH="$GOMA_LIB/SuiteSparse/UMFPACK/Lib;$GOMA_LIB/SuiteSparse/AMD/Lib;$GOMA_LIB/SuiteSparse/SuiteSparse_config" \

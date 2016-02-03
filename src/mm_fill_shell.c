@@ -14182,4 +14182,667 @@ assemble_lubrication_power_law( double time,    /* present time value */
   return(status);
 } /* end of assemble_lubrication_power_law */
 
+/******************************************************************************
+ * assemble_shell_tfmp - Assembles the residual and Jacobian equations for a
+ *                      thin-film multi-phase (read: two-phase) flow
+ *                      
+ *
+ * Currently, the following equations are solved.  This is likely to change as
+ * different things are tested.  "Use the source, Luke".
+ *
+ *    0 = d/dt(h*rho) - h*div(h^2/12*rho/mu*grad(P))
+ *    0 = d/dt(S) + v_dot_grad(S)
+ *
+ * where rho = S*rho_l + (1-S)*rho_g
+ *        mu = S*mu_l + (1-S)*mu_g
+ *         h = height from height function model (to be coupled with mesh deflection later..)
+ *         P = fluid pressure
+ *         v = velocity = -(h^2/12/mu)*grad(P)
+ * Input
+ * =====
+ * time_value = The current time.
+ * theta      = The implicit-explicit time stepping parameter.
+ * delta_t    = The current step size.
+ * 
+ * Output
+ * ======
+ * (none)
+ * 
+ * Returns
+ * ======
+ * 0  = Success
+ * -1 = Failure
+ *
+ * Revision History
+ * ================
+ * 7 May 2002 - Patrick Notz - Creation.
+ * 5 November 2014 - Andrew Cochrane - worked into thin-film multiphase flow model
+
+ ******************************************************************************/
+/*
+ * This test function was set up by PKN. It is being retained
+ * for use as an example for creating new shell equations.
+ */
+
+int
+assemble_shell_tfmp(double time,   /* Time */
+		 double tt,        /* Time stepping parameter */
+		 double delta_t,      /* Time step size */
+		 double xi[DIM],      /* Local stu coordinates */
+		 const PG_DATA *pg_data, /* Upwinding data struct */
+                 const Exo_DB *exo)
+{
+  int i, j, k, l, peqn, var, pvar;
+  dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
+  dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
+  dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
+  dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
+  dbl mass, adv, adv1, diff; // Residual terms
+  dbl etm_mass_eqn, etm_adv_eqn, etm_diff_eqn;
+  int eqn = R_TFMP_MASS;
+  dbl supg = 0;
+  double wt    = fv->wt;
+  double h3    = fv->h3;
+  /* Material Properties (need to be merged into input mp sometime) */
+  double rho_l = 0.998;
+  double rho_g = 0.00118;
+  //double rho_g = 0.997;
+  double mu_l = 1;
+  double mu_g = 0.0186;
+  //double mu_g = 1/2;
+
+  //debugging stuff
+  /*  if (ei->ielem == 287) {
+    dbl derp = 12;
+    }*/
+
+  //Artificial diffusion constant
+  double D;
+  //D = .00001;
+  switch (mp->tfmp_diff_model) {
+  case CONSTANT:
+    D = mp->tfmp_diff_const;
+    break;
+  default:
+    D = 0.0;
+    break;
+    }
+
+/* Setup Lubrication */
+  int *n_dof = NULL;
+  int dof_map[MDE];
+  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+  double det_J = fv->sdet; 
+  double dA = det_J * wt * h3;
+
+  dbl grad_P[DIM], gradII_P[DIM], grad_S[DIM], gradII_S[DIM];
+  for (k = 0; k<DIM; k++) {
+    grad_P[k] = fv->grad_tfmp_pres[k];
+    grad_S[k] = fv->grad_tfmp_sat[k];
+  }
+  Inn(grad_P, gradII_P);
+  Inn(grad_S, gradII_S);
+
+  double S = fv->tfmp_sat;
+  if ( S < 0 ) S = 0;
+  double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
+
+  a_rho = mp->u_tfmp_const[0];
+  b_rho = mp->u_tfmp_const[1];
+  c_rho = mp->u_tfmp_const[2];
+  d_rho = mp->u_tfmp_const[3];
+  a_mu = mp->u_tfmp_const[4];
+  b_mu = mp->u_tfmp_const[5];
+  c_mu = mp->u_tfmp_const[6];
+  d_mu = mp->u_tfmp_const[7];
+
+  double rho = a_rho + b_rho*tanh(c_rho+d_rho*S);
+  double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
+  //double S_cap = fv->tfmp_sat;
+  double drho_dS, dmu_dS;
+  drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+  dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+  /* if (S_cap < 0 ) {
+    S_cap = 0;
+    drho_dS = 0;
+    dmu_dS = 0;
+  } else {
+    drho_dS = rho_l - rho_g;
+    dmu_dS = mu_l - mu_g;
+  }
+  if (S_cap > 1 ) {
+    S_cap = 1;
+    drho_dS = 0;
+    dmu_dS = 0;
+  } else {
+    drho_dS = rho_l - rho_g;
+    dmu_dS = mu_l - mu_g;
+    }*/
+  //  double rho = S_cap*rho_l + (1-S_cap)*rho_g;
+  //  double mu = S_cap*mu_l + (1-S_cap)*mu_g;
+
+/* Use the height_function_model */
+  double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+  h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
+
+  double dh_dtime = dH_U_dtime - dH_L_dtime;
+  /* Need gradII_(Sh) */
+  double grad_h[DIM], gradII_Sh[DIM], gradII_h[DIM];
+  for (k=0; k<DIM; k++) {
+    grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+  }
+
+  Inn(grad_h, gradII_h);
+  for (k=0; k<DIM; k++) {
+    gradII_Sh[k] = S*gradII_h[k] + h*gradII_S[k];
+  }
+
+  double h_elem;
+  double h_elem_inv;
+  double *v_cent;
+  double *hsquared;
+  double hsq[DIM];
+  double dh_elem_dv_cent[DIM];
+  double supg_ramptime, supg_init, supg_final;
+  supg_ramptime = 1e-3;
+  supg_init = 0.1;
+  supg_final = 0.2;
+  if (mp->Ewt_funcModel == GALERKIN) {
+    supg = 0;
+    h_elem = h_elem_inv = 0;
+  }
+  else if(mp->Ewt_funcModel == SUPG ||
+	  mp->Ewt_funcModel == LAGGED_SUPG ) {
+    if( !pd->e[R_MOMENTUM1]) 
+	EH(-1, " must have momentum equation velocity field for shell_tfmp upwinding");
+    v_cent = pg_data->v_avg;
+    hsquared = pg_data->hsquared;
+
+    h_elem = 0;
+    for ( k=0; k<DIM; k++ ) {
+      hsq[k] = hsquared[k];
+      if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
+    }
+    h_elem = sqrt(h_elem)/2;
+    //    if (time < supg_ramptime) {
+    if (time < 0 ) {
+      supg = supg_init + (supg_final - supg_init)/supg_ramptime*time;
+    } else {
+    //supg = supg_final;
+      supg = mp->Ewt_func;
+    }
+    if(h_elem == 0.) {
+      h_elem_inv=0.;
+    }
+    else {
+      h_elem_inv=1./h_elem;
+    }
+    for ( k=0; k<DIM; k++ ) {
+      if (hsquared[k] != 0. && mp->Ewt_funcModel == SUPG) {
+      	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
+      }
+      else {
+	dh_elem_dv_cent[k] = 0.0;
+      }
+    }
+  }
+  
+  /* allocate for various dot products */
+  double gradS_dot_gradphi_i, gradP_dot_gradS, gradP_dot_gradphi_i, gradphi_i_dot_gradphi_j, gradP_dot_gradphi_j, gradS_dot_gradphi_j;
+
+  /* create various vector quantities for easy implementation */
+  double v[DIM];
+  double dv_dPj[DIM], dv_dgradP; // where dv_dPj = dv_dgradP*dgradP_dPj
+  double dv_dSj[DIM], dv_dS[DIM], dv_dS_constant, dS_dSj[DIM];     // where dv_dSj = dv_dS*dS_dSj and dv_dS = dv_dS_constant*gradP
+  double drho_dSj[DIM], gradII_rho[DIM];               // where drho_dSj = drho_dS*dS_dSj
+  double v_dot_gradII_phi_i, v_dot_gradII_h, gradP_dot_gradh, gradh_dot_gradphi_j;
+  dv_dgradP = -h*h/12/mu;
+  dv_dS_constant = -dv_dgradP/mu*dmu_dS;
+  for (k = 0; k<DIM; k++) {
+    v[k] = dv_dgradP*gradII_P[k];
+    dv_dS[k] = dv_dS_constant*gradII_P[k];
+    gradII_rho[k] = drho_dS*gradII_S[k];
+  }
+  
+  //temp mass lumping switch
+  bool mass_lumping;
+  if (mp->tfmp_mass_lump) {
+    mass_lumping = TRUE;
+  } else {
+    mass_lumping = FALSE;
+  }
+
+  // lagging the velocity calculation
+  // collect the old velocity and pressure and saturation
+  dbl v_old[DIM], S_old, P_old;
+  for (k = 0; k<DIM; k++) {
+    v_old[k] = fv_old->v[k];
+  }
+  S_old = fv_old->tfmp_sat;
+  P_old = fv_old->tfmp_pres;
+  
+  bool lag_velo = FALSE;
+
+  if ( af->Assemble_Residual ) {
+    /* Assemble the residual mass equation */
+    eqn = R_TFMP_MASS;
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)]; // d(rho*h)/dt
+    etm_adv_eqn = pd->etm[eqn][(LOG2_ADVECTION)]; // v*rho_dot_gradII_h
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)]; // h*gradii_dot_(v*rho)
+    /* Loop over DOF (i) */   
+    for(i = 0; i < ei->dof[eqn]; i++) {
+      phi_i = bf[eqn]->phi[i];
+      for (k = 0; k<DIM; k++) {
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      }
+      Inn(grad_phi_i, gradII_phi_i);
+      //ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+      /* Assemble mass term */
+      mass = 0.0;
+      if( T_MASS ) {
+      	if (mass_lumping) {
+	  mass += phi_i*(h*(drho_dS)* *esp_dot->tfmp_sat[i] + rho*dh_dtime);
+      	} else {
+	  mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	}
+        mass *= dA * etm_mass_eqn;
+      }
+      /* Assemble advection term */
+      adv = 0.0;
+      if ( T_ADVECTION ) {
+	if (lag_velo == TRUE) {
+	  for ( k = 0; k<DIM; k++ ) {
+	    adv += v_old[k]*gradII_h[k];
+	  }
+	} else {
+	  for ( k = 0; k<DIM; k++ ) {
+	    adv += v[k]*gradII_h[k];
+	  }
+	}
+      	adv *= phi_i*rho;
+      	adv *= dA * etm_adv_eqn;
+      }
+      /* Assemble diffusion term */
+      diff = 0.0;
+      if( T_DIFFUSION ) {
+      	for ( k = 0; k<DIM; k++) {
+      		diff += gradII_P[k]*gradII_phi_i[k];
+      	}
+      	diff *= -h*rho*dv_dgradP;
+      	diff *= dA * etm_diff_eqn;
+      }      
+      lec->R[peqn][i] += mass + adv + diff;
+    }
+
+    /* Assemble the residual boundary equation */
+    eqn = R_TFMP_BOUND;
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)]; // dS_dt
+    etm_adv_eqn = pd->etm[eqn][(LOG2_ADVECTION)]; // v_dot_gradII_S + S/h*v_dot_gradII_h
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)]; // -D*divII_gradII_S
+    /* Loop over DOF (i) */
+    for(i = 0; i < ei->dof[eqn]; i++) {
+            phi_i = bf[eqn]->phi[i];
+      for (k = 0; k<DIM; k++) {
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      }
+      Inn(grad_phi_i, gradII_phi_i);
+      //ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+      /* Assemble mass term */
+      mass = 0.0;
+      if( T_MASS ) {
+      	if (mass_lumping) {
+	  mass += phi_i* (*esp_dot->tfmp_sat[i]);
+      	} else {
+	  mass += phi_i*fv_dot->tfmp_sat;
+      	}
+      	mass *= dA * etm_mass_eqn;
+      }
+
+      /* Assemble advection term */
+      adv = 0;
+      v_dot_gradII_phi_i = 0.0;
+      v_dot_gradII_h = 0.0;
+      if ( T_ADVECTION ) {
+	if (lag_velo == TRUE ) {
+	  for ( k = 0; k<DIM; k++ ) {
+	    v_dot_gradII_h += v_old[k]*gradII_h[k];
+	    adv += v_old[k]*gradII_S[k];
+	    if (supg != 0.0) v_dot_gradII_phi_i += v_old[k]*gradII_phi_i[k];
+	  }
+	} else {
+	  for ( k = 0; k<DIM; k++ ) {
+	    v_dot_gradII_h += v[k]*gradII_h[k];
+	    adv += v[k]*gradII_S[k];
+	    if (supg != 0.0) v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
+	  }
+	}
+      	wt_func = phi_i;
+      	if((mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) 
+	   && supg != 0.0) {
+      		wt_func += supg*h_elem_inv*v_dot_gradII_phi_i;
+      	}
+      	adv *= wt_func;
+      	adv += phi_i*S/h*v_dot_gradII_h;
+      	adv *= dA * etm_adv_eqn;
+      }
+      /* Assemble diffusion term */
+      diff = 0.0;
+      if( T_DIFFUSION ) {
+      	gradS_dot_gradphi_i = 0.0;
+      	for ( k = 0; k<DIM; k++) {
+      		gradS_dot_gradphi_i += gradII_S[k]*gradII_phi_i[k];
+      	}
+      	// add backwards diffusion term
+      	diff += D*gradS_dot_gradphi_i;
+
+      	diff *= dA * etm_diff_eqn;
+      }
+      lec->R[peqn][i] += mass + adv + diff;
+    }
+  }
+
+
+  /* Assemble sensitivities of R_TFMP_MASS */
+  eqn = R_TFMP_MASS;
+  if (af->Assemble_Jacobian) {
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_adv_eqn = pd->etm[eqn][(LOG2_ADVECTION)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) { /* The sensitivities of R_TFMP_MASS to TFMP_PRES and TFMP_SAT */
+      // Load basis functions
+      phi_i = bf[eqn]->phi[i];
+      for (k = 0; k<DIM; k++) {
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      }
+      Inn(grad_phi_i, gradII_phi_i);
+      //ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      // Assemble sensitivities for TFMP_PRES
+      var = TFMP_PRES;
+      if (pd->v[var]) {
+      	pvar = upd->vp[var];
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  phi_j = bf[eqn]->phi[j];
+	  for (k = 0; k<DIM; k++) {
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	  }
+	  Inn(grad_phi_j, gradII_phi_j);
+	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+	  
+	  //mass *= dA * etm_mass_eqn;
+	  // Assemble advection term
+	  adv = 0.0;
+	  // dgradP_dPj = gradII_phi_j
+	  if ( T_ADVECTION ) {
+	    for ( k = 0; k < DIM; k++ ) {
+	      adv += gradII_h[k]*gradII_phi_j[k];
+	    }
+	    adv *= phi_i*rho*dv_dgradP;
+	    adv *= etm_adv_eqn;
+	  }
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      diff += gradII_phi_j[k]*gradII_phi_i[k];
+	    }
+	    diff *= -h*rho*dv_dgradP;
+	  }
+	  diff *= etm_diff_eqn;
+	  
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
+	  
+      	} // End of loop over DOF (j)
+	
+      }// End of R_TFMP_MASS sensitivities to TFMP_PRES
+      // Assemble sensitivities for TFMP_SAT
+      var = TFMP_SAT;
+      if (pd->v[var]) {
+      	pvar = upd->vp[var];
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  phi_j = bf[eqn]->phi[j];
+	  for (k = 0; k<DIM; k++) {
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	  }
+	  Inn(grad_phi_j, gradII_phi_j);
+	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+	  if( T_MASS ) {
+	    if (mass_lumping) {
+	      if (i == j) {
+		mass += phi_i*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+	      } else {
+		mass += phi_i*drho_dS*dh_dtime;
+	      }
+	    } else {
+	      mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
+	    }
+	    mass *= etm_mass_eqn;
+	  }
+	  
+	  // Assemble advection term
+	  adv = 0.0;
+	  if ( T_ADVECTION ) {
+	    for( k=0; k<DIM; k++) {
+	      dv_dSj[k] = phi_j*dv_dS[k];
+	      adv += gradII_h[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
+	    }
+	    adv *= phi_i;
+	    adv *= etm_adv_eqn;
+	  }
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  if ( T_DIFFUSION ) {
+	    for ( k = 0; k < DIM ; k++) {
+	      dv_dSj[k] = phi_j*dv_dS[k];
+	      diff += gradII_phi_i[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
+	    }
+	    diff *= -h;
+	    diff *= etm_diff_eqn;
+	  }
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
+      	} // End of loop over DOF (j)
+      }// End of R_TFMP_MASS sensitivities to TFMP_SAT
+    } // End of loop over DOF (i)
+  } // End of Sensitivities of R_TFMP_MASS
+  /* Assemble sensitivities of R_TFMP_BOUND */
+  eqn = R_TFMP_BOUND;
+  if (af->Assemble_Jacobian) {
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];
+    etm_adv_eqn = pd->etm[eqn][(LOG2_ADVECTION)];
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)];
+    // Loop over DOF (i)
+    for ( i = 0; i < ei->dof[eqn]; i++) { /* The sensitivities of R_TFMP_BOUND to TFMP_PRES and TFMP_SAT and VELOCITY */
+      // Load basis functions
+      phi_i = bf[eqn]->phi[i];
+      for (k = 0; k<DIM; k++) {
+       	grad_phi_i[k] = bf[eqn]->grad_phi[i][k];
+      }
+      Inn(grad_phi_i, gradII_phi_i);
+      //ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      // Assemble sensitivities for TFMP_PRES
+      var = TFMP_PRES;
+      if (pd->v[var]) {
+      	pvar = upd->vp[var];
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  phi_j = bf[eqn]->phi[j];
+	  for (k = 0; k<DIM; k++) {
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	  }
+	  Inn(grad_phi_j, gradII_phi_j);
+	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term ** mass term has no sensitivity to pressure
+	  mass = 0.0;
+	  
+	  //mass *= dA * etm_mass_eqn;
+	  // Assemble advection term
+	  adv = 0.0;
+	  gradh_dot_gradphi_j = 0.0;
+	  gradphi_i_dot_gradphi_j = 0.0;
+	  gradP_dot_gradS = 0.0;
+	  gradP_dot_gradphi_i= 0.0;
+	  gradS_dot_gradphi_j = 0.0;
+	  
+	  if ( T_ADVECTION ) {
+	    for (k = 0; k<DIM; k++ ) {
+	      gradh_dot_gradphi_j       += 	gradII_h[k]*gradII_phi_j[k];
+	      gradS_dot_gradphi_j 			+=	gradII_phi_j[k]*gradII_S[k];
+	      gradphi_i_dot_gradphi_j 	+= 	gradII_phi_j[k]*gradII_phi_i[k];
+	      gradP_dot_gradphi_i 			+=	gradII_P[k]*gradII_phi_i[k];
+	      gradP_dot_gradS 					+=	gradII_P[k]*gradII_S[k];
+	    }
+	    adv += phi_i*(dv_dgradP)*gradS_dot_gradphi_j;
+	    if( (mp->Ewt_funcModel == SUPG) ||
+		(mp->Ewt_funcModel == LAGGED_SUPG) )  {
+	      adv += supg*h_elem_inv*(dv_dgradP)*gradphi_i_dot_gradphi_j*(dv_dgradP)*gradP_dot_gradS;
+	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradS_dot_gradphi_j;
+	    }
+	    adv += phi_i*S/h*dv_dgradP*gradh_dot_gradphi_j;
+	    adv *= etm_adv_eqn;
+	  }
+	  // Assemble diffusion term ** diffusion Term has no sensitivity to pressure
+	  diff = 0.0;
+	  
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += adv*dA;
+	  
+      	} // End of loop over DOF (j)
+      
+      }// End of R_TFMP_BOUND sensitivities to TFMP_PRES
+      // Assemble sensitivities for TFMP_SAT
+      var = TFMP_SAT;
+      if (pd->v[var]) {
+      	pvar = upd->vp[var];
+      	// Loop over DOF (j)
+      	for ( j = 0; j < ei->dof[var]; j++) {
+	  // Load basis functions
+	  phi_j = bf[eqn]->phi[j];
+	  for (k = 0; k<DIM; k++) {
+	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	  }
+	  Inn(grad_phi_j, gradII_phi_j);
+	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  // Assemble mass term
+	  mass = 0.0;
+	  if( T_MASS ) {
+	    if (mass_lumping) {
+	      if (i == j) {
+		mass += phi_i*(1+2*tt)/delta_t;
+	      }
+	    } else {
+	      mass += phi_i*phi_j*((1+2*tt)/delta_t);
+	    }
+	    //mass += phi_i*phi_j*((1+2*tt)/delta_t);
+	    mass *= etm_mass_eqn;
+	  }
+	  // Assemble advection term
+	  adv = 0.0;
+	  adv1 = 0.0;
+	  if ( T_ADVECTION  ) {
+	    gradP_dot_gradS = 0.0;
+	    gradP_dot_gradphi_i = 0.0;
+	    gradphi_i_dot_gradphi_j = 0.0;
+	    gradP_dot_gradphi_j = 0.0;
+	    gradP_dot_gradh = 0.0;
+	    v_dot_gradII_h = 0.0;
+	    for ( k = 0; k < DIM ; k++) {
+	      gradP_dot_gradh += gradII_P[k]*gradII_h[k];
+	      v_dot_gradII_h += v[k]*gradII_h[k];
+	      gradP_dot_gradS += gradII_P[k]*gradII_S[k];
+	      gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+	      gradphi_i_dot_gradphi_j += gradII_phi_i[k]*gradII_phi_j[k];
+	      gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
+	      dv_dSj[k] = phi_j*dv_dS[k];
+	      adv1 += gradII_h[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
+	    }
+	    
+	    adv += phi_i*( (dv_dgradP)*(gradP_dot_gradphi_j + gradP_dot_gradS/mu*phi_j*dmu_dS) );
+	    if((mp->Ewt_funcModel == SUPG) || (mp->Ewt_funcModel == SUPG)
+	       && supg != 0.0) {
+	      adv += supg*h_elem_inv*(dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradphi_i * (dv_dgradP)*gradP_dot_gradS;
+	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i * ( (dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradS + (dv_dgradP)*gradP_dot_gradphi_j );
+	    }
+	    adv += phi_i*phi_j/h*v_dot_gradII_h;
+	    adv += phi_i/h*S*adv1;
+	    adv *= etm_adv_eqn;
+	  }
+	  // Assemble diffusion term
+	  diff = 0.0;
+	  if ( T_DIFFUSION ) {
+	    gradphi_i_dot_gradphi_j = 0.0;
+	    for ( k = 0; k < DIM ; k++) {
+	      gradphi_i_dot_gradphi_j += gradII_phi_i[k]*gradII_phi_j[k];
+	    }
+	    diff += D*gradphi_i_dot_gradphi_j;
+	    diff *= etm_diff_eqn;
+	  }
+	  // Assemble full Jacobian
+	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
+	  
+      	} // End of loop over DOF (j)
+      }// End of R_TFMP_BOUND sensitivities to TFMP_SAT
+
+      /* Begin sensitivities of element average velocities to nodal velocities */
+      for (l = 0; l<DIM; l++) {
+      	var = VELOCITY1 + l;
+      	if (pd->v[var] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG ) ) {
+	  pvar = upd->vp[var];
+	  // Loop over DOF (j)
+	  for ( j = 0; j < ei->dof[var]; j++) {
+	    // Load basis functions
+	    phi_j = bf[eqn]->phi[j];
+	    for (k = 0; k<DIM; k++) {
+	      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    }
+	    Inn(grad_phi_j, gradII_phi_j);
+	    //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	    // Assemble SU/PG term sensitivity to VELOCITY1
+	    adv = 0.0;
+	    if( T_ADVECTION ) {
+	      gradP_dot_gradphi_i = 0.0;
+	      gradP_dot_gradS =0.0;
+	      for ( k = 0; k < DIM ; k++) {
+		gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+		gradP_dot_gradS += gradII_P[k]*gradII_S[k];
+	      }
+	      adv += supg*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradP_dot_gradS*(-1.0*h_elem_inv*h_elem_inv);
+	      adv *= dh_elem_dv_cent[l];
+	      adv *= pg_data->dv_dnode[l][j];
+	    }
+	    adv *= etm_adv_eqn;
+	    
+	    // Assemble full Jacobian
+	    lec->J[peqn][pvar][i][j] += dA*adv;
+	    
+	  }  // End of loop over DOF (j)
+      	} // End of Sensitivities to VELOCITY1
+      }
+    } // End of loop over DOF (i)
+  } // End of Sensitivites of R_TFMP_BOUND
+
+  safe_free((void *) n_dof);
+  return(0);
+
+} 
+/* End of assemble_shell_tfmp() */
+
 /* End of mm_fill_shell.c */

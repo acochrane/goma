@@ -52,6 +52,11 @@ PROTO((dbl [DIM],		/* v_avg                                     */
        dbl [DIM][MDE],		/* dv_dnode                                  */
        const Exo_DB *));	/* exo - ptr to FE db                        */
 
+EXTERN void lagged_element_velocity
+PROTO((dbl [DIM],		/* v_avg                                     */
+       dbl [DIM][MDE],		/* dv_dnode                                  */
+       const Exo_DB *));	/* exo - ptr to FE db                        */
+
 EXTERN void h_elem_siz
 PROTO((dbl [DIM],		/* h                                         */
        dbl [DIM][DIM],		/* hh                                        */

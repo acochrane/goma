@@ -1286,6 +1286,13 @@ assembly_alloc(Exo_DB *exo)
     esp->poynt = (dbl ***) alloc_ptr_2(vim, MDE);
   }
 
+  if(Num_Var_In_Type[imtrx][TFMP_PRES]) {
+    esp->tfmp_pres = (dbl **) alloc_ptr_1(MDE);
+  }
+  if(Num_Var_In_Type[imtrx][TFMP_SAT]) {
+    esp->tfmp_sat = (dbl **) alloc_ptr_1(MDE);
+  }
+
   if(Num_Var_In_Type[imtrx][SHELL_SHEAR_TOP]) {
     esp->sh_shear_top = (dbl **) alloc_ptr_1(MDE);
   }

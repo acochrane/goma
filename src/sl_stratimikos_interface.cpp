@@ -37,7 +37,6 @@ int stratimikos_solve(struct Aztec_Linear_Solver_System *ams, double *x_,
   using Teuchos::RCP;
   bool success = true;
   bool verbose = true;
-
   try {
     Epetra_Map map = ams->RowMatrix->RowMatrixRowMap();
 
@@ -67,13 +66,11 @@ int stratimikos_solve(struct Aztec_Linear_Solver_System *ams, double *x_,
 #ifdef HAVE_TEKO
     Teko::addTekoToStratimikosBuilder(linearSolverBuilder);
 #endif
-
     linearSolverBuilder.setParameterList(solverParams);
 
     // set up solver factory using base/params
     RCP<Thyra::LinearOpWithSolveFactoryBase<double> > solverFactory =
         linearSolverBuilder.createLinearSolveStrategy("");
-
 
     linearSolverBuilder.writeParamsFile(*solverFactory, "echo_stratimikos.xml");
     

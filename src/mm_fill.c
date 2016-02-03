@@ -790,11 +790,21 @@ matrix_fill(
       (mp->Ewt_funcModel == SUPG && pde[R_ENERGY] &&
        (pde[R_MOMENTUM1] || pde[R_MESH1])) ||
       (mp->Ewt_funcModel == SUPG && pde[R_SHELL_ENERGY] &&
-       (pde[R_LUBP] ))) {
+       (pde[R_LUBP] )) ) {
+	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
+	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+      }
+  
+  if ((mp->Ewt_funcModel == SUPG && pde[R_TFMP_BOUND])) {
     h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
     element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
   }
-  
+
+  if ((mp->Ewt_funcModel == LAGGED_SUPG && pde[R_TFMP_BOUND])) {
+    h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
+    lagged_element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
+  }
+
   if (cr->MassFluxModel == HYDRODYNAMIC)
     {
       /* For shock capturing diffusivity in Phillips model */
@@ -1960,6 +1970,15 @@ matrix_fill(
 #endif
         }
 
+      if(pde[R_TFMP_MASS] ||pde[R_TFMP_BOUND])
+	{
+	  err = assemble_shell_tfmp( time_value, theta, delta_t, xi, &pg_data, exo );
+	  EH( err, "assemble_shell_tfmp");
+#ifdef CHECK_FINITE
+	  CHECKFINITE("assemble_shell_tfmp");
+#endif
+	}
+
       if( pde[R_MOMENTUM1] )
 	{
             err = assemble_momentum(time_value, theta, delta_t, h_elem_avg, &pg_data, xi, exo);
@@ -2121,7 +2140,7 @@ matrix_fill(
 	  CHECKFINITE("assemble_volume_lagrange_multiplier");
 #endif
 	}
-      
+
       /******************************************************************************/
     }
   /* END  for (ip = 0; ip < ip_total; ip++)                               */  

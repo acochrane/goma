@@ -743,6 +743,9 @@ SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
  { "SURFDOMAINCHEMKIN_KIN_STEFAN_VOL_FLOW", "SDC_KIN_SFV_BC", STRONG_INT_SURF, SDC_KIN_SFV_BC, R_MESH_NORMAL, SCALAR, R_MESH1, {0, 0, 0, 1, 1, 1, 1, 1, 0, 0}, CROSS_PHASE_DISCONTINUOUS, DVI_MULTI_PHASE_SINGLE } ,
   { "SURFDOMAINCHEMKIN_HEATRXN", "SDC_HEATRXN_BC", WEAK_INT_SURF, SDC_HEATRXN_BC, R_ENERGY, SCALAR, NO_ROT, {1,1,1,1,1,1,1,1,1,1}, CROSS_PHASE_DISCONTINUOUS, DVI_VSIG } ,
   { "SURFDOMAINCHEMKIN_STEFAN_FLOW", "SDC_STEFANFLOW_BC", STRONG_INT_SURF, SDC_STEFANFLOW_BC, R_MOM_NORMAL, SCALAR, NO_ROT, {1,1,1,1,1,1,1,1,1,1}, CROSS_PHASE_DISCONTINUOUS, DVI_SIDTIE } ,
+  { "SHELL_TFMP_PRES_BC", "SHELL_TFMP_PRES_BC", DIRICHLET, SHELL_TFMP_PRES_BC, R_TFMP_MASS, SCALAR, NO_ROT, {1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
+  { "SHELL_TFMP_SAT_BC", "SHELL_TFMP_SAT_BC", DIRICHLET, SHELL_TFMP_SAT_BC, R_TFMP_MASS, SCALAR, NO_ROT, {1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, SINGLE_PHASE, DVI_SINGLE_PHASE_DB},
+
 };
 
 /* order of sensitivities in list (as of 5/15/95): 
@@ -982,7 +985,8 @@ struct Equation_Names EQ_Name[] = {
     { "R_LIGHT_INTP", "LIGHT_INTP", R_LIGHT_INTP},
     { "R_LIGHT_INTM", "LIGHT_INTM", R_LIGHT_INTM},
     { "R_LIGHT_INTD", "LIGHT_INTD", R_LIGHT_INTD},  /*   182  */
-
+    { "R_TFMP_MASS", "TFMP_MASS", R_TFMP_MASS},     /*   183  */
+    { "R_TFMP_BOUND", "TFMP_BOUND", R_TFMP_BOUND},     /*   184  */
     /*
      *  Note -> these entries must remain until we get rid
      *          of putting the species unknowns after V_LAST
@@ -1252,6 +1256,9 @@ struct Equation_Names Var_Name[] =  {
     { "LIGHT_INTP", "INTP", LIGHT_INTP},
     { "LIGHT_INTM", "INTM", LIGHT_INTM},
     { "LIGHT_INTD", "INTD", LIGHT_INTD},                     /* 182 */
+    { "TFMP_PRES", "PRES", TFMP_PRES},                     /* 183 */
+    { "TFMP_SAT", "SAT", TFMP_SAT},                     /* 184 */
+
 
     { "MESH_POSITION1", "X",  MESH_POSITION1 } ,
     { "MESH_POSITION2", "Y",  MESH_POSITION2 } ,	/* 188 */
@@ -1491,6 +1498,8 @@ struct Equation_Names Exo_Var_Names[] =
   { "Plus Propagating Intensity", "INTP", LIGHT_INTP },
   { "Minus Propagating Intensity", "INTM", LIGHT_INTM },
   { "Dispersive Scattering Intensity", "INTD", LIGHT_INTD },
+  { "Thin-Film Multi-Phase Lubrication Pressure", "TFMP_PRES", TFMP_PRES },
+  { "Thin-Film Multi-Phase Saturation", "TFMP_SAT", TFMP_SAT },
 };
 
 int Num_Exo_Var_Names = sizeof(Exo_Var_Names) / sizeof(struct Equation_Names);  
@@ -1754,6 +1763,8 @@ struct Equation_Names Var_Units[] =
   { "Plus Intensity", "[1]", LIGHT_INTP},
   { "Minus Intensity", "[1]", LIGHT_INTM},
   { "Dispersive Intensity", "[1]", LIGHT_INTD},
+  { "Thin-Film Multi-Phase Lubrication Pressure", "[1]", TFMP_PRES},
+  { "Thin-Film Multi-Phase Saturation", "[1]", TFMP_SAT},
 };
 
 int Num_Var_Units = sizeof(Var_Units) / sizeof(struct Equation_Names);  

@@ -932,6 +932,46 @@ element_velocity(dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
 	}
     }
 } /* end of v_elem_avg */
+
+void
+lagged_element_velocity (dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
+		 const Exo_DB *exo)
+
+    /*
+     * this routine is used to calculate the average element velocity from 
+     * the last time step for SUPG.  Current apps are for the TFMP speedup. 
+     */
+{
+  int i, p, I, dofs, centroid_node, dim;
+  dbl ddofs;
+  
+  dim =  pd->Num_Dim;
+  
+  /* parameter variables are initialized in matrix_fill */
+  
+  if (pd->i[VELOCITY1]==I_Q1)
+    {
+      if (cr->MeshMotion == ARBITRARY) {
+	  for (p = 0; p < dim; p++)
+	    {
+
+	      dofs     = ei->dof[VELOCITY1];
+	      ddofs = dofs;  
+
+	      for (i = 0; i < dofs; i++)
+		{
+		  v_avg[p] += *esp_old->v[p][i]/ddofs;
+		  //v_avg[p] += 1./ddofs;
+		  dv_dnode[p][i] = 0.0;
+		}
+	    }
+      }
+      else {
+	EH(-1,"You're doing something wrong");
+      }
+    }
+}
+
 /*************************************************************************/
 /*************************************************************************/
 /*************************************************************************/

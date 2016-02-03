@@ -378,6 +378,17 @@ setup_pd()
 		    pd_glob[mn]->e[imtrx][ce] |= T_SOURCE;
 		   }
 	        }
+	      else if ((ce == R_TFMP_MASS) ||
+		       (ce == R_TFMP_BOUND)) {
+		if ( pd_glob[mn]->etm[imtrx][ce][(LOG2_MASS)] != 0. )
+		  {
+		    pd_glob[mn]->e[imtrx][ce] |= T_MASS;
+		  }
+		if ( pd_glob[mn]->etm[imtrx][ce][(LOG2_DIFFUSION)] != 0. )
+		  {
+		    pd_glob[mn]->e[imtrx][ce] |= T_DIFFUSION;
+		  }
+	      }
 	      else if(
                   (ce == R_ENERGY )||
 		  (ce == R_MASS)||

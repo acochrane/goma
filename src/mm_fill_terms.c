@@ -2608,8 +2608,12 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
-  
+	if (pd->e[R_TFMP_BOUND] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG)  ) {
+	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
+	} else {
+	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
+	}
+
 	fv->wt = wt; /*load_neighbor_var_data screws fv->wt up */
       }
       
@@ -2855,10 +2859,26 @@ assemble_momentum(dbl time,       /* current time */
 		      porous    *= -phi_i*d_area;
 		      porous    *= porous_brinkman_etm;
 		    }
+		  else if (mp->tfmp_pspg_model == CONSTANT) {
+		    /*	  eqn  = R_MOMENTUM1 + a;
+			  peqn = upd->ep[eqn];
+		    	  bfm  = bf[eqn];
+		    */
+		    porous = v[a] - LubAux->v_avg[a];
+		    dbl grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
+		    int k;
+		    for (k = 0; k<DIM; k++) {
+		      grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];
+		    }
+		    Inn(grad_phi_pres_i, grad_II_phi_pres_i);
+		    phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg_const * grad_II_phi_pres_i[a];
+		    porous *= phi_i * wt * fv->sdet * h3;
+		    porous *= porous_brinkman_etm;
+		  }
 		  else if ( mp->FSIModel > 0 )
-		    {	      
+		    {
 		      porous = v[a] - LubAux->v_avg[a];
-		      porous *= phi_i * wt * fv->sdet * h3;
+		      porous *= bf[eqn]->phi[i] * wt * fv->sdet * h3;
 		      porous *= porous_brinkman_etm;
 		    }
 		  else if (vis == 0. && mp->viscosity == 0.)
@@ -3381,6 +3401,19 @@ assemble_momentum(dbl time,       /* current time */
 				  porous *= -phi_i*phi_j*d_area;
 				  porous *= porous_brinkman_etm;
 				}
+
+			      else if(mp->tfmp_pspg_model == CONSTANT) {
+				dbl grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
+				int k;
+				for (k = 0; k<DIM; k++) {
+				  grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];
+				}
+				Inn(grad_phi_pres_i, grad_II_phi_pres_i);
+				porous = delta(a,b)*(phi_i + mp->tfmp_pspg_const*grad_II_phi_pres_i[a]);
+				porous *= phi_j* wt * fv->sdet * h3;
+				// porous *= phi_i*phi_j* wt * h3;
+				porous *= porous_brinkman_etm;
+			      }
 			      else if (mp->viscosity !=0)
 				{
 				  porous = delta(a,b);
@@ -3610,6 +3643,85 @@ assemble_momentum(dbl time,       /* current time */
 			lec->J[peqn][pvar][ii][j] += porous;
 		      }
 		  }
+	      }
+
+	      if ( pdv[TFMP_PRES] ) {
+		if (porous_brinkman_on) {
+		  var = TFMP_PRES;
+		  pvar = upd->vp[var];		  
+		  /*
+		    eqn  = R_MOMENTUM1 + a;
+		    peqn = upd->ep[eqn];
+		    bfm  = bf[eqn]; 
+		  */
+
+
+		  //int *n_dof = NULL;
+		  //int dof_map[MDE];
+		  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE], grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
+		  int k;
+		  // phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg * bf[R_TFMP_MASS]->grad_phi[i][k];
+
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    phi_j = bf[eqn]->phi[j]; // this might fix strange vz jacobian bug
+		    for (k = 0; k<DIM; k++) {
+		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		      grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];
+		    }
+		    Inn(grad_phi_j, grad_II_phi_j);
+		    Inn(grad_phi_pres_i,grad_II_phi_pres_i);
+		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    porous = 0.;
+		    /* Assemble */
+		    porous += -bf[eqn]->phi[i]*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
+
+		    porous += -mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*grad_II_phi_j[a]*LubAux->dv_avg_dp1[a][j];
+		    porous *= fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  //safe_free((void *) n_dof);
+		}
+	      }
+	      if ( pdv[TFMP_SAT] ) {
+		if (porous_brinkman_on) {
+		  var = TFMP_SAT;
+		  pvar = upd->vp[var];		  
+
+		  //int *n_dof = NULL;
+		  //int dof_map[MDE];
+		  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE], grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
+		  int k;
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    phi_j = bf[eqn]->phi[j];
+		    for (k = 0; k<DIM; k++) {
+		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+		      grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];		    
+		    }
+		    Inn(grad_phi_j, grad_II_phi_j);
+		    
+		    
+		    Inn(grad_phi_pres_i,grad_II_phi_pres_i);
+		    //ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    porous = 0.0;
+		    /* Assemble */
+		    porous += -phi_i*( LubAux->dv_avg_dc[a][j] )*phi_j;
+
+		    porous += -mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*phi_j*LubAux->dv_avg_dp1[a][j];
+		    porous *= fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  //safe_free((void *) n_dof);
+		}
 	      }
 
 	      /*
@@ -8753,6 +8865,22 @@ load_fv(void)
 	fv->vlambda += *esp->vlambda[i] * bf[v]->phi[i];
     }
 
+  if (pdv[TFMP_PRES]) 
+    {
+      v = TFMP_PRES;
+      scalar_fv_fill(esp->tfmp_pres, esp_dot->tfmp_pres, esp_old->tfmp_pres, bf[v]->phi, ei->dof[v],
+		     &(fv->tfmp_pres), &(fv_dot->tfmp_pres), &(fv_old->tfmp_pres));
+      stateVector[v] = fv->tfmp_pres;
+    } 
+  if (pdv[TFMP_SAT]) 
+    {
+      v = TFMP_SAT;
+      scalar_fv_fill(esp->tfmp_sat, esp_dot->tfmp_sat, esp_old->tfmp_sat, bf[v]->phi, ei->dof[v],
+		     &(fv->tfmp_sat), &(fv_dot->tfmp_sat), &(fv_old->tfmp_sat));
+      stateVector[v] = fv->tfmp_sat;
+    } 
+
+
   /*
    * External...
    */
@@ -10558,6 +10686,52 @@ load_fv_grads(void)
     } else if ( zero_unused_grads && upd->vp[pg->imtrx][LIGHT_INTD] == -1 ) {
     for (p=0; p<VIM; p++) fv->grad_poynt[2][p] = 0.0;
   } 
+
+  if ( pd->v[TFMP_PRES] )
+    {
+      v = TFMP_PRES;
+      dofs  = ei->dof[v];
+#ifdef DO_NO_UNROLL
+      for ( p=0; p<VIM; p++)
+	{
+	  fv->grad_tfmp_pres[p] = 0.0;
+		  
+	  for ( i=0; i<dofs; i++)
+	    {
+	      fv->grad_tfmp_pres[p] += *esp->tfmp_pres[i] * bf[v]->grad_phi[i] [p];
+	      fv_old->grad_tfmp_pres[p] += *esp_old->tfmp_pres[i] * bf[v]->grad_phi[i] [p]
+	    }
+	}
+#else
+      grad_scalar_fv_fill( esp->tfmp_pres, bf[v]->grad_phi, dofs, fv->grad_tfmp_pres);
+    } else if ( zero_unused_grads &&  upd->vp[TFMP_PRES] == -1 ) {
+      for (p=0; p<VIM; p++) fv->grad_tfmp_pres[p] = 0.0;
+    }
+
+#endif
+
+
+  if ( pd->v[TFMP_SAT] )
+    {
+      v = TFMP_SAT;
+      dofs  = ei->dof[v];
+#ifdef DO_NO_UNROLL
+      for ( p=0; p<VIM; p++)
+	{
+	  fv->grad_tfmp_sat[p] = 0.0;
+		  
+	  for ( i=0; i<dofs; i++)
+	    {
+	      fv->grad_tfmp_sat[p] += *esp->tfmp_sat[i] * bf[v]->grad_phi[i] [p];
+	      fv_old->grad_tfmp_sat[p] += *esp_old->tfmp_sat[i] * bf[v]->grad_phi[i] [p]
+	    }
+	}
+#else
+      grad_scalar_fv_fill( esp->tfmp_sat, bf[v]->grad_phi, dofs, fv->grad_tfmp_sat);
+    } else if ( zero_unused_grads &&  upd->vp[TFMP_SAT] == -1 ) {
+      for (p=0; p<VIM; p++) fv->grad_tfmp_sat[p] = 0.0;
+    }
+#endif
 
  /*
   * External 

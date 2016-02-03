@@ -788,6 +788,7 @@
 #define SH_LUBP_SOLID_BC    970000014
 #define SH_LUBP_SOLID_RS_BC    970000015
 
+
 /* Shell variables that are not structural shells */
 #define SH_GAMMA1_BC            980000001
 #define SH_GAMMA1_DERIV_SYMM_BC 980000002
@@ -977,7 +978,8 @@
 #define SH_P_OPEN_USER_BC 777000021
 #define LUB_PRESS_2_BC  777000022
 #define SHELL_OPEN_PRESS_2_BC 777000023
-
+#define SHELL_TFMP_PRES_BC    777000030
+#define SHELL_TFMP_SAT_BC    777000031
 
 
 

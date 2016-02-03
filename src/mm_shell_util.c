@@ -2532,7 +2532,8 @@ calculate_lub_q_v (
   
   /* Confined lubrication flow - Newtonian */
   /* The next else block is for film flow) */
-  if (pd->e[pg->imtrx][EQN])   
+
+  if (pd->e[pg->imtrx][EQN] && EQN == R_LUBP)   
     {
       
       /* Set proper fill variable first.   If in lub_p layer, then use FILL, 
@@ -3160,8 +3161,7 @@ calculate_lub_q_v (
       fv->wt = wt_old;
       safe_free((void *) n_dof);
       
-    }
-  
+    }   /* End of Film flow - Newtonian   */
   
   /* Film flow - Newtonian */
   else if (pd->e[pg->imtrx][R_SHELL_FILMP])
@@ -3431,6 +3431,126 @@ calculate_lub_q_v (
       
     }
   
+  /* thin film multiphase flow - Reynolds [R_TFMP_BOUND] */
+  else if (pd->e[pg->imtrx][EQN] && EQN == R_TFMP_BOUND ) {
+      
+    /******* PRECALCULATE ALL NECESSARY COMPONENTS ***********/
+
+    /* Load the pressure gradient */
+
+    dbl grad_P[DIM], gradII_P[DIM];
+
+    /* Load Saturation */
+
+    dbl S;
+
+    if (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) {
+      for (k = 0; k<DIM; k++) {
+	grad_P[k] = fv->grad_tfmp_pres[k];
+      }
+      S = fv->tfmp_sat;
+    } else {
+      for (k = 0; k<DIM; k++) {
+	grad_P[k] = fv_old->grad_tfmp_pres[k];
+      }
+      S = fv_old->tfmp_sat;
+    }
+    Inn(grad_P, gradII_P);
+
+
+    /* Load density and viscosity */
+
+    double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
+    
+    a_rho = mp->u_tfmp_const[0];
+    b_rho = mp->u_tfmp_const[1];
+    c_rho = mp->u_tfmp_const[2];
+    d_rho = mp->u_tfmp_const[3];
+    a_mu = mp->u_tfmp_const[4];
+    b_mu = mp->u_tfmp_const[5];
+    c_mu = mp->u_tfmp_const[6];
+    d_mu = mp->u_tfmp_const[7];
+
+    double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
+    double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
+    double drho_dS, dmu_dS;
+    drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+    dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+      
+    /***** CALCULATE HEIGHT, SLOPES, AND SENSITIVITIES *****/
+    
+    dbl GRADH[DIM];
+    dbl D_GRADH_DH[DIM][MDE];
+    memset(GRADH,       0.0, sizeof(double)*DIM);
+    memset(D_GRADH_DH,  0.0, sizeof(double)*DIM);
+    
+    /* Extract film thickness */
+    //H = fv->sh_fh;
+
+    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+    h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				 dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, dt);
+
+    double dh_dtime = dH_U_dtime - dH_L_dtime;
+    /* Need gradII_(Sh) */
+    double grad_h[DIM], gradII_h[DIM];
+    for (k=0; k<DIM; k++) {
+      grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+    }
+      
+
+
+    /* Perfrom I - nn gradient */
+    Inn(grad_h, gradII_h);
+      
+      /******* CALCULATE FLOW RATE AND AVERAGE VELOCITY ***********/
+      
+    memset(v_avg, 0.0, sizeof(double)*DIM);
+    for (i = 0; i< DIM; i++) {
+      v_avg[i] += -h*h/(12. * mu) * gradII_P[i];
+    }
+      
+    /*Evaluate average velocity sensitivity w.r.t. pressure */
+    dbl dv_dP[DIM][MDE];
+    memset(dv_dP, 0.0, sizeof(double)*DIM*MDE);
+      
+    if (TRUE) {
+      for (i = 0; i < DIM; i++) {
+	for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
+	  dv_dP[i][j] += (-h*h/12./mu);
+	}
+      }
+    }
+ 
+    /*Evaluate average velocity sensitivity w.r.t. saturation */
+    dbl dv_dS[DIM][MDE];
+    memset(dv_dS, 0.0, sizeof(double)*DIM*MDE);
+
+    for (i = 0; i < DIM; i++) {
+      for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
+	dv_dS[i][j] += gradII_P[i]*(-h*h/12.0)*(-1.0/mu/mu)*dmu_dS;
+      }
+    }
+      
+      
+      
+    /******* STORE THE INFORMATION TO LUBRICATION AUXILIARIES STRUCTURE ***********/
+      
+    for (i = 0; i < DIM; i++) {
+      LubAux->v_avg[i] = v_avg[i];
+      
+      for ( j = 0; j < ei->dof[TFMP_PRES]; j++) {
+	LubAux->dv_avg_dp1[i][j] = dv_dP[i][j];
+      }
+      
+      for ( j = 0; j < ei->dof[TFMP_SAT]; j++) {
+	LubAux->dv_avg_dc[i][j] = dv_dS[i][j];
+      }
+    }
+  }
+  
+
   
   return;
   
