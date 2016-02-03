@@ -838,7 +838,9 @@ struct Material_Properties
   int tfmp_diff_model;
   dbl tfmp_diff_const;
 
-  
+  // TFMP variables for stabilizing pressure in velocity equations
+  int tfmp_pspg_model;
+  dbl tfmp_pspg_const;
 
   int table_index;
 

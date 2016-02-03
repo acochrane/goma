@@ -9449,6 +9449,13 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       
       }*/
   }  
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Pressure Stabilization", 
+				   &(mat_ptr->tfmp_pspg_model), 
+				   &(mat_ptr->tfmp_pspg_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+  }
   /*********************************************************************/
 
 

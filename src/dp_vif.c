@@ -1799,6 +1799,11 @@ noahs_ark()
        */
       ddd_add_member(n, &mp_glob[i]->tfmp_diff_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_diff_const, 1, MPI_DOUBLE);
+      /*
+       * TFMP pspg model 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_pspg_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_pspg_const, 1, MPI_DOUBLE);
 		     
 
       /*
