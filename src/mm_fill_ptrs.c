@@ -2208,6 +2208,8 @@ load_elem_dofptr_all(const int ielem,
 
   status = 0;
 
+  if (upd->Total_Num_Matrices == 1) return;
+
   /*
    * Looking for the stuff that loaded up gun_list, ln_to_dof,
    * and all their friends ?

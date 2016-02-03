@@ -3648,7 +3648,7 @@ assemble_momentum(dbl time,       /* current time */
 	      if ( pdv[TFMP_PRES] ) {
 		if (porous_brinkman_on) {
 		  var = TFMP_PRES;
-		  pvar = upd->vp[var];		  
+		  pvar = upd->vp[pg->imtrx][var];		  
 		  /*
 		    eqn  = R_MOMENTUM1 + a;
 		    peqn = upd->ep[eqn];
@@ -3690,7 +3690,7 @@ assemble_momentum(dbl time,       /* current time */
 	      if ( pdv[TFMP_SAT] ) {
 		if (porous_brinkman_on) {
 		  var = TFMP_SAT;
-		  pvar = upd->vp[var];		  
+		  pvar = upd->vp[pg->imtrx][var];		  
 
 		  //int *n_dof = NULL;
 		  //int dof_map[MDE];
