@@ -3517,7 +3517,7 @@ calculate_lub_q_v (
       
     if (TRUE) {
       for (i = 0; i < DIM; i++) {
-	for (j = 0; j < ei->dof[TFMP_PRES]; j++) {
+	for (j = 0; j < ei[pd->mi[TFMP_PRES]]->dof[TFMP_PRES]; j++) {
 	  dv_dP[i][j] += (-h*h/12./mu);
 	}
       }
@@ -3528,7 +3528,7 @@ calculate_lub_q_v (
     memset(dv_dS, 0.0, sizeof(double)*DIM*MDE);
 
     for (i = 0; i < DIM; i++) {
-      for (j = 0; j < ei->dof[TFMP_SAT]; j++) {
+      for (j = 0; j < ei[pd->mi[TFMP_SAT]]->dof[TFMP_SAT]; j++) {
 	dv_dS[i][j] += gradII_P[i]*(-h*h/12.0)*(-1.0/mu/mu)*dmu_dS;
       }
     }
@@ -3540,11 +3540,11 @@ calculate_lub_q_v (
     for (i = 0; i < DIM; i++) {
       LubAux->v_avg[i] = v_avg[i];
       
-      for ( j = 0; j < ei->dof[TFMP_PRES]; j++) {
+      for ( j = 0; j < ei[pd->mi[TFMP_PRES]]->dof[TFMP_PRES]; j++) {
 	LubAux->dv_avg_dp1[i][j] = dv_dP[i][j];
       }
       
-      for ( j = 0; j < ei->dof[TFMP_SAT]; j++) {
+      for ( j = 0; j < ei[pd->mi[TFMP_SAT]]->dof[TFMP_SAT]; j++) {
 	LubAux->dv_avg_dc[i][j] = dv_dS[i][j];
       }
     }

@@ -2034,7 +2034,7 @@ load_elem_dofptr(const int ielem,
     }
 
   eqn = R_POR_ENERGY;
-  if ( pd->e[eqn] )
+  if ( upd->ep[pg->imtrx][eqn] )
     {
       load_varType_Interpolation_ptrs(eqn, esp->T, esp_old->T,
 				      esp_dot->T);
@@ -2047,13 +2047,13 @@ load_elem_dofptr(const int ielem,
     }
 
   eqn = R_TFMP_MASS;
-  if ( pd->e[eqn] )
+  if ( upd->ep[pg->imtrx][eqn] )
     {
       load_varType_Interpolation_ptrs(eqn, esp->tfmp_pres, esp_old->tfmp_pres,
 				      esp_dot->tfmp_pres);
     }
   eqn = R_TFMP_BOUND;
-  if ( pd->e[eqn] )
+  if ( upd->ep[pg->imtrx][eqn] )
     {
       load_varType_Interpolation_ptrs(eqn, esp->tfmp_sat, esp_old->tfmp_sat,
 				      esp_dot->tfmp_sat);
@@ -2878,6 +2878,21 @@ load_elem_dofptr_all(const int ielem,
       {
         EH(-1,"Saturation-based formulation not implemented yet");
       }
+
+
+    eqn = R_TFMP_MASS;
+    if ( upd->ep[imtrx][eqn] )
+      {
+        load_varType_Interpolation_ptrs(eqn, esp->tfmp_pres, esp_old->tfmp_pres,
+                                        esp_dot->tfmp_pres);
+      }
+    eqn = R_TFMP_BOUND;
+    if ( upd->ep[imtrx][eqn] )
+      {
+        load_varType_Interpolation_ptrs(eqn, esp->tfmp_sat, esp_old->tfmp_sat,
+                                        esp_dot->tfmp_sat);
+      }
+
   
     eqn  = R_MASS;
     if (upd->ep[imtrx][eqn] >= 0) {

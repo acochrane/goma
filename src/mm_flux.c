@@ -8435,8 +8435,8 @@ load_fv_sens(void)
 
   v = TFMP_PRES;
   fv_sens->tfmp_pres = 0.;
-  if ( pd->v[v] ) {
-    dofs  = ei->dof[v];
+  if ( pd->gv[v] ) {
+    dofs  = ei[pd->mi[v]]->dof[v];
     for ( i=0; i<dofs; i++) {
       fv_sens->tfmp_pres += *esp_old->tfmp_pres[i] * bf[v]->phi[i];
     }
@@ -8444,8 +8444,8 @@ load_fv_sens(void)
 
   v = TFMP_SAT;
   fv_sens->tfmp_sat = 0.;
-  if ( pd->v[v] ) {
-    dofs  = ei->dof[v];
+  if ( pd->gv[v] ) {
+    dofs  = ei[pd->mi[v]]->dof[v];
     for ( i=0; i<dofs; i++) {
       fv_sens->tfmp_sat += *esp_old->tfmp_sat[i] * bf[v]->phi[i];
     }

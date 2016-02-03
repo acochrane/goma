@@ -949,13 +949,13 @@ lagged_element_velocity (dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
   
   /* parameter variables are initialized in matrix_fill */
   
-  if (pd->i[VELOCITY1]==I_Q1)
+  if (pd->i[pg->imtrx][VELOCITY1]==I_Q1)
     {
       if (cr->MeshMotion == ARBITRARY) {
 	  for (p = 0; p < dim; p++)
 	    {
 
-	      dofs     = ei->dof[VELOCITY1];
+	      dofs     = ei[pg->imtrx]->dof[VELOCITY1];
 	      ddofs = dofs;  
 
 	      for (i = 0; i < dofs; i++)

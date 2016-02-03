@@ -9861,9 +9861,9 @@ rd_eq_specs(FILE *ifp,
     case R_TFMP_MASS:
     case R_TFMP_BOUND:
     	if ( fscanf(ifp, "%lf %lf %lf",
-		  &(pd_ptr->etm[ce][(LOG2_MASS)]),
-		  &(pd_ptr->etm[ce][(LOG2_ADVECTION)]),
-		  &(pd_ptr->etm[ce][(LOG2_DIFFUSION)]))
+		  &(pd_ptr->etm[mtrx_index0][ce][(LOG2_MASS)]),
+		  &(pd_ptr->etm[mtrx_index0][ce][(LOG2_ADVECTION)]),
+		  &(pd_ptr->etm[mtrx_index0][ce][(LOG2_DIFFUSION)]))
 	      != 3 )
     	{
     	  sr = sprintf(err_msg,
@@ -9871,9 +9871,9 @@ rd_eq_specs(FILE *ifp,
 					   EQ_Name[ce].name1, pd_ptr->MaterialName);
     	  EH(-1, err_msg);
     	}
-    	SPF( endofstring(echo_string),"\t %.4g %.4g %.4g", pd_ptr->etm[ce][(LOG2_MASS)],
-    		  	  	  	  	   	   	   	   	   	   	   	   pd_ptr->etm[ce][(LOG2_ADVECTION)],
-														   pd_ptr->etm[ce][(LOG2_DIFFUSION)]);
+    	SPF( endofstring(echo_string),"\t %.4g %.4g %.4g", pd_ptr->etm[mtrx_index0][ce][(LOG2_MASS)],
+             pd_ptr->etm[mtrx_index0][ce][(LOG2_ADVECTION)],
+             pd_ptr->etm[mtrx_index0][ce][(LOG2_DIFFUSION)]);
       break;
       /* 
        * Four terms.... 

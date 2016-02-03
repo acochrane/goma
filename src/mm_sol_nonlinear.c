@@ -1681,7 +1681,7 @@ EH(-1,"version not compiled with frontal solver");
           case STRATIMIKOS:
             if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
               int iterations;
-              int err = stratimikos_solve(ams, &wAC[iAC][0], &bAC[iAC][0], &iterations, Stratimikos_File);
+              int err = stratimikos_solve(ams, &wAC[iAC][0], &bAC[iAC][0], &iterations, Stratimikos_File[pg->imtrx]);
               EH(err, "Error in stratimikos solve");
               aztec_stringer(AZ_normal, iterations, &stringer_AC[0]);
             } else {
@@ -3725,7 +3725,7 @@ soln_sens ( double lambda,  /*  parameter */
     case STRATIMIKOS:
       if ( strcmp( Matrix_Format,"epetra" ) == 0 ) {
         int iterations;
-        int err = stratimikos_solve(ams,  x_sens, resid_vector_sens, &iterations, Stratimikos_File);
+        int err = stratimikos_solve(ams,  x_sens, resid_vector_sens, &iterations, Stratimikos_File[pg->imtrx]);
         EH(err, "Error in stratimikos solve");
         aztec_stringer(AZ_normal, iterations, &stringer[0]);
       } else {

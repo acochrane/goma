@@ -3666,7 +3666,7 @@ assemble_momentum(dbl time,       /* current time */
 		  int k;
 		  // phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg * bf[R_TFMP_MASS]->grad_phi[i][k];
 
-		  for ( j=0; j<ei->dof[var]; j++) {
+		  for ( j=0; j<ei[pg->imtrx]->dof[var]; j++) {
 		    phi_j = bf[eqn]->phi[j]; // this might fix strange vz jacobian bug
 		    for (k = 0; k<DIM; k++) {
 		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
@@ -3700,7 +3700,7 @@ assemble_momentum(dbl time,       /* current time */
 		  /* Need a few more basis functions */
 		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE], grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
 		  int k;
-		  for ( j=0; j<ei->dof[var]; j++) {
+		  for ( j=0; j<ei[pg->imtrx]->dof[var]; j++) {
 		    phi_j = bf[eqn]->phi[j];
 		    for (k = 0; k<DIM; k++) {
 		      grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
@@ -8865,17 +8865,17 @@ load_fv(void)
 	fv->vlambda += *esp->vlambda[i] * bf[v]->phi[i];
     }
 
-  if (pdv[TFMP_PRES]) 
+  if (pdgv[TFMP_PRES]) 
     {
       v = TFMP_PRES;
-      scalar_fv_fill(esp->tfmp_pres, esp_dot->tfmp_pres, esp_old->tfmp_pres, bf[v]->phi, ei->dof[v],
+      scalar_fv_fill(esp->tfmp_pres, esp_dot->tfmp_pres, esp_old->tfmp_pres, bf[v]->phi, ei[pd->mi[v]]->dof[v],
 		     &(fv->tfmp_pres), &(fv_dot->tfmp_pres), &(fv_old->tfmp_pres));
       stateVector[v] = fv->tfmp_pres;
     } 
-  if (pdv[TFMP_SAT]) 
+  if (pdgv[TFMP_SAT]) 
     {
       v = TFMP_SAT;
-      scalar_fv_fill(esp->tfmp_sat, esp_dot->tfmp_sat, esp_old->tfmp_sat, bf[v]->phi, ei->dof[v],
+      scalar_fv_fill(esp->tfmp_sat, esp_dot->tfmp_sat, esp_old->tfmp_sat, bf[v]->phi, ei[pd->mi[v]]->dof[v],
 		     &(fv->tfmp_sat), &(fv_dot->tfmp_sat), &(fv_old->tfmp_sat));
       stateVector[v] = fv->tfmp_sat;
     } 
@@ -10687,10 +10687,10 @@ load_fv_grads(void)
     for (p=0; p<VIM; p++) fv->grad_poynt[2][p] = 0.0;
   } 
 
-  if ( pd->v[TFMP_PRES] )
+  if ( pd->gv[TFMP_PRES] )
     {
       v = TFMP_PRES;
-      dofs  = ei->dof[v];
+      dofs  = ei[pd->mi[v]]->dof[v];
 #ifdef DO_NO_UNROLL
       for ( p=0; p<VIM; p++)
 	{
@@ -10704,17 +10704,17 @@ load_fv_grads(void)
 	}
 #else
       grad_scalar_fv_fill( esp->tfmp_pres, bf[v]->grad_phi, dofs, fv->grad_tfmp_pres);
-    } else if ( zero_unused_grads &&  upd->vp[TFMP_PRES] == -1 ) {
+    } else if ( zero_unused_grads &&  upd->vp[pg->imtrx][TFMP_PRES] == -1 ) {
       for (p=0; p<VIM; p++) fv->grad_tfmp_pres[p] = 0.0;
     }
 
 #endif
 
 
-  if ( pd->v[TFMP_SAT] )
+  if ( pd->gv[TFMP_SAT] )
     {
       v = TFMP_SAT;
-      dofs  = ei->dof[v];
+      dofs  = ei[pd->mi[v]]->dof[v];
 #ifdef DO_NO_UNROLL
       for ( p=0; p<VIM; p++)
 	{
@@ -10728,7 +10728,7 @@ load_fv_grads(void)
 	}
 #else
       grad_scalar_fv_fill( esp->tfmp_sat, bf[v]->grad_phi, dofs, fv->grad_tfmp_sat);
-    } else if ( zero_unused_grads &&  upd->vp[TFMP_SAT] == -1 ) {
+    } else if ( zero_unused_grads &&  upd->vp[pg->imtrx][TFMP_SAT] == -1 ) {
       for (p=0; p<VIM; p++) fv->grad_tfmp_sat[p] = 0.0;
     }
 #endif
