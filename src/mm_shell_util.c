@@ -3432,7 +3432,7 @@ calculate_lub_q_v (
     }
   
   /* thin film multiphase flow - Reynolds [R_TFMP_BOUND] */
-  else if (pd->e[pg->imtrx][EQN] && EQN == R_TFMP_BOUND ) {
+  else if (pd->gv[EQN] && EQN == R_TFMP_BOUND ) {
       
     /******* PRECALCULATE ALL NECESSARY COMPONENTS ***********/
 

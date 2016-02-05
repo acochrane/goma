@@ -14803,7 +14803,7 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Begin sensitivities of element average velocities to nodal velocities */
       for (l = 0; l<DIM; l++) {
       	var = VELOCITY1 + l;
-      	if (pd->v[var] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG ) ) {
+      	if (pd->v[pg->imtrx][var] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG ) ) {
 	  pvar = upd->vp[pg->imtrx][var];
 	  // Loop over DOF (j)
 	  for ( j = 0; j < ei[pg->imtrx]->dof[var]; j++) {

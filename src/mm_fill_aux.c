@@ -827,14 +827,14 @@ element_velocity(dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
   dim =  pd->Num_Dim;
   
   /* parameter variables are initialized in matrix_fill */
-  
-  if (pd->i[pg->imtrx][VELOCITY1]==I_Q1)
+
+  if (pd->gv[VELOCITY1] && pd->i[pd->mi[VELOCITY1]][VELOCITY1]==I_Q1)
     {
       if (cr->MeshMotion == ARBITRARY) {
 	  for (p = 0; p < dim; p++)
 	    {
 
-	      dofs     = ei[pg->imtrx]->dof[VELOCITY1];
+	      dofs     = ei[pd->mi[VELOCITY1]]->dof[VELOCITY1];
 	      ddofs = dofs;  
 
 	      for (i = 0; i < dofs; i++)
@@ -884,11 +884,11 @@ element_velocity(dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
 	}
 	  
     }
-  else if (pd->i[pg->imtrx][VELOCITY1]==I_Q2)
+  else if (pd->gv[VELOCITY1] && pd->i[pd->mi[VELOCITY1]][VELOCITY1]==I_Q2)
     {    
       if ( cr->MeshMotion == ARBITRARY)
 	{
-	  dofs     = ei[pg->imtrx]->dof[VELOCITY1];
+	  dofs     = ei[pd->mi[VELOCITY1]]->dof[VELOCITY1];
 	  centroid_node = dofs-1;
 
 	  for( p=0; p<dim; p++)
@@ -949,13 +949,13 @@ lagged_element_velocity (dbl v_avg[DIM], dbl dv_dnode[DIM][MDE],
   
   /* parameter variables are initialized in matrix_fill */
   
-  if (pd->i[pg->imtrx][VELOCITY1]==I_Q1)
+  if (pd->gv[VELOCITY1] && pd->i[pd->mi[VELOCITY1]][VELOCITY1]==I_Q1)
     {
       if (cr->MeshMotion == ARBITRARY) {
 	  for (p = 0; p < dim; p++)
 	    {
 
-	      dofs     = ei[pg->imtrx]->dof[VELOCITY1];
+	      dofs     = ei[pd->mi[VELOCITY1]]->dof[VELOCITY1];
 	      ddofs = dofs;  
 
 	      for (i = 0; i < dofs; i++)

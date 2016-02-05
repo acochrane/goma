@@ -1537,7 +1537,7 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
       local_lumped[TFMP_RHO_MU] = 1;
     }
   }
- if ((TFMP_GRADP_X != -1 || TFMP_GRADP_Y != -1 || TFMP_GRADP_Z != -1) && (pd->gv[R_TFMP_MASS] || pd->gv[R_TFMP_BOUND]) ) {
+  if ((TFMP_GRADP_X != -1 || TFMP_GRADP_Y != -1 || TFMP_GRADP_Z != -1) && (pd->gv[R_TFMP_MASS] || pd->gv[R_TFMP_BOUND]) ) {
    if (TFMP_GRADP_X != -1) {
      local_post[TFMP_GRADP_X] = fv->grad_tfmp_pres[0];
      local_lumped[TFMP_GRADP_X] = 1;
