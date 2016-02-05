@@ -9300,7 +9300,7 @@ index_post, index_post_export);
       index_post++;
     }
 
-  if (TFMP_RHO != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_RHO != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "RHO", "[1]", "Levered Density", FALSE);
     index++;
     if (TFMP_RHO == 2)
@@ -9311,7 +9311,7 @@ index_post, index_post_export);
     TFMP_RHO = index_post;
     index_post++;
   } 
-  if (TFMP_MU != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_MU != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "MU", "[1]", "Levered Viscosity", FALSE);
     index++;
     if (TFMP_MU == 2)
@@ -9322,7 +9322,7 @@ index_post, index_post_export);
     TFMP_MU = index_post;
     index_post++;
   } 
-  if (TFMP_RHO_MU != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_RHO_MU != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "RHO_MU", "[1]", "Levered Density", FALSE);
     index++;
     if (TFMP_RHO_MU == 2)
@@ -9333,7 +9333,7 @@ index_post, index_post_export);
     TFMP_RHO_MU = index_post;
     index_post++;
   }
-  if (TFMP_GRADP_X != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_GRADP_X != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "GRADP_X", "[1]", "GradP_X", FALSE);
     index++;
     if (TFMP_GRADP_X == 2)
@@ -9344,7 +9344,7 @@ index_post, index_post_export);
     TFMP_GRADP_X = index_post;
     index_post++;
   }
-  if (TFMP_GRADP_Y != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_GRADP_Y != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "GRADP_Y", "[1]", "GradP_Y", FALSE);
     index++;
     if (TFMP_GRADP_Y == 2)
@@ -9355,7 +9355,7 @@ index_post, index_post_export);
     TFMP_GRADP_Y = index_post;
     index_post++;
   } 
-  if (TFMP_GRADP_Z != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+  if (TFMP_GRADP_Z != -1 && Num_Var_In_Type[pg->imtrx][R_TFMP_MASS] ) {
     set_nv_tkud(rd, index, 0, 0, -2, "GRADP_Z", "[1]", "GradP_Z", FALSE);
     index++;
     if (TFMP_GRADP_Z == 2)
