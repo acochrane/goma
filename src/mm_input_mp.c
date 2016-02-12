@@ -9456,6 +9456,13 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
   }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Sink", 
+				   &(mat_ptr->tfmp_sink_model), 
+				   &(mat_ptr->tfmp_sink_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+  }
   /*********************************************************************/
 
 

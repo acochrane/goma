@@ -842,6 +842,9 @@ struct Material_Properties
   int tfmp_pspg_model;
   dbl tfmp_pspg_const;
 
+  int tfmp_sink_model;
+  dbl tfmp_sink_const;
+
   int table_index;
 
   

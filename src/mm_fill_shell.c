@@ -14426,6 +14426,13 @@ assemble_shell_tfmp(double time,   /* Time */
   
   bool lag_velo = FALSE;
 
+  dbl tfmp_sink;
+  if (mp->tfmp_sink_model) {
+    tfmp_sink = mp->tfmp_sink_const;
+  } else {
+    tfmp_sink = 0;
+  }
+
   if ( af->Assemble_Residual ) {
     /* Assemble the residual mass equation */
     eqn = R_TFMP_MASS;
@@ -14473,6 +14480,10 @@ assemble_shell_tfmp(double time,   /* Time */
       		diff += gradII_P[k]*gradII_phi_i[k];
       	}
       	diff *= -h*rho*dv_dgradP;
+
+	// temp space for sink term
+	diff += tfmp_sink*phi_i*rho*dh_dtime;
+
       	diff *= dA * etm_diff_eqn;
       }      
       lec->R[peqn][i] += mass + adv + diff;
@@ -14653,6 +14664,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	      diff += gradII_phi_i[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
 	    }
 	    diff *= -h;
+
+	    // temp space for sink term
+	    diff +=phi_i*tfmp_sink*dh_dtime*phi_j;
+
 	    diff *= etm_diff_eqn;
 	  }
 	  // Assemble full Jacobian
