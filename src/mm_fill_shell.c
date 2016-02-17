@@ -14285,7 +14285,7 @@ assemble_shell_tfmp(double time,   /* Time */
   Inn(grad_S, gradII_S);
 
   double S = fv->tfmp_sat;
-  if ( S < 0 ) S = 0;
+  //if ( S < 0 ) S = 0;
   double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
 
   a_rho = mp->u_tfmp_const[0];

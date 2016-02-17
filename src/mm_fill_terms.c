@@ -2517,6 +2517,7 @@ assemble_momentum(dbl time,       /* current time */
         }
 
     }
+
   /* end Petrov-Galerkin addition */
   
   if( pd->v[POLYMER_STRESS11] )
@@ -2715,6 +2716,18 @@ assemble_momentum(dbl time,       /* current time */
 
   (void) momentum_source_term(f, df, time);
 
+  dbl tfmp_S = fv->tfmp_sat;
+  dbl tfmp_a_rho, tfmp_b_rho, tfmp_c_rho, tfmp_d_rho;
+		      
+  tfmp_a_rho = mp->u_tfmp_const[0];
+  tfmp_b_rho = mp->u_tfmp_const[1];
+  tfmp_c_rho = mp->u_tfmp_const[2];
+  tfmp_d_rho = mp->u_tfmp_const[3];
+
+  dbl tfmp_rho = tfmp_a_rho + tfmp_b_rho*tanh(tfmp_c_rho+tfmp_d_rho*tfmp_S);
+  dbl drho_dS = tfmp_b_rho*tfmp_d_rho/cosh(tfmp_c_rho + tfmp_d_rho*tfmp_S)/cosh(tfmp_c_rho + tfmp_d_rho*tfmp_S);
+  
+
   /*
    * Residuals_________________________________________________________________
    */
@@ -2850,7 +2863,8 @@ assemble_momentum(dbl time,       /* current time */
 		      porous    *= -phi_i*d_area;
 		      porous    *= porous_brinkman_etm;
 		    }
-		  else if (mp->tfmp_pspg_model == CONSTANT) {
+		  else if (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) {
+
 		    /*	  eqn  = R_MOMENTUM1 + a;
 			  peqn = upd->ep[eqn];
 		    	  bfm  = bf[eqn];
@@ -2862,7 +2876,15 @@ assemble_momentum(dbl time,       /* current time */
 		      grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];
 		    }
 		    Inn(grad_phi_pres_i, grad_II_phi_pres_i);
-		    phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg_const * grad_II_phi_pres_i[a];
+
+		    if (mp->tfmp_pspg_model == CONSTANT) {
+		      phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg_const * grad_II_phi_pres_i[a];
+		    }
+		    else if (mp->tfmp_pspg_model == VARIABLE_DENSITY) {
+		      phi_i = bf[eqn]->phi[i] + mp->tfmp_pspg_const * tfmp_rho * grad_II_phi_pres_i[a];
+		    } else {
+		      phi_i = bf[eqn]->phi[i];
+		    }
 		    porous *= phi_i * wt * fv->sdet * h3;
 		    porous *= porous_brinkman_etm;
 		  }
@@ -3386,14 +3408,20 @@ assemble_momentum(dbl time,       /* current time */
 				  porous *= porous_brinkman_etm;
 				}
 
-			      else if(mp->tfmp_pspg_model == CONSTANT) {
+			      else if(mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) { // sensitivity with respect to velocity
 				dbl grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
 				int k;
 				for (k = 0; k<DIM; k++) {
 				  grad_phi_pres_i[k] = bf[R_TFMP_MASS]->grad_phi[i][k];
 				}
+				double tfmp_kappa;
+				if (mp->tfmp_pspg_model == VARIABLE_DENSITY) {
+				  tfmp_kappa = tfmp_rho;
+				} else {
+				  tfmp_kappa = 1.0;
+				}
 				Inn(grad_phi_pres_i, grad_II_phi_pres_i);
-				porous = delta(a,b)*(phi_i + mp->tfmp_pspg_const*grad_II_phi_pres_i[a]);
+				porous = delta(a,b)*(phi_i + mp->tfmp_pspg_const*tfmp_kappa*grad_II_phi_pres_i[a]);
 				porous *= phi_j* wt * fv->sdet * h3;
 				// porous *= phi_i*phi_j* wt * h3;
 				porous *= porous_brinkman_etm;
@@ -3650,8 +3678,13 @@ assemble_momentum(dbl time,       /* current time */
 		    porous = 0.;
 		    /* Assemble */
 		    porous += -bf[eqn]->phi[i]*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
-
-		    porous += -mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*grad_II_phi_j[a]*LubAux->dv_avg_dp1[a][j];
+		    dbl tfmp_kappaJP;
+		    if (mp->tfmp_pspg_model == VARIABLE_DENSITY) {
+		      tfmp_kappaJP = tfmp_rho;
+		    } else if (mp->tfmp_pspg_model == CONSTANT) {
+		      tfmp_kappaJP = 1.0;
+		    }
+		    porous += -mp->tfmp_pspg_const*tfmp_kappaJP*grad_II_phi_pres_i[a]*grad_II_phi_j[a]*LubAux->dv_avg_dp1[a][j];
 		    porous *= fv->sdet * wt * h3;
 		    porous *= porous_brinkman_etm;
 		    lec->J[peqn][pvar][ii][j] += porous;
@@ -3686,8 +3719,16 @@ assemble_momentum(dbl time,       /* current time */
 		    porous = 0.0;
 		    /* Assemble */
 		    porous += -phi_i*( LubAux->dv_avg_dc[a][j] )*phi_j;
+		    dbl tfmp_kappaJS;
+		    dbl dkappa_dS;
+		    if (mp->tfmp_pspg_model == VARIABLE_DENSITY) {
+		      tfmp_kappaJS = tfmp_rho;
+		      dkappa_dS = drho_dS*phi_j;
+		      porous += mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*( (fv->v[a]-LubAux->v_avg[a])*dkappa_dS - tfmp_kappaJS*LubAux->dv_avg_dp1[a][j]*phi_j*grad_II_phi_j[a] );
+		    } else if (mp->tfmp_pspg_model == CONSTANT) {
+		      porous += -mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*phi_j*LubAux->dv_avg_dc[a][j];
+		    }
 
-		    porous += -mp->tfmp_pspg_const*grad_II_phi_pres_i[a]*phi_j*LubAux->dv_avg_dp1[a][j];
 		    porous *= fv->sdet * wt * h3;
 		    porous *= porous_brinkman_etm;
 		    lec->J[peqn][pvar][ii][j] += porous;
