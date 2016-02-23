@@ -2853,7 +2853,8 @@ DPRINTF(stderr,"new surface value = %g \n",pp_volume[i]->params[pd->Num_Species]
 	delta_t_old    = delta_t;
         tran->delta_t_old = delta_t_old;
         tran->time_value_old = time;
-	delta_t = tran->resolved_delta_t_min;
+	//delta_t = tran->resolved_delta_t_min;
+	delta_t = delta_t_old*0.5;
 	tran->delta_t  = delta_t;
 	tran->delta_t_avg = 0.25*(delta_t+delta_t_old+delta_t_older
 					+delta_t_oldest);
