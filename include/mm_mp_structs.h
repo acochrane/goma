@@ -842,9 +842,15 @@ struct Material_Properties
   int tfmp_pspg_model;
   dbl tfmp_pspg_const;
 
+  // TFMP variables for arbitrary sink term
   int tfmp_sink_model;
   dbl tfmp_sink_const;
 
+  // TFMP variables for wt function application
+  int tfmp_wt_model;
+  int tfmp_wt_len;
+  dbl *tfmp_wt_const;
+  
   int table_index;
 
   

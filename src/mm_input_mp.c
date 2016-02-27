@@ -3136,19 +3136,6 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
 	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
 	} 
-      else if ( !strcmp(model_name, "LAGGED_SUPG") )
-	{
-	  mat_ptr->Ewt_funcModel = LAGGED_SUPG;
-	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
-	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
-	} 
-      else if ( !strcmp(model_name, "MASS_LUMPED_SUPG") )
-	{
-	  mat_ptr->Ewt_funcModel = SUPG;
-	  fscanf(imp, "%lg",&(mat_ptr->Ewt_func));
-	  SPF(endofstring(es)," %.4g", mat_ptr->Ewt_func );
-	  mat_ptr->tfmp_mass_lump = TRUE;
-	} 
       else  
 	{
 	  SPF(err_msg,"Syntax error or invalid model for %s\n", search_string);
@@ -9462,6 +9449,68 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 				   &(mat_ptr->tfmp_sink_const), 
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
+  }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Weighting Function", 
+				   &(mat_ptr->tfmp_wtFunc), 
+				   &(mat_ptr->tfmp_sink_const), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+      if ( !strcmp(model_name, "GALERKIN") )
+	{
+	  mat_ptr->tfmp_wt_model = GALERKIN;
+	} 
+      else if ( !strcmp(model_name, "SUPG") )
+	{
+	  mat_ptr->tfmp_wt_model = SUPG;
+	  num_const = read_constants(imp, &(mat_ptr->tfmp_wt_const), 
+				     NO_SPECIES);
+	  dbl temp_tfmp_supg = mat_ptr->tfmp_wt_const[0];
+	  SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+	  safe_free(mat_ptr->tfmp_wt_const);
+	  mat_ptr->u_tfmp_const = alloc_dbl_1(6, 0.0);
+	  for (i=0; i<6; i++) {
+	    mat_ptr->tfmp_wt_const[i] = temp_tfmp_supg;
+	  }
+	  mat_ptr->tfmp_wt_len = 6;
+	} 
+      else if ( !strcmp(model_name, "INCONSISTENT_SUPG") )
+	{
+	  mat_ptr->tfmp_wt_model = SUPG;
+	  num_const = read_constants(imp, &(mat_ptr->tfmp_wt_const), 
+				     NO_SPECIES);
+	  //        
+	  // bound R = mass + adv + diff
+	  //           inp0  inp1   inp2
+	  // mass  R = mass + adv + diff
+	  //           inp3  inp4   inp5
+	  SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+	  if (num_const != 6) {
+	    EH(model_read, "INCONSISTENT_SUPG requires 6 floats");
+	  }
+	  mat_ptr->tfmp_wt_len = num_const;
+	} 
+      else if ( !strcmp(model_name, "LAGGED_SUPG") )
+	{
+	  mat_ptr->tfmp_wt_model = LAGGED_SUPG;
+	  num_const = read_constants(imp, &(mat_ptr->tfmp_wt_const), 
+				     NO_SPECIES);
+	  // This probably shouldn't be used
+	  EH(model_read, "Use a different tfmp_wt_model");
+	} 
+  }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    mat_ptr->tfmp_mass_lump = FALSE;
+    int temp_tfmp_int;
+    dbl temp_tfmp_dbl;
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Mass Lumping", 
+				   &(temp_tfmp_int), 
+				   &(temp_tfmp_dbl), 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+    if ( !strcmp(model_name, "TRUE") ) {
+	  mat_ptr->tfmp_mass_lump = TRUE;
+    } 
   }
   /*********************************************************************/
 
