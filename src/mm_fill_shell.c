@@ -14233,7 +14233,7 @@ assemble_shell_tfmp(double time,   /* Time */
                  const Exo_DB *exo)
 {
   int i, j, k, l, peqn, var, pvar;
-  dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
+  dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM], phi_i_b; // Basis funcitons (i)
   dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
   dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
   dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
@@ -14343,28 +14343,31 @@ assemble_shell_tfmp(double time,   /* Time */
   double h_elem;
   double h_elem_inv;
   double *v_cent;
+  double vII_cent[DIM];
   double *hsquared;
   double hsq[DIM];
   double dh_elem_dv_cent[DIM];
   double supg_ramptime, supg_init, supg_final;
+  double supg_const[6];
   supg_ramptime = 1e-3;
   supg_init = 0.1;
   supg_final = 0.2;
-  if (mp->Ewt_funcModel == GALERKIN) {
+  if (mp->tfmp_wt_model == GALERKIN) {
     supg = 0;
     h_elem = h_elem_inv = 0;
   }
-  else if(mp->Ewt_funcModel == SUPG ||
-	  mp->Ewt_funcModel == LAGGED_SUPG ) {
+  else if(mp->tfmp_wt_model == SUPG ||
+	  mp->tfmp_wt_model == LAGGED_SUPG ) {
     if( !pd->e[R_MOMENTUM1]) 
-	EH(-1, " must have momentum equation velocity field for shell_tfmp upwinding");
+	EH(-1, " must have brinkman term in momentum equation velocity field for shell_tfmp upwinding");
     v_cent = pg_data->v_avg;
+    Inn(&v_cent,vII_cent);
     hsquared = pg_data->hsquared;
 
     h_elem = 0;
     for ( k=0; k<DIM; k++ ) {
       hsq[k] = hsquared[k];
-      if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
+      if (hsquared[k] != 0.) h_elem += vII_cent[k]*vII_cent[k]/hsquared[k];
     }
     h_elem = sqrt(h_elem)/2;
     //    if (time < supg_ramptime) {
@@ -14372,7 +14375,7 @@ assemble_shell_tfmp(double time,   /* Time */
       supg = supg_init + (supg_final - supg_init)/supg_ramptime*time;
     } else {
     //supg = supg_final;
-      supg = mp->Ewt_func;
+      supg = mp->tfmp_wt_const[0];
     }
     if(h_elem == 0.) {
       h_elem_inv=0.;
@@ -14381,8 +14384,8 @@ assemble_shell_tfmp(double time,   /* Time */
       h_elem_inv=1./h_elem;
     }
     for ( k=0; k<DIM; k++ ) {
-      if (hsquared[k] != 0. && mp->Ewt_funcModel == SUPG) {
-      	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
+      if (hsquared[k] != 0. && mp->tfmp_wt_model == SUPG) {
+      	dh_elem_dv_cent[k] = h_elem_inv/4.*vII_cent[k]/hsquared[k];
       }
       else {
 	dh_elem_dv_cent[k] = 0.0;
@@ -14451,10 +14454,11 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
+	wt_func = phi_i;
       	if (mass_lumping) {
-	  mass += phi_i*(h*(drho_dS)* *esp_dot->tfmp_sat[i] + rho*dh_dtime);
-      	} else {
-	  mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	  mass += wt_func*(h*(drho_dS)* *esp_dot->tfmp_sat[i] + rho*dh_dtime);
+	} else {
+	  mass += wt_func*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
 	}
         mass *= dA * etm_mass_eqn;
       }
@@ -14506,10 +14510,20 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
+	if (mp->tfmp_wt_model == SUPG) {
+	  v_dot_gradII_phi_i = 0;
+	  for (k = 0; k<DIM; k++) {
+	    v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
+	  }
+	  wt_func = phi_i + supg*h_elem_inv*v_dot_gradII_phi_i;
+	} else {
+	  wt_func = phi_i;
+	}
+
       	if (mass_lumping) {
-	  mass += phi_i* (*esp_dot->tfmp_sat[i]);
+	  mass += wt_func*(*esp_dot->tfmp_sat[i]);
       	} else {
-	  mass += phi_i*fv_dot->tfmp_sat;
+	  mass += wt_func*fv_dot->tfmp_sat;
       	}
       	mass *= dA * etm_mass_eqn;
       }
@@ -14533,7 +14547,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	}
       	wt_func = phi_i;
-      	if((mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) 
+      	if((mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG) 
 	   && supg != 0.0) {
       		wt_func += supg*h_elem_inv*v_dot_gradII_phi_i;
       	}
@@ -14705,29 +14719,43 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
-	  // Assemble mass term ** mass term has no sensitivity to pressure
-	  mass = 0.0;
 	  
-	  //mass *= dA * etm_mass_eqn;
-	  // Assemble advection term
-	  adv = 0.0;
 	  gradh_dot_gradphi_j = 0.0;
 	  gradphi_i_dot_gradphi_j = 0.0;
 	  gradP_dot_gradS = 0.0;
 	  gradP_dot_gradphi_i= 0.0;
 	  gradS_dot_gradphi_j = 0.0;
+	  v_dot_gradII_phi_i = 0;
+	  for (k = 0; k<DIM; k++ ) {
+	    gradh_dot_gradphi_j       += 	gradII_h[k]*gradII_phi_j[k];
+	    gradS_dot_gradphi_j 			+=	gradII_phi_j[k]*gradII_S[k];
+	    gradphi_i_dot_gradphi_j 	+= 	gradII_phi_j[k]*gradII_phi_i[k];
+	    gradP_dot_gradphi_i 			+=	gradII_P[k]*gradII_phi_i[k];
+	    gradP_dot_gradS 					+=	gradII_P[k]*gradII_S[k];
+	    v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
+	  }
+	  phi_i_b = h_elem_inv*v_dot_gradII_phi_i;
+	  // Assemble mass term ** mass term has no sensitivity to pressure
+	  mass = 0.0;
+	  // until you apply supg consistently
+	  if (T_MASS) {
+	    if (mp->tfmp_wt_model == SUPG) {
+	      if (mass_lumping) {
+		mass += *esp_dot->tfmp_sat[i]*h_elem_inv*dv_dgradP*gradphi_i_dot_gradphi_j;
+	      } else {
+		mass += fv_dot->tfmp_sat*h_elem_inv*dv_dgradP*gradphi_i_dot_gradphi_j;
+	      }
+	    }
+	    mass *= dA * etm_mass_eqn;
+	  }
+	  // Assemble advection term
+	  adv = 0.0;
 	  
 	  if ( T_ADVECTION ) {
-	    for (k = 0; k<DIM; k++ ) {
-	      gradh_dot_gradphi_j       += 	gradII_h[k]*gradII_phi_j[k];
-	      gradS_dot_gradphi_j 			+=	gradII_phi_j[k]*gradII_S[k];
-	      gradphi_i_dot_gradphi_j 	+= 	gradII_phi_j[k]*gradII_phi_i[k];
-	      gradP_dot_gradphi_i 			+=	gradII_P[k]*gradII_phi_i[k];
-	      gradP_dot_gradS 					+=	gradII_P[k]*gradII_S[k];
-	    }
+	    
 	    adv += phi_i*(dv_dgradP)*gradS_dot_gradphi_j;
-	    if( (mp->Ewt_funcModel == SUPG) ||
-		(mp->Ewt_funcModel == LAGGED_SUPG) )  {
+	    if( (mp->tfmp_wt_model == SUPG) ||
+		(mp->tfmp_wt_model == LAGGED_SUPG) )  {
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradphi_i_dot_gradphi_j*(dv_dgradP)*gradP_dot_gradS;
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradS_dot_gradphi_j;
 	    }
@@ -14756,41 +14784,61 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+
+	  v_dot_gradII_phi_i = 0;
+	  for (k = 0; k<DIM; k++ ) {
+	    v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
+	  }
+	  phi_i_b = h_elem_inv*v_dot_gradII_phi_i;
+	  
+	  gradP_dot_gradS = 0.0;
+	  gradP_dot_gradphi_i = 0.0;
+	  gradphi_i_dot_gradphi_j = 0.0;
+	  gradP_dot_gradphi_j = 0.0;
+	  gradP_dot_gradh = 0.0;
+	  v_dot_gradII_h = 0.0;
+	  adv = 0.0;
+	  adv1 = 0.0;
+	  for ( k = 0; k < DIM ; k++) {
+	    gradP_dot_gradh += gradII_P[k]*gradII_h[k];
+	    v_dot_gradII_h += v[k]*gradII_h[k];
+	    gradP_dot_gradS += gradII_P[k]*gradII_S[k];
+	    gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+	    gradphi_i_dot_gradphi_j += gradII_phi_i[k]*gradII_phi_j[k];
+	    gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
+	    dv_dSj[k] = phi_j*dv_dS[k];
+	    adv1 += gradII_h[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
+	  }
+	    
+	  adv += phi_i*( (dv_dgradP)*(gradP_dot_gradphi_j + gradP_dot_gradS/mu*phi_j*dmu_dS) );
+
 	  // Assemble mass term
 	  mass = 0.0;
 	  if( T_MASS ) {
+	    if (mp->tfmp_wt_model == SUPG ) {
+	      supg_const[1] = 1.;
+	    } else {
+	      supg_const[1] = 0.0;
+	    }
 	    if (mass_lumping) {
 	      if (i == j) {
-		mass += phi_i*(1+2*tt)/delta_t;
+		// no supg
+		mass += phi_i*(1+2*tt)/delta_t; 
+		mass += supg_const[1]*phi_i_b*(1+2*tt)/delta_t;
+		mass += supg_const[1]*(*esp_dot->tfmp_sat[i])*h_elem_inv*gradP_dot_gradphi_i*dv_dS_constant;
 	      }
+
 	    } else {
-	      mass += phi_i*phi_j*((1+2*tt)/delta_t);
+		mass += phi_i_b*(1+2*tt)/delta_t;
+		mass += supg_const[1]*fv_dot->tfmp_sat*h_elem_inv*gradP_dot_gradphi_i*dv_dS_constant*phi_j;
+		mass += supg_const[1]*phi_i*phi_j*((1+2*tt)/delta_t);
 	    }
 	    //mass += phi_i*phi_j*((1+2*tt)/delta_t);
 	    mass *= etm_mass_eqn;
 	  }
 	  // Assemble advection term
-	  adv = 0.0;
-	  adv1 = 0.0;
-	  if ( T_ADVECTION  ) {
-	    gradP_dot_gradS = 0.0;
-	    gradP_dot_gradphi_i = 0.0;
-	    gradphi_i_dot_gradphi_j = 0.0;
-	    gradP_dot_gradphi_j = 0.0;
-	    gradP_dot_gradh = 0.0;
-	    v_dot_gradII_h = 0.0;
-	    for ( k = 0; k < DIM ; k++) {
-	      gradP_dot_gradh += gradII_P[k]*gradII_h[k];
-	      v_dot_gradII_h += v[k]*gradII_h[k];
-	      gradP_dot_gradS += gradII_P[k]*gradII_S[k];
-	      gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
-	      gradphi_i_dot_gradphi_j += gradII_phi_i[k]*gradII_phi_j[k];
-	      gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
-	      dv_dSj[k] = phi_j*dv_dS[k];
-	      adv1 += gradII_h[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
-	    }
-	    
-	    adv += phi_i*( (dv_dgradP)*(gradP_dot_gradphi_j + gradP_dot_gradS/mu*phi_j*dmu_dS) );
+	  if ( T_ADVECTION ) {
+
 	    if((mp->Ewt_funcModel == SUPG) || (mp->Ewt_funcModel == SUPG)
 	       && supg != 0.0) {
 	      adv += supg*h_elem_inv*(dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradphi_i * (dv_dgradP)*gradP_dot_gradS;
@@ -14819,7 +14867,7 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Begin sensitivities of element average velocities to nodal velocities */
       for (l = 0; l<DIM; l++) {
       	var = VELOCITY1 + l;
-      	if (pd->v[var] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG ) ) {
+      	if (pd->v[var] && (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG ) ) {
 	  pvar = upd->vp[var];
 	  // Loop over DOF (j)
 	  for ( j = 0; j < ei->dof[var]; j++) {
@@ -14831,6 +14879,12 @@ assemble_shell_tfmp(double time,   /* Time */
 	    Inn(grad_phi_j, gradII_phi_j);
 	    //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	    // Assemble SU/PG term sensitivity to VELOCITY1
+	    // Mass term
+	    mass = 0.0;
+	    if( T_MASS ) {
+	      mass += fv_dot->tfmp_sat*(-h_elem_inv*h_elem_inv*h_elem_inv)*vII_cent[l]/hsquared[l]*phi_j*pg_data->dv_dnode[l][j];
+	    }
+	    // Advection term
 	    adv = 0.0;
 	    if( T_ADVECTION ) {
 	      gradP_dot_gradphi_i = 0.0;

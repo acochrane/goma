@@ -2603,7 +2603,7 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	if (pd->e[R_TFMP_BOUND] && (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG)  ) {
+	if (pd->e[R_TFMP_BOUND] && (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG)  ) {
 	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
 	} else {
 	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
@@ -2863,7 +2863,7 @@ assemble_momentum(dbl time,       /* current time */
 		      porous    *= -phi_i*d_area;
 		      porous    *= porous_brinkman_etm;
 		    }
-		  else if (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) {
+		  else if (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG) {
 
 		    /*	  eqn  = R_MOMENTUM1 + a;
 			  peqn = upd->ep[eqn];
@@ -3408,7 +3408,7 @@ assemble_momentum(dbl time,       /* current time */
 				  porous *= porous_brinkman_etm;
 				}
 
-			      else if(mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) { // sensitivity with respect to velocity
+			      else if(mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG) { // sensitivity with respect to velocity
 				dbl grad_phi_pres_i[DIM], grad_II_phi_pres_i[DIM];
 				int k;
 				for (k = 0; k<DIM; k++) {

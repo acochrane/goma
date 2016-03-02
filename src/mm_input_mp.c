@@ -9452,8 +9452,8 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   }
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Weighting Function", 
-				   &(mat_ptr->tfmp_wtFunc), 
-				   &(mat_ptr->tfmp_sink_const), 
+				   &(mat_ptr->tfmp_wt_model), 
+				   &(mat_ptr->tfmp_wt_const), 
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
       if ( !strcmp(model_name, "GALERKIN") )
@@ -9468,7 +9468,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 	  dbl temp_tfmp_supg = mat_ptr->tfmp_wt_const[0];
 	  SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
 	  safe_free(mat_ptr->tfmp_wt_const);
-	  mat_ptr->u_tfmp_const = alloc_dbl_1(6, 0.0);
+	  mat_ptr->tfmp_wt_const = alloc_dbl_1(6, 0.0);
 	  for (i=0; i<6; i++) {
 	    mat_ptr->tfmp_wt_const[i] = temp_tfmp_supg;
 	  }
