@@ -14511,7 +14511,7 @@ assemble_shell_tfmp(double time,   /* Time */
       mass = 0.0;
       if( T_MASS ) {
 	if (mp->tfmp_wt_model == SUPG) {
-	  v_dot_gradII_phi_i = 0;
+	  v_dot_gradII_phi_i = 0.0;
 	  for (k = 0; k<DIM; k++) {
 	    v_dot_gradII_phi_i += v[k]*gradII_phi_i[k];
 	  }
@@ -14551,7 +14551,6 @@ assemble_shell_tfmp(double time,   /* Time */
       		wt_func += supg*h_elem_inv*v_dot_gradII_phi_i;
       	}
       	adv *= wt_func;
-	adv = 1;
       	//adv += phi_i*S/h*v_dot_gradII_h;
       	adv *= dA * etm_adv_eqn;
       }
@@ -14823,9 +14822,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	      }
 
 	    } else {
-		mass += supg*supg_const[1]*phi_i_b*(1+2*tt)/delta_t;
+		mass += supg*supg_const[1]*phi_i_b*(1+2*tt)/delta_t*phi_j;
 		mass += supg*supg_const[1]*fv_dot->tfmp_sat*h_elem_inv*gradP_dot_gradphi_i*dv_dS_constant*phi_j;
-		mass += supg*supg_const[1]*phi_i*phi_j*((1+2*tt)/delta_t);
+		//		mass += supg*supg_const[1]*phi_i*phi_j*((1+2*tt)/delta_t);
 	    }
 	    mass += phi_i*phi_j*((1+2*tt)/delta_t);
 	    mass *= etm_mass_eqn;
@@ -14837,12 +14836,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	    //for (k = 0; k<DIM; k++) {
 	    //  adv1 += gradII_h[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
 	    //}
-	    //adv += phi_i*( (dv_dgradP)*(gradP_dot_gradphi_j + gradP_dot_gradS/mu*phi_j*dmu_dS) );
-	    adv = 0.0;
-	    //if((mp->tfmp_wt_model == SUPG)) {
-	    //  adv += supg*h_elem_inv*(dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradphi_i * (dv_dgradP)*gradP_dot_gradS;
-	    //  adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i * ( (dv_dgradP)*(-1.0/mu)*phi_j*dmu_dS*gradP_dot_gradS + (dv_dgradP)*gradP_dot_gradphi_j );
-	    //}
+	    adv += -phi_i*h*h/12.*( gradP_dot_gradphi_j/mu + -gradP_dot_gradS/mu/mu*phi_j*dmu_dS );
+	    if((mp->tfmp_wt_model == SUPG)) {
+	      adv += supg*h_elem_inv*h*h*h*h/12./12.*gradP_dot_gradphi_i*( gradP_dot_gradS*(-2.)/mu/mu/mu*dmu_dS*phi_j + gradP_dot_gradphi_j/mu/mu);
+	    }
 	    //adv += phi_i*phi_j/h*v_dot_gradII_h;
 	    //adv += phi_i/h*S*adv1;
 	    adv *= etm_adv_eqn;
@@ -14858,10 +14855,6 @@ assemble_shell_tfmp(double time,   /* Time */
 	    diff *= etm_diff_eqn;
 	  }
 	  // Assemble full Jacobian
-	  mass = 0.0;
-	  adv = 0.0;
-	  diff = 0.0;
-	  dbl *crazyjack = &lec->J[peqn][pvar][1][1];
 	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
 	  
       	} // End of loop over DOF (j)
