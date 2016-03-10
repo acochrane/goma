@@ -522,7 +522,7 @@ struct Material_Properties
      *                     inventory terms is carried out. 
      */
   int Porous_Mass_Lump;
-  int tfmp_mass_lump;
+
   dbl porous_diffusivity[MAX_PMV];
   int PorousDiffusivityModel[MAX_PMV];
   int PorousTimeIntegration[MAX_PMV];         /* STANDARD or TAYLOR_GALERKIN */
@@ -851,6 +851,8 @@ struct Material_Properties
   int tfmp_wt_len;
   dbl *tfmp_wt_const;
   
+  int tfmp_mass_lump;
+
   int table_index;
 
   

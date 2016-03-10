@@ -775,7 +775,7 @@ matrix_fill(
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
       }
   
-  if ((mp->Ewt_funcModel == SUPG && pde[R_TFMP_BOUND])) {
+  if ((mp->tfmp_wt_model == SUPG && pde[R_TFMP_BOUND])) {
     h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
     element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
   }

@@ -3441,7 +3441,7 @@ calculate_lub_q_v (
 
     dbl S;
 
-    if (mp->Ewt_funcModel == SUPG || mp->Ewt_funcModel == LAGGED_SUPG) {
+    if (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG) {
       for (k = 0; k<DIM; k++) {
 	grad_P[k] = fv->grad_tfmp_pres[k];
       }

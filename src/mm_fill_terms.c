@@ -3683,6 +3683,8 @@ assemble_momentum(dbl time,       /* current time */
 		      tfmp_kappaJP = tfmp_rho;
 		    } else if (mp->tfmp_pspg_model == CONSTANT) {
 		      tfmp_kappaJP = 1.0;
+		    } else {
+		      tfmp_kappaJP = 0.0;
 		    }
 		    porous += -mp->tfmp_pspg_const*tfmp_kappaJP*grad_II_phi_pres_i[a]*grad_II_phi_j[a]*LubAux->dv_avg_dp1[a][j];
 		    porous *= fv->sdet * wt * h3;

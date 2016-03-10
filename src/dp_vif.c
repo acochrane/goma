@@ -1805,11 +1805,21 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->tfmp_pspg_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_pspg_const, 1, MPI_DOUBLE);
       /*
-       * TFMP pspg model 
+       * TFMP sink model 
        */
       ddd_add_member(n, &mp_glob[i]->tfmp_sink_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_sink_const, 1, MPI_DOUBLE);
-		     
+      /*
+       * TFMP weighting function model 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_wt_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_wt_const, 1, MPI_DOUBLE);
+      /*
+       * TFMP mass lumping 
+       */
+      ddd_add_member(n, &mp_glob[i]->tfmp_mass_lump, 1, MPI_INT);
+      
+            
 
       /*
        * Loop over user-defined constants lists of lengths.
@@ -1871,6 +1881,7 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->diffusivity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->saturation_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_wt_len, 1, MPI_INT);
 
       /*
        * Material property constants that are vectors over the concentration
@@ -2910,6 +2921,8 @@ ark_landing()
 
       dalloc( m->len_u_tfmp_const,
               m->    u_tfmp_const);
+      dalloc( m->tfmp_wt_len,
+              m->tfmp_wt_const);
 
 
 
@@ -3275,6 +3288,9 @@ noahs_dove()
 
     crdv( m->len_u_tfmp_const,
 	  m->    u_tfmp_const);
+    crdv( m->tfmp_wt_len,
+	  m->    tfmp_wt_const);
+    
 
     /*
      *  Add species names
