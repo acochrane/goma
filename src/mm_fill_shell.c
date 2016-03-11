@@ -14361,13 +14361,13 @@ assemble_shell_tfmp(double time,   /* Time */
     if( !pd->e[R_MOMENTUM1]) 
 	EH(-1, " must have brinkman term in momentum equation velocity field for shell_tfmp upwinding");
     v_cent = pg_data->v_avg;
-    Inn(&v_cent,vII_cent);
+    //Inn(&v_cent,vII_cent);
     hsquared = pg_data->hsquared;
 
     h_elem = 0;
     for ( k=0; k<DIM; k++ ) {
       hsq[k] = hsquared[k];
-      if (hsquared[k] != 0.) h_elem += vII_cent[k]*vII_cent[k]/hsquared[k];
+      if (hsquared[k] != 0.) h_elem += v_cent[k]*v_cent[k]/hsquared[k];
     }
     h_elem = sqrt(h_elem)/2;
     //    if (time < supg_ramptime) {
@@ -14385,7 +14385,7 @@ assemble_shell_tfmp(double time,   /* Time */
     }
     for ( k=0; k<DIM; k++ ) {
       if (hsquared[k] != 0. && mp->tfmp_wt_model == SUPG) {
-      	dh_elem_dv_cent[k] = h_elem_inv/4.*vII_cent[k]/hsquared[k];
+      	dh_elem_dv_cent[k] = h_elem_inv/4.*v_cent[k]/hsquared[k];
       }
       else {
 	dh_elem_dv_cent[k] = 0.0;
@@ -14884,7 +14884,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	    // Mass term
 	    mass = 0.0;
 	    if( T_MASS ) {
-	      mass += fv_dot->tfmp_sat*(-h_elem_inv*h_elem_inv*h_elem_inv)*vII_cent[l]/hsquared[l]*phi_j*pg_data->dv_dnode[l][j];
+	      mass += fv_dot->tfmp_sat*(-h_elem_inv*h_elem_inv*h_elem_inv)*v_cent[l]/hsquared[l]*phi_j*pg_data->dv_dnode[l][j];
 	    }
 	    // Advection term
 	    adv = 0.0;
