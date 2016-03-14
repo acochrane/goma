@@ -14342,9 +14342,9 @@ assemble_shell_tfmp(double time,   /* Time */
 
   double h_elem;
   double h_elem_inv;
-  double *v_cent;
+  const double *v_cent;
   double vII_cent[DIM];
-  double *hsquared;
+  const double *hsquared;
   double hsq[DIM];
   double dh_elem_dv_cent[DIM];
   double supg_ramptime, supg_init, supg_final;
@@ -14356,8 +14356,7 @@ assemble_shell_tfmp(double time,   /* Time */
     supg = 0;
     h_elem = h_elem_inv = 0;
   }
-  else if(mp->tfmp_wt_model == SUPG ||
-	  mp->tfmp_wt_model == LAGGED_SUPG ) {
+  else if(mp->tfmp_wt_model == SUPG){
     if( !pd->e[R_MOMENTUM1]) 
 	EH(-1, " must have brinkman term in momentum equation velocity field for shell_tfmp upwinding");
     v_cent = pg_data->v_avg;
@@ -14462,31 +14461,33 @@ assemble_shell_tfmp(double time,   /* Time */
 	}
         mass *= dA * etm_mass_eqn;
       }
-      /* Assemble advection term */
+      /* Assemble gradh advection term */
       adv = 0.0;
       if ( T_ADVECTION ) {
-	if (lag_velo == TRUE) {
-	  for ( k = 0; k<DIM; k++ ) {
-	    adv += v_old[k]*gradII_h[k];
-	  }
-	} else {
-	  for ( k = 0; k<DIM; k++ ) {
+	for ( k = 0; k<DIM; k++ ) {
 	    adv += v[k]*gradII_h[k];
-	  }
 	}
       	adv *= phi_i*rho;
       	adv *= dA * etm_adv_eqn;
       }
-      /* Assemble diffusion term */
+      /* Assemble mass advection term */
       diff = 0.0;
+      gradP_dot_gradh = 0.0;
+      gradP_dot_gradphi_i = 0.0;
+      gradP_dot_gradS = 0.0;
+            
       if( T_DIFFUSION ) {
       	for ( k = 0; k<DIM; k++) {
-      		diff += gradII_P[k]*gradII_phi_i[k];
+	  gradP_dot_gradh     += gradII_h[k]*gradII_P[k];
+	  gradP_dot_gradphi_i += gradII_phi_i[k]*gradII_P[k];
+	  gradP_dot_gradS     += gradII_S[k]*gradII_P[k];
       	}
-      	diff *= -h*rho*dv_dgradP;
+	//      	diff += -(-h*h/12.0/mu)*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
 
+	diff += phi_i*(-h*h*h/12.0/mu)*drho_dS*gradP_dot_gradS;
+	//	diff = 1.0;
 	// temp space for sink term
-	diff += tfmp_sink*phi_i*rho*dh_dtime;
+	//	diff += tfmp_sink*phi_i*rho*dh_dtime;
 
       	diff *= dA * etm_diff_eqn;
       }      
@@ -14547,7 +14548,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	}
       	wt_func = phi_i;
-      	if(mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG) {
+      	if(mp->tfmp_wt_model == SUPG) {
       		wt_func += supg*h_elem_inv*v_dot_gradII_phi_i;
       	}
       	adv *= wt_func;
@@ -14600,11 +14601,21 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+
+	  gradh_dot_gradphi_j = 0.0;
+	  gradS_dot_gradphi_j = 0.0;
+	  gradphi_i_dot_gradphi_j = 0.0;
+	  for (k = 0; k<DIM; k++ ) {
+	    gradh_dot_gradphi_j       += 	gradII_h[k]*gradII_phi_j[k];
+	    gradS_dot_gradphi_j       +=	gradII_S[k]*gradII_phi_j[k];
+	    gradphi_i_dot_gradphi_j   += 	gradII_phi_i[k]*gradII_phi_j[k];
+	  }
+
 	  // Assemble mass term
 	  mass = 0.0;
 	  
 	  //mass *= dA * etm_mass_eqn;
-	  // Assemble advection term
+	  // Assemble gradh advection term
 	  adv = 0.0;
 	  // dgradP_dPj = gradII_phi_j
 	  if ( T_ADVECTION ) {
@@ -14614,17 +14625,14 @@ assemble_shell_tfmp(double time,   /* Time */
 	    adv *= phi_i*rho*dv_dgradP;
 	    adv *= etm_adv_eqn;
 	  }
-	  // Assemble diffusion term
+	  // Assemble mass advection term
 	  diff = 0.0;
 	  
 	  if ( T_DIFFUSION ) {
-	    for ( k = 0; k < DIM ; k++) {
-	      diff += gradII_phi_j[k]*gradII_phi_i[k];
-	    }
-	    diff *= -h*rho*dv_dgradP;
+	    //	    diff += -(-h*h/12.0/mu)*(rho*h*gradphi_i_dot_gradphi_j + rho*phi_i*gradh_dot_gradphi_j + phi_i*h*drho_dS*gradS_dot_gradphi_j);
+	    diff += phi_i*(-h*h*h/12.0/mu)*drho_dS*gradS_dot_gradphi_j;
 	  }
 	  diff *= etm_diff_eqn;
-	  
 	  // Assemble full Jacobian
 	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
 	  
@@ -14644,6 +14652,18 @@ assemble_shell_tfmp(double time,   /* Time */
 	  }
 	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+
+	  gradP_dot_gradh = 0.0;
+	  gradP_dot_gradphi_i = 0.0;
+	  gradP_dot_gradphi_j = 0.0;
+	  gradP_dot_gradS = 0.0;
+	  for (k = 0; k<DIM; k++ ) {
+	    gradP_dot_gradh           += 	gradII_P[k]*gradII_h[k];
+	    gradP_dot_gradphi_i       +=	gradII_P[k]*gradII_phi_i[k];
+	    gradP_dot_gradphi_j       += 	gradII_P[k]*gradII_phi_j[k];
+	    gradP_dot_gradS           +=        gradII_P[k]*gradII_S[k];
+	  }
+
 	  // Assemble mass term
 	  mass = 0.0;
 	  if( T_MASS ) {
@@ -14669,17 +14689,15 @@ assemble_shell_tfmp(double time,   /* Time */
 	    adv *= phi_i;
 	    adv *= etm_adv_eqn;
 	  }
-	  // Assemble diffusion term
+	  // Assemble mass advection term
 	  diff = 0.0;
 	  if ( T_DIFFUSION ) {
-	    for ( k = 0; k < DIM ; k++) {
-	      dv_dSj[k] = phi_j*dv_dS[k];
-	      diff += gradII_phi_i[k]*(rho*dv_dSj[k] + v[k]*drho_dS*phi_j);
-	    }
-	    diff *= -h;
+	    //	    diff += -(-h*h/12.0/mu)*(drho_dS*phi_j*h*gradP_dot_gradphi_i+ drho_dS*phi_j*phi_i*gradP_dot_gradh + phi_i*h*gradP_dot_gradphi_j);
+	    //	    diff += -(-h*h/12.0)*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
+	    diff = phi_i*(-h*h*h/12.0/mu)*drho_dS*gradP_dot_gradphi_j;
 
 	    // temp space for sink term
-	    diff +=phi_i*tfmp_sink*dh_dtime*phi_j;
+	    // diff +=phi_i*tfmp_sink*dh_dtime*phi_j;
 
 	    diff *= etm_diff_eqn;
 	  }
@@ -14753,8 +14771,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  if ( T_ADVECTION ) {
 	    
 	    adv += phi_i*(dv_dgradP)*gradS_dot_gradphi_j;
-	    if( (mp->tfmp_wt_model == SUPG) ||
-		(mp->tfmp_wt_model == LAGGED_SUPG) )  {
+	    if( (mp->tfmp_wt_model == SUPG) )  {
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradphi_i_dot_gradphi_j*(dv_dgradP)*gradP_dot_gradS;
 	      adv += supg*h_elem_inv*(dv_dgradP)*gradP_dot_gradphi_i*(dv_dgradP)*gradS_dot_gradphi_j;
 	    }
@@ -14863,13 +14880,8 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Begin sensitivities of element average velocities to nodal velocities */
       for (l = 0; l<DIM; l++) {
       	var = VELOCITY1 + l;
-	if (pd->v[var]) {
-	  //  adv = 0.1;
-	}
-	if (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG ) {
-	  //  adv = 0.2;
-	}
-      	if (pd->v[var] && (mp->tfmp_wt_model == SUPG || mp->tfmp_wt_model == LAGGED_SUPG ) ) {
+
+      	if (pd->v[var] && (mp->tfmp_wt_model == SUPG)) {
 	  pvar = upd->vp[var];
 	  // Loop over DOF (j)
 	  for ( j = 0; j < ei->dof[var]; j++) {

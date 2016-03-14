@@ -9367,7 +9367,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Properties", 
 				   &(mat_ptr->tfmp_model), 
-				   mat_ptr->u_tfmp_const, 
+				   (mat_ptr->u_tfmp_const), 
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
 
@@ -9453,7 +9453,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Weighting Function", 
 				   &(mat_ptr->tfmp_wt_model), 
-				   &(mat_ptr->tfmp_wt_const), 
+				   (mat_ptr->tfmp_wt_const), 
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
       if ( !strcmp(model_name, "GALERKIN") )
