@@ -14300,8 +14300,9 @@ assemble_shell_tfmp(double time,   /* Time */
   double rho = a_rho + b_rho*tanh(c_rho+d_rho*S);
   double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
   //double S_cap = fv->tfmp_sat;
-  double drho_dS, dmu_dS;
+  double drho_dS, d2rho_dS2, dmu_dS;
   drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+  d2rho_dS2 = -2*b_rho*d_rho*d_rho*tanh(c_rho+d_rho*S)/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
   dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
   /* if (S_cap < 0 ) {
     S_cap = 0;
@@ -14478,13 +14479,13 @@ assemble_shell_tfmp(double time,   /* Time */
             
       if( T_DIFFUSION ) {
       	for ( k = 0; k<DIM; k++) {
-	  gradP_dot_gradh     += gradII_h[k]*gradII_P[k];
-	  gradP_dot_gradphi_i += gradII_phi_i[k]*gradII_P[k];
-	  gradP_dot_gradS     += gradII_S[k]*gradII_P[k];
+	  gradP_dot_gradh     += gradII_P[k]*gradII_h[k];
+	  gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+	  gradP_dot_gradS     += gradII_P[k]*gradII_S[k];
       	}
-	//      	diff += -(-h*h/12.0/mu)*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
-
+	diff += -(-h*h/12.0/mu)*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
 	diff += phi_i*(-h*h*h/12.0/mu)*drho_dS*gradP_dot_gradS;
+
 	//	diff = 1.0;
 	// temp space for sink term
 	//	diff += tfmp_sink*phi_i*rho*dh_dtime;
@@ -14629,7 +14630,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  diff = 0.0;
 	  
 	  if ( T_DIFFUSION ) {
-	    //	    diff += -(-h*h/12.0/mu)*(rho*h*gradphi_i_dot_gradphi_j + rho*phi_i*gradh_dot_gradphi_j + phi_i*h*drho_dS*gradS_dot_gradphi_j);
+	    diff += -(-h*h/12.0/mu)*(rho*h*gradphi_i_dot_gradphi_j + rho*phi_i*gradh_dot_gradphi_j + phi_i*h*drho_dS*gradS_dot_gradphi_j);
 	    diff += phi_i*(-h*h*h/12.0/mu)*drho_dS*gradS_dot_gradphi_j;
 	  }
 	  diff *= etm_diff_eqn;
@@ -14646,9 +14647,9 @@ assemble_shell_tfmp(double time,   /* Time */
       	// Loop over DOF (j)
       	for ( j = 0; j < ei->dof[var]; j++) {
 	  // Load basis functions
-	  phi_j = bf[eqn]->phi[j];
+	  phi_j = bf[var]->phi[j];
 	  for (k = 0; k<DIM; k++) {
-	    grad_phi_j[k] = bf[eqn]->grad_phi[j][k];
+	    grad_phi_j[k] = bf[var]->grad_phi[j][k];
 	  }
 	  Inn(grad_phi_j, gradII_phi_j);
 	  //ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
@@ -14658,10 +14659,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	  gradP_dot_gradphi_j = 0.0;
 	  gradP_dot_gradS = 0.0;
 	  for (k = 0; k<DIM; k++ ) {
-	    gradP_dot_gradh           += 	gradII_P[k]*gradII_h[k];
-	    gradP_dot_gradphi_i       +=	gradII_P[k]*gradII_phi_i[k];
-	    gradP_dot_gradphi_j       += 	gradII_P[k]*gradII_phi_j[k];
-	    gradP_dot_gradS           +=        gradII_P[k]*gradII_S[k];
+	    gradP_dot_gradh     += gradII_P[k]*gradII_h[k];
+	    gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+	    gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
+	    gradP_dot_gradS     += gradII_P[k]*gradII_S[k];
 	  }
 
 	  // Assemble mass term
@@ -14692,10 +14693,11 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Assemble mass advection term
 	  diff = 0.0;
 	  if ( T_DIFFUSION ) {
-	    //	    diff += -(-h*h/12.0/mu)*(drho_dS*phi_j*h*gradP_dot_gradphi_i+ drho_dS*phi_j*phi_i*gradP_dot_gradh + phi_i*h*gradP_dot_gradphi_j);
-	    //	    diff += -(-h*h/12.0)*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
-	    diff = phi_i*(-h*h*h/12.0/mu)*drho_dS*gradP_dot_gradphi_j;
-
+	    diff += -(-h*h/12.0/mu)*(drho_dS*phi_j*h*gradP_dot_gradphi_i + drho_dS*phi_j*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradphi_j + phi_i*h*d2rho_dS2*phi_j*gradP_dot_gradS);
+	    diff += -(-h*h/12.0)*(-1/mu/mu)*dmu_dS*phi_j*(rho*h*gradP_dot_gradphi_i + rho*phi_i*gradP_dot_gradh + phi_i*h*drho_dS*gradP_dot_gradS);
+	    diff += phi_i*(-h*h*h/12.0/mu)*drho_dS*gradP_dot_gradphi_j;
+	    diff += phi_i*phi_j*(-h*h*h/12.0)*(-1/mu/mu)*drho_dS*dmu_dS*gradP_dot_gradS;
+	    diff += phi_i*phi_j*(-h*h*h/12.0/mu)*d2rho_dS2*gradP_dot_gradS;
 	    // temp space for sink term
 	    // diff +=phi_i*tfmp_sink*dh_dtime*phi_j;
 
