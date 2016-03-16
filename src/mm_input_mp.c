@@ -9397,15 +9397,15 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       
       a_rho = (rho_l+rho_g)/2;
       b_rho = (rho_l-rho_g)/2;
-      beta_rho *= b_rho;
-      c_rho = atanh((rho_g + beta_rho - a_rho)/b_rho);
-      d_rho = atanh((rho_l - beta_rho - a_rho)/b_rho) - c_rho;
+      //      beta_rho *= b_rho;
+      c_rho = atanh((rho_g*(1 + beta_rho) - a_rho)/b_rho);
+      d_rho = atanh((rho_l*(1 - beta_rho) - a_rho)/b_rho) - c_rho;
       
       a_mu = (mu_l+mu_g)/2;
       b_mu = (mu_l-mu_g)/2;
-      beta_mu *= b_mu;
-      c_mu = atanh((mu_g + beta_mu - a_mu)/b_mu);
-      d_mu = atanh((mu_l - beta_mu - a_mu)/b_mu) - c_mu;
+      //      beta_mu *= b_mu;
+      c_mu = atanh((mu_g*(1 + beta_mu) - a_mu)/b_mu);
+      d_mu = atanh((mu_l*(1 - beta_mu) - a_mu)/b_mu) - c_mu;
       //printf("we have done something in the mp_read\n");
       mat_ptr->u_tfmp_const = alloc_dbl_1(8, 0.0);
       
