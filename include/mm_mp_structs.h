@@ -838,6 +838,11 @@ struct Material_Properties
   int tfmp_diff_model;
   dbl tfmp_diff_const;
 
+  // TFMP variables for wt function application
+  int tfmp_wt_model;
+  int tfmp_wt_len;
+  dbl tfmp_wt_const;
+
   int table_index;
 
   

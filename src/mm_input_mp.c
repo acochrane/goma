@@ -9435,7 +9435,44 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_diff_const );
       
       }*/
-  }  
+  }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    strcpy(search_string,"Thin Film Multiphase Weight Function");
+    model_read = look_for_mat_prop(imp, search_string, 
+				   &(mat_ptr->Ewt_funcModel), 
+				   &(mat_ptr->Ewt_func), NO_USER, NULL,
+				   model_name, SCALAR_INPUT, &NO_SPECIES,es);
+    if(strncmp(model_name," ",1) != 0 ) {
+      if ( !strcmp(model_name, "GALERKIN") ) {
+	mat_ptr->tfmp_wt_model = GALERKIN;
+	mat_ptr->tfmp_wt_len = 0.;
+	SPF(es, "\t(%s = %s)",search_string,"GALERKIN");
+      } 
+      else if ( !strcmp(model_name, "SUPG") ) {
+	mat_ptr->tfmp_wt_model = SUPG;
+	fscanf(imp, "%lg",&(mat_ptr->tfmp_wt_const));
+	SPF(es, "\t(%s = %s)",search_string,"SUPG");
+	SPF(endofstring(es)," %.4g", mat_ptr->tfmp_wt_const );
+      } 
+      else if ( !strcmp(model_name, "SUPG_SCHUNK") ) {
+	mat_ptr->tfmp_wt_model = SUPG_SCHUNK;
+	fscanf(imp, "%lg",&(mat_ptr->tfmp_wt_const));
+	SPF(es, "\t(%s = %s)",search_string,"SUPG_SCHUNK");
+	SPF(endofstring(es)," %.4g", mat_ptr->tfmp_wt_const );
+      } 
+      else {
+	SPF(err_msg,"Syntax error or invalid model for %s\n", search_string);
+	EH(-1,err_msg);
+      }
+    }
+    else {
+      mat_ptr->tfmp_wt_model = GALERKIN;
+      mat_ptr->tfmp_wt_len = 0.;
+      SPF(es, "\t(%s = %s)",search_string,"GALERKIN");
+    }
+  }
+  ECHO(es, echo_file);
+  
   /*********************************************************************/
 
 

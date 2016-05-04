@@ -4013,6 +4013,67 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
+tfmp_PGWF (int eqn,
+	   double supg,
+	   double *phi_i,
+	   double *phi_j,
+	   double gradII_phi_i[DIM],
+	   double S,
+	   double P,
+	   double vII[DIM],
+	   double v_cent[DIM],
+	   double h_squared[DIM],
+	   double gradII_S[DIM],
+	   double gradII_P[DIM],
+	   double dv_cent_dvj,
+	   double *wt_func,
+	   double dwt_func_dvj[DIM],
+	   double *dwt_func_dS,
+	   double *dwt_func_dP) {
+  // compute Petrov-Galerkin weighting functions
+  int k;
+  double k_supg, h_supg_elem[DIM], v_mag_squared, vII_dot_gradII_phi_i;
+  
+  switch (mp->tfmp_wt_model) {
+  case GALERKIN:
+    wt_func = phi_i;
+    for (k=0; k<DIM; k++) {
+      dwt_func_dv[k] = 0.0;
+    }
+    dwt_func_dS = 0.0;
+    dwt_func_dP = 0.0;
+    break;
+  case SUPG: // 1982 Alexander Brooks and Thomas Hughes
+    k_supg = 0.0;
+    v_mag_squared = 0.0;
+    vII_dot_gradII_phi_i = 0.0; 
+    for (k=0, k<DIM; k++) {
+      h_supg_elem[k] = sqrt(h_squared[k]);
+      k_supg += v_cent[k]*h_supg_elem[k];
+      v_mag_squared += vII[k]*vII[k];
+      vII_dot_gradII_phi_i += vII[k]*gradII_phi_i[k];
+    }
+    k_supg *= 0.5;
+    
+    wt_func = phi_i;
+    wt_func += supg*k_supg*vII_dot_gradII_phi_i/v_mag_squared;
+    
+    for (k=0; k<DIM; k++) {
+      dwt_func_dvj[k] = k_supg*( vII_dot_gradII_phi_i*(2*vII[k]*phi_j/v_mag_squared/v_mag_squared) 
+				 + gradII_phi_i[k]*phi_j/v_mag_squared);
+      dwt_func_dvj[k] += vII_dot_gradII_phi_i/v_mag_squared/2.0*dv_cent_dvj*phi_j*h_supg_elem[k];
+      dwt_func_dvj[k] *= supg;
+    }
+    dwt_func_dS = 0.0;
+    dwt_func_dP = 0.0;
+  
+    break;
+  case SUPG_SCHUNK:
+    break;
+  }
+}
+
+void
 calculate_lub_q_v_nonnewtonian (
                                 double time,
                                 double dt

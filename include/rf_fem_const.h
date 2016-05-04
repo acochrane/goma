@@ -62,6 +62,7 @@
 /* Viscoelastic Constitutive equation weight functions */
 #define GALERKIN        1
 #define SUPG            2
+#define SUPG_SCHUNK     3 
 
 /* Viscoelastic Constitutive equation formulation */
 #define EVSS_G          1  /* Rajagopalan's formulation */
