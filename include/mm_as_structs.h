@@ -2902,7 +2902,14 @@ struct Petrov_Galerkin_Data {
   double dhv_dxnode[DIM][MDE];
   double rho_avg;
   double v_avg[DIM];
+  double vII[DIM]; // velocity rotated into shell tangent plane
   double dv_dnode[DIM][MDE];
+  double wt_func; // weight function - compute once per DOF
+  double k; // supg factor - compute once per element
+  double v_mag_squared; // velocity magnitude squared - compute at every gauss point
+  double vII_dot_gradII_phi_i; // inner product of velocity with with basis function gradient - compute at every DOF
+  double dwt_func_dvarj[5]; /* derivative of wt_func w.r.t. varj - compute the var'th entry in every jacobian iteration
+			       so far only tfmp uses 5 variables max; 0:vx, 1:vy, 2:vz, 3:tfmp_pres, 4:tfmp_sat */
 };
 
 typedef struct Petrov_Galerkin_Data PG_DATA;

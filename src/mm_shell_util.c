@@ -4013,64 +4013,107 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
-tfmp_PGWF (int eqn,
-	   double supg,
-	   double *phi_i,
-	   double *phi_j,
-	   double gradII_phi_i[DIM],
-	   double S,
-	   double P,
-	   double vII[DIM],
-	   double v_cent[DIM],
-	   double h_squared[DIM],
-	   double gradII_S[DIM],
-	   double gradII_P[DIM],
-	   double dv_cent_dvj,
-	   double *wt_func,
-	   double dwt_func_dvj[DIM],
-	   double *dwt_func_dS,
-	   double *dwt_func_dP) {
+tfmp_PG_elem(PG_DATA *pg_data) {
+  int k;
+  // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
+  pg_data->k = 0.0;
+  for (k=0; k<DIM; k++) {
+    pg_data->h[k] = sqrt(pg_data->hsquared[k]);
+    pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
+  }
+  pg_data->k *= 0.5;
+  return;
+}
+
+void
+tfmp_PG_gausspt(PG_DATA *pg_data) {
+  int k;
+  // every gauss point we need vII, v_mag_sq
+  // Inn is expensive so perform once in assemble then set pg_data->vII in assemble
+  // before calling this function in 
+  pg_data->v_mag_squared = 0.0;
+  for (k=0; k<DIM; k++) {
+    pg_data->v_mag_squared += pg_data->vII[k]*pg_data->vII[k];
+  }
+  return;
+}
+
+void
+tfmp_PG_dof (double *phi_i,
+	     double gradII_phi_i[DIM],
+	     PG_DATA *pg_data) {
   // compute Petrov-Galerkin weighting functions
   int k;
-  double k_supg, h_supg_elem[DIM], v_mag_squared, vII_dot_gradII_phi_i;
-  
   switch (mp->tfmp_wt_model) {
   case GALERKIN:
-    wt_func = phi_i;
-    for (k=0; k<DIM; k++) {
-      dwt_func_dv[k] = 0.0;
-    }
-    dwt_func_dS = 0.0;
-    dwt_func_dP = 0.0;
+    pg_data->wt_func = *phi_i;
     break;
+ 
   case SUPG: // 1982 Alexander Brooks and Thomas Hughes
-    k_supg = 0.0;
-    v_mag_squared = 0.0;
-    vII_dot_gradII_phi_i = 0.0; 
-    for (k=0, k<DIM; k++) {
-      h_supg_elem[k] = sqrt(h_squared[k]);
-      k_supg += v_cent[k]*h_supg_elem[k];
-      v_mag_squared += vII[k]*vII[k];
-      vII_dot_gradII_phi_i += vII[k]*gradII_phi_i[k];
-    }
-    k_supg *= 0.5;
-    
-    wt_func = phi_i;
-    wt_func += supg*k_supg*vII_dot_gradII_phi_i/v_mag_squared;
-    
+    pg_data->vII_dot_gradII_phi_i = 0.0; 
+
     for (k=0; k<DIM; k++) {
-      dwt_func_dvj[k] = k_supg*( vII_dot_gradII_phi_i*(2*vII[k]*phi_j/v_mag_squared/v_mag_squared) 
-				 + gradII_phi_i[k]*phi_j/v_mag_squared);
-      dwt_func_dvj[k] += vII_dot_gradII_phi_i/v_mag_squared/2.0*dv_cent_dvj*phi_j*h_supg_elem[k];
-      dwt_func_dvj[k] *= supg;
+      pg_data->vII_dot_gradII_phi_i += pg_data->vII[k]*gradII_phi_i[k];
     }
-    dwt_func_dS = 0.0;
-    dwt_func_dP = 0.0;
+    
+    pg_data->wt_func = *phi_i;
+    if (pg_data->v_mag_squared != 0.0) pg_data->wt_func += (mp->tfmp_wt_const
+							     *(pg_data->k)
+							     *(pg_data->vII_dot_gradII_phi_i)
+							     /(pg_data->v_mag_squared));
   
     break;
-  case SUPG_SCHUNK:
+  case SUPG_SCHUNK: // Randy's SUPG from shell energy eqn
+    
     break;
   }
+  return;
+}
+
+void
+tfmp_PG_dvarj(double *phi_i,
+	      double gradII_phi_i[DIM],
+	      double *phi_j,
+	      PG_DATA *pg_data,
+	      int var){
+  // var indicates which variable to set dvarj to: 0:vx, 1:vy, 2:vz, 3:tfmp_pres, 4:temp_sat
+  double dv_cent_dv;
+    if (pd->i[VELOCITY1]==I_Q1) {
+      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+    }
+    else {
+      EH(-1, "We only know how to use Q1 weighting functions so far");
+      dv_cent_dv = 1.0/4.0;
+    }
+
+  switch (mp->tfmp_wt_model) {
+  case GALERKIN:
+    pg_data->dwt_func_dvarj[var] = 0.0;
+    break;
+  case SUPG:
+    // velocities
+    if (var < 3 && pg_data->v_mag_squared != 0.0) {
+      pg_data->dwt_func_dvarj[var] = (pg_data->k
+				      *( pg_data->vII_dot_gradII_phi_i
+					 *(-2.0*pg_data->vII[var]*(*phi_j)
+					   /pg_data->v_mag_squared
+					   /pg_data->v_mag_squared) 
+					 + (gradII_phi_i[var]
+					    *(*phi_j)
+					    /pg_data->v_mag_squared)));
+      pg_data->dwt_func_dvarj[var] += (pg_data->vII_dot_gradII_phi_i
+				       /pg_data->v_mag_squared
+				       /2.0
+				       *dv_cent_dv
+				       *pg_data->h[var]);
+      pg_data->dwt_func_dvarj[var] *= mp->tfmp_wt_const;
+    }
+    else if (var > 2) {
+      pg_data->dwt_func_dvarj[var] = 0.0;
+    }
+    break;
+  }
+  return;
 }
 
 void

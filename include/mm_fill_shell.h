@@ -309,7 +309,7 @@ PROTO((double,                   /* Time */
        double,                   /* theta or tt*/
        double,                   /* dt */
        double [DIM],             /* Local stu coords */
-       const PG_DATA *,
+       PG_DATA *,
        const Exo_DB * ));        /* ExodusII database struct pointer */  
 
 
