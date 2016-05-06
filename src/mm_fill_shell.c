@@ -14299,24 +14299,8 @@ assemble_shell_tfmp(double time,   /* Time */
   }
 
   double S = fv->tfmp_sat;
-
-  double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
-
-  a_rho = mp->u_tfmp_const[0];
-  b_rho = mp->u_tfmp_const[1];
-  c_rho = mp->u_tfmp_const[2];
-  d_rho = mp->u_tfmp_const[3];
-  a_mu = mp->u_tfmp_const[4];
-  b_mu = mp->u_tfmp_const[5];
-  c_mu = mp->u_tfmp_const[6];
-  d_mu = mp->u_tfmp_const[7];
-
-  double rho = a_rho + b_rho*tanh(c_rho+d_rho*S);
-  //double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
-  //double S_cap = fv->tfmp_sat;
-  double drho_dS, dmu_dS;
-  drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
-  //dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
+  double rho, drho_dS;
+  tfmp_rho(S, &rho, &drho_dS);
 
 /* Use the height_function_model */
   double h, H_U, dH_U_dtime, H_L, dH_L_dtime;

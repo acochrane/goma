@@ -1474,46 +1474,11 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
       local_lumped[NON_VOLFRAC] = 1.0;
   } /* end of NON_VOLFRAC*/
   if ((TFMP_RHO != -1 || TFMP_MU != -1 || TFMP_RHO_MU != -1) && (pd->e[R_TFMP_MASS] || pd->e[R_TFMP_BOUND]) ) {
-  	double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
-  	a_rho = mp->u_tfmp_const[0];
-  	b_rho = mp->u_tfmp_const[1];
-  	c_rho = mp->u_tfmp_const[2];
-  	d_rho = mp->u_tfmp_const[3];
-  	a_mu = mp->u_tfmp_const[4];
-  	b_mu = mp->u_tfmp_const[5];
-  	c_mu = mp->u_tfmp_const[6];
-  	d_mu = mp->u_tfmp_const[7];
-  	double S_cap = fv->tfmp_sat;
-  	double rho = a_rho + b_rho*tanh(c_rho+d_rho*S_cap);
-  	double mu = a_mu + b_mu*tanh(c_mu + d_mu*S_cap);
-  	/* These are left over from the levered material properties rule
-    double rho_l = 0.998;
-    double rho_g = 0.00118;
-    //double rho_g = 0.998;
-    double mu_l = 1;
-    double mu_g = 0.0186;
-    //double mu_g = 0.01;
-    double drho_dS, dmu_dS;
-    if (S_cap < 0 ) {
-      S_cap = 0;
-      drho_dS = 0;
-      dmu_dS = 0;
-    } else {
-      drho_dS = rho_l - rho_g;
-      dmu_dS = mu_l - mu_g;
-    }
-    if (S_cap > 1 ) {
-      S_cap = 1;
-      drho_dS = 0;
-      dmu_dS = 0;
-    } else {
-      drho_dS = rho_l - rho_g;
-      dmu_dS = mu_l - mu_g;
-    }
-    double rho = S_cap*rho_l + (1-S_cap)*rho_g;
-    double mu = S_cap*mu_l + (1-S_cap)*mu_g;
+    double S = fv->tfmp_sat;
+    double rho, mu, drho_dS, dmu_dS;
+    tfmp_rho(S, &rho, &drho_dS);
+    tfmp_mu(S, &mu, &dmu_dS);
 
-    */
     if (TFMP_RHO != -1) {
       local_post[TFMP_RHO] = rho;
       local_lumped[TFMP_RHO] = 1;

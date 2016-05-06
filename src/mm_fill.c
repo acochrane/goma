@@ -105,7 +105,7 @@ static void zero_lec(void);
  *
  *
  *  Construct the Jacobian and Residual. This is a wrapper around the
- *  element level fill routine, matrix_fill().
+*  element level fill routine, matrix_fill().
  *
  * Return:
  *  -1 : A negative element volume was encountered somewhere in the
@@ -776,7 +776,7 @@ matrix_fill(
        (pde[R_LUBP] ))) {
 	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
-      }
+  }
   if (mp->tfmp_wt_model != GALERKIN) {
 	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);

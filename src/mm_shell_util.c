@@ -3449,25 +3449,9 @@ calculate_lub_q_v (
     }
     Inn(grad_S, gradII_S);
 
-    /* Load density and viscosity */
-
-    double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu;
-    
-    a_rho = mp->u_tfmp_const[0];
-    b_rho = mp->u_tfmp_const[1];
-    c_rho = mp->u_tfmp_const[2];
-    d_rho = mp->u_tfmp_const[3];
-    a_mu = mp->u_tfmp_const[4];
-    b_mu = mp->u_tfmp_const[5];
-    c_mu = mp->u_tfmp_const[6];
-    d_mu = mp->u_tfmp_const[7];
-
-    //double rho = a_rho + b_rho*tanh(c_rho + d_rho*S);
-    double mu = a_mu + b_mu*tanh(c_mu + d_mu*S);
-    double drho_dS, dmu_dS;
-    drho_dS = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
-    dmu_dS =  b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
-
+    /* Load viscosity */
+    double mu, dmu_dS;
+    tfmp_mu(S, &mu, &dmu_dS); 
     // Load Surface Tension
     double surface_tension;
     surface_tension = mp->surface_tension;
@@ -4111,6 +4095,68 @@ tfmp_PG_dvarj(double *phi_i,
     else if (var > 2) {
       pg_data->dwt_func_dvarj[var] = 0.0;
     }
+    break;
+  }
+  return;
+}
+
+void
+tfmp_rho( const double S,
+	  double *rho,
+	  double *drho_dS) {
+  double a_rho, b_rho, c_rho, d_rho;
+  switch (mp->tfmp_model) {
+  case LEVER:
+    if (S < 0) {
+      (*rho) = mp->u_tfmp_const[0]; // rho_g
+      (*drho_dS) = 0.0;
+    } else if ( S > 1 ) {
+      (*rho) = mp->u_tfmp_const[1]; // rho_l
+      (*drho_dS) = 0.0;
+    } else {
+      (*rho) = mp->u_tfmp_const[0] + S*(mp->u_tfmp_const[1] - mp->u_tfmp_const[0]);
+      (*drho_dS) = mp->u_tfmp_const[1] - mp->u_tfmp_const[0];
+    }
+    break;
+  case TANH:
+
+    a_rho = mp->u_tfmp_const[0];
+    b_rho = mp->u_tfmp_const[1];
+    c_rho = mp->u_tfmp_const[2];
+    d_rho = mp->u_tfmp_const[3];
+
+    (*rho)     = a_rho + b_rho*tanh(c_rho+d_rho*S);
+    (*drho_dS) = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
+    break;
+  }
+  return;
+}
+void
+tfmp_mu( const double S,
+	  double *mu,
+	  double *dmu_dS) {
+  double a_mu, b_mu, c_mu, d_mu;
+  switch (mp->tfmp_model) {
+  case LEVER:
+    if (S < 0) {
+      (*mu) = mp->u_tfmp_const[2]; // mu_g
+      (*dmu_dS) = 0.0;
+    } else if ( S > 1 ) {
+      (*mu) = mp->u_tfmp_const[3]; // mu_l
+      (*dmu_dS) = 0.0;
+    } else {
+      (*mu) = mp->u_tfmp_const[2] + S*(mp->u_tfmp_const[3] - mp->u_tfmp_const[2]);
+      (*dmu_dS) = mp->u_tfmp_const[3] - mp->u_tfmp_const[2];
+    }
+    break;
+  case TANH:
+    a_mu = mp->u_tfmp_const[4];
+    b_mu = mp->u_tfmp_const[5];
+    c_mu = mp->u_tfmp_const[6];
+    d_mu = mp->u_tfmp_const[7];
+
+    (*mu)     = a_mu + b_mu*tanh(c_mu+d_mu*S);
+    (*dmu_dS) = b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);
     break;
   }
   return;

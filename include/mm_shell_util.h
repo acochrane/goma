@@ -167,6 +167,18 @@ PROTO((
        PG_DATA *pg_data,
        int var
        ));
+EXTERN void tfmp_rho
+PROTO((
+       const double S,
+       double *rho,
+       double *drho_dS
+       ));
+EXTERN void tfmp_mu
+PROTO((
+       const double S,
+       double *mu,
+       double *dmu_dS
+       ));
 
 EXTERN double shell_saturation_pressure_curve
 PROTO((
