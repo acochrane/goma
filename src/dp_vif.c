@@ -1796,7 +1796,7 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->tfmp_diff_const, 1, MPI_DOUBLE);
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_const, 1, MPI_DOUBLE);
-      
+      ddd_add_member(n, &mp_glob[i]->tfmp_model, 1, MPI_INT);
 
       /*
        * Loop over user-defined constants lists of lengths.
