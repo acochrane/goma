@@ -829,11 +829,14 @@ struct Material_Properties
   dbl d_Inertia_coefficient[MAX_VARIABLE_TYPES + MAX_CONC];
   int InertiaCoefficientModel;
 
-  // TFMP structure for hyperbolic density and viscosity function constants
+  // TFMP structure for material properties function constants
   int tfmp_density_model;
+  int len_tfmp_density_const;
+  dbl *tfmp_density_const;
+
   int tfmp_viscosity_model;
-  int len_u_tfmp_const;
-  dbl *u_tfmp_const;
+  int len_tfmp_viscosity_const;
+  dbl *tfmp_viscosity_const;
 
   // TFMP indicators for the diffusivity corrector experiment
   int tfmp_diff_model;
