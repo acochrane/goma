@@ -1798,7 +1798,10 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_const, 1, MPI_DOUBLE);
 
-      ddd_add_member(n, &mp_glob[i]->tfmp_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_density_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_tfmp_density_const, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->tfmp_viscosity_model, 1, MPI_INT);
+      ddd_add_member(n, &mp_glob[i]->len_tfmp_viscosity_const, 1, MPI_INT);
 
      
       /*
@@ -2003,7 +2006,7 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_FilmEvap_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_DisjPress_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_DiffCoeff_function_constants, 1 , MPI_INT); 
-      ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
+
 
       /*
        * Material properties that are fixed size arrays governed by
@@ -2898,8 +2901,10 @@ ark_landing()
       dalloc( m->len_u_light_absorption,
               m->    u_light_absorption);
 
-      dalloc( m->len_u_tfmp_const,
-              m->    u_tfmp_const);
+      dalloc( m->len_tfmp_density_const,
+              m->    tfmp_density_const);
+      dalloc( m->len_tfmp_viscosity_const,
+              m->    tfmp_viscosity_const);
 
 
 
@@ -3263,8 +3268,10 @@ noahs_dove()
     crdv( m->len_u_light_absorption,
 	  m->    u_light_absorption);
 
-    crdv( m->len_u_tfmp_const,
-	  m->    u_tfmp_const);
+    crdv( m->len_tfmp_density_const,
+	  m->    tfmp_density_const);
+    crdv( m->len_tfmp_viscosity_const,
+	  m->    tfmp_viscosity_const);
 
     /*
      *  Add species names

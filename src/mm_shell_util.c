@@ -4105,25 +4105,25 @@ tfmp_rho( const double S,
 	  double *rho,
 	  double *drho_dS) {
   double a_rho, b_rho, c_rho, d_rho;
-  switch (mp->tfmp_model) {
+  switch (mp->tfmp_density_model) {
   case LEVER:
     if (S < 0) {
-      (*rho) = mp->u_tfmp_const[0]; // rho_g
+      (*rho) = mp->tfmp_density_const[0]; // rho_g
       (*drho_dS) = 0.0;
     } else if ( S > 1 ) {
-      (*rho) = mp->u_tfmp_const[1]; // rho_l
+      (*rho) = mp->tfmp_density_const[1]; // rho_l
       (*drho_dS) = 0.0;
     } else {
-      (*rho) = mp->u_tfmp_const[0] + S*(mp->u_tfmp_const[1] - mp->u_tfmp_const[0]);
-      (*drho_dS) = mp->u_tfmp_const[1] - mp->u_tfmp_const[0];
+      (*rho) = mp->tfmp_density_const[0] + S*(mp->tfmp_density_const[1] - mp->tfmp_density_const[0]);
+      (*drho_dS) = mp->tfmp_density_const[1] - mp->tfmp_density_const[0];
     }
     break;
   case TANH:
 
-    a_rho = mp->u_tfmp_const[0];
-    b_rho = mp->u_tfmp_const[1];
-    c_rho = mp->u_tfmp_const[2];
-    d_rho = mp->u_tfmp_const[3];
+    a_rho = mp->tfmp_density_const[0];
+    b_rho = mp->tfmp_density_const[1];
+    c_rho = mp->tfmp_density_const[2];
+    d_rho = mp->tfmp_density_const[3];
 
     (*rho)     = a_rho + b_rho*tanh(c_rho+d_rho*S);
     (*drho_dS) = b_rho*d_rho/cosh(c_rho + d_rho*S)/cosh(c_rho + d_rho*S);
@@ -4136,24 +4136,24 @@ tfmp_mu( const double S,
 	  double *mu,
 	  double *dmu_dS) {
   double a_mu, b_mu, c_mu, d_mu;
-  switch (mp->tfmp_model) {
+  switch (mp->tfmp_viscosity_model) {
   case LEVER:
     if (S < 0) {
-      (*mu) = mp->u_tfmp_const[2]; // mu_g
+      (*mu) = mp->tfmp_viscosity_const[0]; // mu_g
       (*dmu_dS) = 0.0;
     } else if ( S > 1 ) {
-      (*mu) = mp->u_tfmp_const[3]; // mu_l
+      (*mu) = mp->tfmp_viscosity_const[1]; // mu_l
       (*dmu_dS) = 0.0;
     } else {
-      (*mu) = mp->u_tfmp_const[2] + S*(mp->u_tfmp_const[3] - mp->u_tfmp_const[2]);
-      (*dmu_dS) = mp->u_tfmp_const[3] - mp->u_tfmp_const[2];
+      (*mu) = mp->tfmp_viscosity_const[0] + S*(mp->tfmp_viscosity_const[1] - mp->tfmp_viscosity_const[0]);
+      (*dmu_dS) = mp->tfmp_viscosity_const[1] - mp->tfmp_viscosity_const[0];
     }
     break;
   case TANH:
-    a_mu = mp->u_tfmp_const[4];
-    b_mu = mp->u_tfmp_const[5];
-    c_mu = mp->u_tfmp_const[6];
-    d_mu = mp->u_tfmp_const[7];
+    a_mu = mp->tfmp_viscosity_const[0];
+    b_mu = mp->tfmp_viscosity_const[1];
+    c_mu = mp->tfmp_viscosity_const[2];
+    d_mu = mp->tfmp_viscosity_const[3];
 
     (*mu)     = a_mu + b_mu*tanh(c_mu+d_mu*S);
     (*dmu_dS) = b_mu*d_mu/cosh(c_mu + d_mu*S)/cosh(c_mu + d_mu*S);

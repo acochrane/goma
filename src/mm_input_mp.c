@@ -9371,16 +9371,13 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
 
-    //int stuff = strcmp(model_name, "TANH");
-    //    printf("%s, %d", model_name, strcmp(model_name, "TANH"));
-    
     if (model_read == -1 && !strcmp(model_name, "TANH") ) {
       model_read = 1;
-      mat_ptr->tfmp_model = TANH;
-      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+      mat_ptr->tfmp_density_model = TANH;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_density_const), 
 				     NO_SPECIES);
 
-      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_density_const );
 
       double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu, beta_rho, beta_mu;
       double rho_g = mat_ptr->tfmp_density_const[0];
@@ -9391,14 +9388,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       b_rho = (rho_l-rho_g)/2;
       c_rho = atanh((rho_g*(1 + beta_rho) - a_rho)/b_rho);
       d_rho = atanh((rho_l*(1 - beta_rho) - a_rho)/b_rho) - c_rho;
-      /*      
-      a_mu = (mu_l+mu_g)/2;
-      b_mu = (mu_l-mu_g)/2;
-      //      beta_mu *= b_mu;
-      c_mu = atanh((mu_g*(1 + beta_mu) - a_mu)/b_mu);
-      d_mu = atanh((mu_l*(1 - beta_mu) - a_mu)/b_mu) - c_mu;
-      //printf("we have done something in the mp_read\n");
-      */      
+
       safe_free(mat_ptr->tfmp_density_const);
       mat_ptr->tfmp_density_const = alloc_dbl_1(4, 0.0);
       
@@ -9411,21 +9401,57 @@ ECHO("\n----Acoustic Properties\n", echo_file);
     }
     if (model_read == -1 && !strcmp(model_name, "LEVER") ) {
       model_read = 1;
-      mat_ptr->tfmp_model = LEVER;
-      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+      mat_ptr->tfmp_density_model = LEVER;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_density_const), 
 				     NO_SPECIES);
 
-      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
-      mat_ptr->len_u_tfmp_const = num_const;
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_density_const );
+      mat_ptr->len_tfmp_density_const = num_const;
+    }
+  }
+  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Viscosity", 
+				   &(mat_ptr->tfmp_viscosity_model), 
+				   mat_ptr->tfmp_viscosity_const, 
+				   NO_USER, NULL, model_name, 
+				   SCALAR_INPUT, &NO_SPECIES,es);
+
+    if (model_read == -1 && !strcmp(model_name, "TANH") ) {
+      model_read = 1;
+      mat_ptr->tfmp_viscosity_model = TANH;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_viscosity_const), 
+				     NO_SPECIES);
+
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_viscosity_const );
+
+      double a_mu, b_mu, c_mu, d_mu, beta_mu;
+      double mu_g = mat_ptr->tfmp_viscosity_const[0];
+      double mu_l = mat_ptr->tfmp_viscosity_const[1];
+      beta_mu = mat_ptr->tfmp_viscosity_const[2];
+
+      a_mu = (mu_l+mu_g)/2;
+      b_mu = (mu_l-mu_g)/2;
+      c_mu = atanh((mu_g*(1 + beta_mu) - a_mu)/b_mu);
+      d_mu = atanh((mu_l*(1 - beta_mu) - a_mu)/b_mu) - c_mu;
+
+      safe_free(mat_ptr->tfmp_viscosity_const);
+      mat_ptr->tfmp_viscosity_const = alloc_dbl_1(4, 0.0);
+      
+      mat_ptr->tfmp_viscosity_const[0] = a_mu;
+      mat_ptr->tfmp_viscosity_const[1] = b_mu;
+      mat_ptr->tfmp_viscosity_const[2] = c_mu;
+      mat_ptr->tfmp_viscosity_const[3] = d_mu;
+      
+      mat_ptr->len_tfmp_viscosity_const = 4;
     }
     if (model_read == -1 && !strcmp(model_name, "LEVER") ) {
       model_read = 1;
-      mat_ptr->tfmp_model = LEVER;
-      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+      mat_ptr->tfmp_viscosity_model = LEVER;
+      num_const = read_constants(imp, &(mat_ptr->tfmp_viscosity_const), 
 				     NO_SPECIES);
 
-      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
-      mat_ptr->len_u_tfmp_const = num_const;
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->tfmp_viscosity_const );
+      mat_ptr->len_tfmp_viscosity_const = num_const;
     }
   }
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
