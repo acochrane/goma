@@ -1790,14 +1790,17 @@ noahs_ark()
 		     (MAX_VARIABLE_TYPES + MAX_CONC),
 		     MPI_DOUBLE);
       /*
-       * TFMP backward diffusivity model 
+       * TFMP model stuff
        */
       ddd_add_member(n, &mp_glob[i]->tfmp_diff_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_diff_const, 1, MPI_DOUBLE);
+      
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_model, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->tfmp_wt_const, 1, MPI_DOUBLE);
+
       ddd_add_member(n, &mp_glob[i]->tfmp_model, 1, MPI_INT);
 
+     
       /*
        * Loop over user-defined constants lists of lengths.
        *
@@ -1857,7 +1860,6 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->heat_capacity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->diffusivity_tableid, 1, MPI_INT);
       ddd_add_member(n, &mp_glob[i]->saturation_tableid, 1, MPI_INT);
-      ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
 
       /*
        * Material property constants that are vectors over the concentration
@@ -2001,7 +2003,8 @@ noahs_ark()
       ddd_add_member(n, &mp_glob[i]->len_u_FilmEvap_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_DisjPress_function_constants, 1 , MPI_INT); 
       ddd_add_member(n, &mp_glob[i]->len_u_DiffCoeff_function_constants, 1 , MPI_INT); 
-     
+      ddd_add_member(n, &mp_glob[i]->len_u_tfmp_const, 1, MPI_INT);
+
       /*
        * Material properties that are fixed size arrays governed by
        * the maximum number of species and maximum number of dependent

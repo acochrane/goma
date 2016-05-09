@@ -9362,12 +9362,12 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   } // End of porous shell gas diffusion constants
   
   /*
-   * Inputs specific to thin film multiphase flow hyperbolic density and viscosity calculations
+   * Inputs specific to thin film multiphase flow density and viscosity calculations
    */
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
-    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Properties", 
-				   &(mat_ptr->tfmp_model), 
-				   mat_ptr->u_tfmp_const, 
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Density", 
+				   &(mat_ptr->tfmp_density_model), 
+				   mat_ptr->tfmp_density_const, 
 				   NO_USER, NULL, model_name, 
 				   SCALAR_INPUT, &NO_SPECIES,es);
 
@@ -9382,43 +9382,50 @@ ECHO("\n----Acoustic Properties\n", echo_file);
 
       SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
 
-      /* Need to read in 6 parameters as in
-       *  Thin Film Multiphase Properties = TANH 1.0 2.0 3.0 1.0 2.0 3.0
-       */
       double a_rho, b_rho, c_rho, d_rho, a_mu, b_mu, c_mu, d_mu, beta_rho, beta_mu;
-      double rho_g = mat_ptr->u_tfmp_const[0];
-      double rho_l = mat_ptr->u_tfmp_const[1];
-      beta_rho = mat_ptr->u_tfmp_const[2];
-      double mu_g = mat_ptr->u_tfmp_const[3];
-      double mu_l = mat_ptr->u_tfmp_const[4];
-      beta_mu = mat_ptr->u_tfmp_const[5];
-      
-      safe_free(mat_ptr->u_tfmp_const);
-      
+      double rho_g = mat_ptr->tfmp_density_const[0];
+      double rho_l = mat_ptr->tfmp_density_const[1];
+      beta_rho = mat_ptr->tfmp_density_const[2];
+            
       a_rho = (rho_l+rho_g)/2;
       b_rho = (rho_l-rho_g)/2;
-      //      beta_rho *= b_rho;
       c_rho = atanh((rho_g*(1 + beta_rho) - a_rho)/b_rho);
       d_rho = atanh((rho_l*(1 - beta_rho) - a_rho)/b_rho) - c_rho;
-      
+      /*      
       a_mu = (mu_l+mu_g)/2;
       b_mu = (mu_l-mu_g)/2;
       //      beta_mu *= b_mu;
       c_mu = atanh((mu_g*(1 + beta_mu) - a_mu)/b_mu);
       d_mu = atanh((mu_l*(1 - beta_mu) - a_mu)/b_mu) - c_mu;
       //printf("we have done something in the mp_read\n");
-      mat_ptr->u_tfmp_const = alloc_dbl_1(8, 0.0);
+      */      
+      safe_free(mat_ptr->tfmp_density_const);
+      mat_ptr->tfmp_density_const = alloc_dbl_1(4, 0.0);
       
-      mat_ptr->u_tfmp_const[0] = a_rho;
-      mat_ptr->u_tfmp_const[1] = b_rho;
-      mat_ptr->u_tfmp_const[2] = c_rho;
-      mat_ptr->u_tfmp_const[3] = d_rho;
-      mat_ptr->u_tfmp_const[4] = a_mu;
-      mat_ptr->u_tfmp_const[5] = b_mu;
-      mat_ptr->u_tfmp_const[6] = c_mu;
-      mat_ptr->u_tfmp_const[7] = d_mu;
+      mat_ptr->tfmp_density_const[0] = a_rho;
+      mat_ptr->tfmp_density_const[1] = b_rho;
+      mat_ptr->tfmp_density_const[2] = c_rho;
+      mat_ptr->tfmp_density_const[3] = d_rho;
       
-      mat_ptr->len_u_tfmp_const = 8;
+      mat_ptr->len_tfmp_density_const = 4;
+    }
+    if (model_read == -1 && !strcmp(model_name, "LEVER") ) {
+      model_read = 1;
+      mat_ptr->tfmp_model = LEVER;
+      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+				     NO_SPECIES);
+
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+      mat_ptr->len_u_tfmp_const = num_const;
+    }
+    if (model_read == -1 && !strcmp(model_name, "LEVER") ) {
+      model_read = 1;
+      mat_ptr->tfmp_model = LEVER;
+      num_const = read_constants(imp, &(mat_ptr->u_tfmp_const), 
+				     NO_SPECIES);
+
+      SPF_DBL_VEC( endofstring(es), num_const, mat_ptr->u_tfmp_const );
+      mat_ptr->len_u_tfmp_const = num_const;
     }
   }
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
@@ -9437,39 +9444,33 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       }*/
   }
   if(pd_glob[mn]->e[R_TFMP_BOUND]) {
-    strcpy(search_string,"Thin Film Multiphase Weight Function");
-    model_read = look_for_mat_prop(imp, search_string, 
-				   &(mat_ptr->Ewt_funcModel), 
-				   &(mat_ptr->Ewt_func), NO_USER, NULL,
+    model_read = look_for_mat_prop(imp, "Thin Film Multiphase Weight Function", 
+				   &(mat_ptr->tfmp_wt_model), 
+				   &(mat_ptr->tfmp_wt_const), NO_USER, NULL,
 				   model_name, SCALAR_INPUT, &NO_SPECIES,es);
-    if(strncmp(model_name," ",1) != 0 ) {
-      if ( !strcmp(model_name, "GALERKIN") ) {
-	mat_ptr->tfmp_wt_model = GALERKIN;
-	mat_ptr->tfmp_wt_len = 0.;
-	SPF(es, "\t(%s = %s)",search_string,"GALERKIN");
-      } 
-      else if ( !strcmp(model_name, "SUPG") ) {
+
+    if ( !strcmp(model_name, "GALERKIN") ) {
+      mat_ptr->tfmp_wt_model = GALERKIN;
+      mat_ptr->tfmp_wt_len = 0.;
+      SPF(es, "\t(%s = %s)",search_string,"GALERKIN");
+    } 
+    else if ( !strcmp(model_name, "SUPG") ) {
 	mat_ptr->tfmp_wt_model = SUPG;
 	fscanf(imp, "%lg",&(mat_ptr->tfmp_wt_const));
 	SPF(es, "\t(%s = %s)",search_string,"SUPG");
 	SPF(endofstring(es)," %.4g", mat_ptr->tfmp_wt_const );
-      } 
-      else if ( !strcmp(model_name, "SUPG_SCHUNK") ) {
+    } 
+    else if ( !strcmp(model_name, "SUPG_SCHUNK") ) {
 	mat_ptr->tfmp_wt_model = SUPG_SCHUNK;
 	fscanf(imp, "%lg",&(mat_ptr->tfmp_wt_const));
 	SPF(es, "\t(%s = %s)",search_string,"SUPG_SCHUNK");
 	SPF(endofstring(es)," %.4g", mat_ptr->tfmp_wt_const );
-      } 
-      else {
+    } 
+    else {
 	SPF(err_msg,"Syntax error or invalid model for %s\n", search_string);
 	EH(-1,err_msg);
-      }
     }
-    else {
-      mat_ptr->tfmp_wt_model = GALERKIN;
-      mat_ptr->tfmp_wt_len = 0.;
-      SPF(es, "\t(%s = %s)",search_string,"GALERKIN");
-    }
+    
   }
   ECHO(es, echo_file);
   
