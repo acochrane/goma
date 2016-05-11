@@ -4064,6 +4064,8 @@ tfmp_PG_dvarj(double *phi_i,
   double dv_cent_dv;
     if (pd->i[VELOCITY1]==I_Q1) {
       dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+    } else if (pd->i[VELOCITY1]==I_Q2) {
+      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
     }
     else {
       EH(-1, "We only know how to use Q1 weighting functions so far");
