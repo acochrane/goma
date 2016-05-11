@@ -2602,7 +2602,7 @@ assemble_momentum(dbl time,       /* current time */
 	 * But then why do I even need this equation?
 	 * I DON'T!!!
 	 */
-	if (pd->e[R_TFMP_BOUND] && mp->tfmp_wt_model == SUPG ) {
+	if (pd->e[R_TFMP_BOUND] ) {
 	  calculate_lub_q_v(R_TFMP_BOUND, time, dt, xi, exo);
 	} else {
 	  calculate_lub_q_v(R_LUBP, time, dt, xi, exo);
@@ -2714,6 +2714,8 @@ assemble_momentum(dbl time,       /* current time */
   fluid_stress( Pi, d_Pi );
 
   (void) momentum_source_term(f, df, time);
+
+  dbl tfmp_msfem = .0;
 
   /*
    * Residuals_________________________________________________________________
@@ -2850,6 +2852,46 @@ assemble_momentum(dbl time,       /* current time */
 		      porous    *= -phi_i*d_area;
 		      porous    *= porous_brinkman_etm;
 		    }
+		  else if ( pd->e[R_TFMP_BOUND] ) {
+		    porous = v[a] - LubAux->v_avg[a];
+		    porous *= phi_i;
+
+		    // for stabilized mixed fem
+		    // going to need mu and darcy permeability
+		    dbl tf_mu, tfmp_dmu_dS;
+		    tfmp_mu(fv->tfmp_sat, &tf_mu, &tfmp_dmu_dS);
+		    /* Use the height_function_model */
+		    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+		    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+		    h = height_function_model(&H_U, &dH_U_dtime, 
+					      &H_L, &dH_L_dtime,
+					      dH_U_dX, dH_L_dX, &dH_U_dp, 
+					      &dH_U_ddh, time, dt);
+
+		    //double dh_dtime = dH_U_dtime - dH_L_dtime;
+
+		    dbl tfmp_permeability = h*h/12;
+		    
+		    // going to need phi_v(x,y,z)_i and gradII_phi_P_i
+		    dbl bf_velo[DIM], bf_grad_pres[DIM];
+		    bf_velo[0] = bf[R_MOMENTUM1]->phi[i];
+		    bf_velo[1] = bf[R_MOMENTUM2]->phi[i];
+		    bf_velo[2] = bf[R_MOMENTUM3]->phi[i];
+		    
+		    bf_grad_pres[0] = bf[R_TFMP_MASS]->grad_phi[i][0];
+		    bf_grad_pres[1] = bf[R_TFMP_MASS]->grad_phi[i][1];
+		    bf_grad_pres[2] = bf[R_TFMP_MASS]->grad_phi[i][2];
+		    
+		    dbl stabilized= 0.0;
+		    int k;
+		    for (k=0;k<DIM;k++) {
+		      stabilized += ( (-tf_mu/tfmp_permeability*bf_velo[k] + bf_grad_pres[k])
+				      *(tfmp_permeability/tf_mu)*(tf_mu/tfmp_permeability*(fv->v[k]) + fv->grad_tfmp_pres[k]) );
+		    }
+		    porous += tfmp_msfem*stabilized;
+		    porous *=  wt * fv->sdet * h3 * porous_brinkman_etm;
+		  }
+		}
 		  else if ( mp->FSIModel > 0 )
 		    {	      
 		      porous = v[a] - LubAux->v_avg[a];
@@ -2860,7 +2902,7 @@ assemble_momentum(dbl time,       /* current time */
 		    {
 		      EH(-1, "cannot have both flowing liquid viscosity and mp->viscosity equal to zero");
 		    }
-		}
+
 		  
 	      diffusion = 0.;
 	      if ( diffusion_on )
@@ -3369,6 +3411,50 @@ assemble_momentum(dbl time,       /* current time */
 				  porous *= -phi_i*phi_j*d_area;
 				  porous *= porous_brinkman_etm;
 				}
+			      else if  ( pd->e[R_TFMP_BOUND] ) {
+				porous = 0.0;
+				if (a == b) {
+				  // jacobian of phi_i*v[a]
+				  porous += phi_i*phi_j;
+				}
+				// for stabilized mixed fem
+				// going to need mu and darcy permeability
+				dbl tf_mu, tfmp_dmu_dS;
+				tfmp_mu(fv->tfmp_sat, &tf_mu, &tfmp_dmu_dS);
+				/* Use the height_function_model */
+				double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+				double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+				h = height_function_model(&H_U, &dH_U_dtime, 
+							  &H_L, &dH_L_dtime,
+							  dH_U_dX, dH_L_dX, &dH_U_dp, 
+							  &dH_U_ddh, time, dt);
+				
+				//double dh_dtime = dH_U_dtime - dH_L_dtime;
+				
+				dbl tfmp_permeability = h*h/12;
+				
+				// going to need phi_v(x,y,z)_i and gradII_phi_P_i
+				// this could probably be more efficient... func(a,b,i,j) ? Shotgun apporach for now
+				dbl bf_velo_i[DIM], bf_velo_j[DIM], bf_grad_pres[DIM];
+				bf_velo_i[0] = bf[R_MOMENTUM1]->phi[i];
+				bf_velo_i[1] = bf[R_MOMENTUM2]->phi[i];
+				bf_velo_i[2] = bf[R_MOMENTUM3]->phi[i];
+				
+				bf_velo_j[0] = bf[R_MOMENTUM1]->phi[j];
+				bf_velo_j[1] = bf[R_MOMENTUM2]->phi[j];
+				bf_velo_j[2] = bf[R_MOMENTUM3]->phi[j];
+				
+				bf_grad_pres[0] = bf[R_TFMP_MASS]->grad_phi[i][0];
+				bf_grad_pres[1] = bf[R_TFMP_MASS]->grad_phi[i][1];
+				bf_grad_pres[2] = bf[R_TFMP_MASS]->grad_phi[i][2];
+				
+				// jacobian of stabilized
+				porous += tfmp_msfem*( -tf_mu/tfmp_permeability*bf_velo_i[b] + bf_grad_pres[b] )*bf_velo_j[b];
+				
+				porous *= wt*fv->sdet*h3;
+				
+			      }
+
 			      else if (mp->viscosity !=0)
 				{
 				  porous = delta(a,b);
@@ -3590,49 +3676,116 @@ assemble_momentum(dbl time,       /* current time */
 
 	      if ( pdv[TFMP_PRES] ) {
 	      	if (porous_brinkman_on) {
-	      		var = TFMP_PRES;
-	      		pvar = upd->vp[var];
+		  var = TFMP_PRES;
+		  pvar = upd->vp[var];
 
-	      		//int *n_dof = NULL;
-	      		//int dof_map[MDE];
-	      		//n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
-	      		//lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+		  //int *n_dof = NULL;
+		  //int dof_map[MDE];
+		  //n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+		  //lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
 
-	      		/* Need a few more basis functions */
-	      		dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
 		  
-	      		for ( j=0; j<ei->dof[var]; j++) {
-	      			porous = 0.0;
-	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
-
-	      			/* Assemble Jacobian*/
-	      			porous += -phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
-	      			porous *= fv->sdet * wt * h3;
-	      			porous *= porous_brinkman_etm;
-	      			lec->J[peqn][pvar][ii][j] += porous;
-	      		}
-	      		//safe_free((void *) n_dof);
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    porous = 0.0;
+		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    
+		    /* Assemble Jacobian*/
+		    porous += -phi_i*( LubAux->dv_avg_dp1[a][j] )*grad_II_phi_j[a];
+		    
+		    // jacobian of stabilized term is
+		    dbl tf_mu, tfmp_dmu_dS;
+		    tfmp_mu(fv->tfmp_sat, &tf_mu, &tfmp_dmu_dS);
+		    /* Use the height_function_model */
+		    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+		    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+		    h = height_function_model(&H_U, &dH_U_dtime, 
+					      &H_L, &dH_L_dtime,
+					      dH_U_dX, dH_L_dX, &dH_U_dp, 
+					      &dH_U_ddh, time, dt);
+		    
+		    //double dh_dtime = dH_U_dtime - dH_L_dtime;
+		    
+		    dbl tfmp_permeability = h*h/12;
+		    
+		    dbl dstabilized_dP = 0.0;
+		    int k;
+		    
+		    for (k=0; k<DIM; k++) {
+		      dstabilized_dP += ( (-tf_mu/tfmp_permeability*bf[R_MOMENTUM1 + k]->phi[i] + bf[R_TFMP_MASS]->grad_phi[i][k])
+					  *tfmp_permeability/tf_mu*(bf[R_TFMP_MASS]->grad_phi[j][k]) );
+		    }
+		    
+		    
+		    dstabilized_dP *= tfmp_msfem;
+		    
+		    porous += dstabilized_dP;
+		    porous *= fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  //safe_free((void *) n_dof);
 	      	}
 	      }
 	      if ( pdv[TFMP_SAT] ) {
 	      	if (porous_brinkman_on) {
-	      		var = TFMP_SAT;
-	      		pvar = upd->vp[var];
+		  var = TFMP_SAT;
+		  pvar = upd->vp[var];
 
-	      		/* Need a few more basis functions */
-	      		dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
+		  /* Need a few more basis functions */
+		  dbl grad_phi_j[DIM], grad_II_phi_j[DIM], d_grad_II_phi_j_dmesh[DIM][DIM][MDE];
 		  
-	      		for ( j=0; j<ei->dof[var]; j++) {
-	      			porous = 0.0;
-	      			ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		  for ( j=0; j<ei->dof[var]; j++) {
+		    porous = 0.0;
+		    ShellBF(var, j, &phi_j, grad_phi_j, grad_II_phi_j, d_grad_II_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+		    
+		    /* Assemble */
+		    porous += phi_i*(( LubAux->dv_avg_dS1[a][j] )*phi_j + LubAux->dv_avg_dS2[a][j]*grad_II_phi_j[a]);
+		    
+		    // jacobian of stabilized term is
+		    
+		    dbl tf_mu, tfmp_dmu_dS;
+		    tfmp_mu(fv->tfmp_sat, &tf_mu, &tfmp_dmu_dS);
+		    /* Use the height_function_model */
+		    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+		    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+		    h = height_function_model(&H_U, &dH_U_dtime, 
+					      &H_L, &dH_L_dtime,
+					      dH_U_dX, dH_L_dX, &dH_U_dp, 
+					      &dH_U_ddh, time, dt);
+		    
+		    //double dh_dtime = dH_U_dtime - dH_L_dtime;
+		    
+		    dbl tfmp_permeability = h*h/12;
+		    
+		    dbl dstabilized_dS = 0.0;
+		    dbl bf_sum, dbf_sum_dS;
+		    dbl dSj;
+		    int k;
+		    
+		    for (k=0; k<DIM; k++) {
+		      bf_sum = -tf_mu/tfmp_permeability*bf[R_MOMENTUM1 + k]->phi[i] + bf[R_TFMP_MASS]->grad_phi[i][k];
 
-	      			/* Assemble */
-	      			porous += phi_i*(( LubAux->dv_avg_dS1[a][j] )*phi_j + LubAux->dv_avg_dS2[a][j]*grad_II_phi_j[a]);
-	      			porous *= fv->sdet * wt * h3;
-	      			porous *= porous_brinkman_etm;
-	      			lec->J[peqn][pvar][ii][j] += porous;
-	      		}
-	      		//safe_free((void *) n_dof);
+		      dSj =  -1.0/tf_mu/tf_mu*tfmp_dmu_dS*bf[R_TFMP_MASS]->phi[j]*tfmp_permeability
+			*( tf_mu/tfmp_permeability*fv->v[k] + fv->grad_tfmp_pres[k] )
+			+ 1.0/tf_mu*tfmp_dmu_dS*bf[R_TFMP_MASS]->phi[j]*fv->v[k];
+
+		      dbf_sum_dS = -tfmp_dmu_dS*bf[R_TFMP_MASS]->phi[j]/tfmp_permeability*bf[R_MOMENTUM1+k]->phi[i];
+
+		      dstabilized_dS += bf_sum*dSj + tfmp_permeability/tf_mu*(tf_mu/tfmp_permeability*fv->v[k] + fv->grad_tfmp_pres[k])*dbf_sum_dS;
+
+
+		    }
+		    
+		    dstabilized_dS *= tfmp_msfem;
+		    
+		    porous += dstabilized_dS;
+		    porous *= fv->sdet * wt * h3;
+		    porous *= porous_brinkman_etm;
+		    lec->J[peqn][pvar][ii][j] += porous;
+		  }
+		  //safe_free((void *) n_dof);
 	      	}
 	      }
 
