@@ -5230,6 +5230,9 @@ tfmp_PG_elem(PG_DATA *pg_data) {
     pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
   }
   pg_data->k *= 0.5;
+
+  // find a way to add average gradp and and average mu and average gap thickness
+
   return;
 }
 

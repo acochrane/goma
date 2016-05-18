@@ -15967,7 +15967,8 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
-      	mass += phi_i*(h*(drho_dS)*fv_dot->tfmp_sat + rho*dh_dtime);
+	mass += phi_i*h*drho_dS*fv_dot->tfmp_sat;
+	mass += phi_i*rho*dh_dtime;
       	mass *= dA * etm_mass_eqn;
       }
       /* Assemble advection term */
@@ -16090,8 +16091,9 @@ assemble_shell_tfmp(double time,   /* Time */
       		mass = 0.0;
 
       		if( T_MASS ) {
-      			mass = phi_i*phi_j*drho_dS*(h*(1+2*tt)/delta_t + dh_dtime);
-      			mass *= etm_mass_eqn;
+		  mass += phi_i*phi_j*drho_dS*h*(1+2*tt)/delta_t;
+		  mass += phi_i*phi_j*drho_dS*dh_dtime;
+		  mass *= etm_mass_eqn;
       		}
       		// Assemble advection term
       		adv = 0.0;

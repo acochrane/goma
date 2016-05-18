@@ -793,12 +793,16 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
     local_lumped[MEAN_SHEAR] = 1.;
   }
 
-  if (PRESSURE_CONT != -1 && pd->v[PRESSURE] &&
+  if (PRESSURE_CONT != -1 && (pd->v[PRESSURE] || pd->v[TFMP_PRES]) &&
       (pd->e[R_MOMENTUM1] || (pd->MeshMotion == LAGRANGIAN ||
 			      pd->MeshMotion == DYNAMIC_LAGRANGIAN)
        || (pd->MeshMotion == TOTAL_ALE)))
     {
-      local_post[PRESSURE_CONT] = fv->P;
+      if (pd->v[PRESSURE]) {
+	local_post[PRESSURE_CONT] = fv->P;
+      } else if (pd->v[TFMP_PRES]) {
+	local_post[PRESSURE_CONT] = fv->tfmp_pres;
+      }
       local_lumped[PRESSURE_CONT] = 1.;
     }
 
