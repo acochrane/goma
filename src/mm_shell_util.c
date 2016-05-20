@@ -5222,17 +5222,59 @@ ShellBF (
 
 void
 tfmp_PG_elem(PG_DATA *pg_data) {
-  int k;
+  int k, inode, err;
+
   // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
   pg_data->k = 0.0;
-  for (k=0; k<DIM; k++) {
-    pg_data->h[k] = sqrt(pg_data->hsquared[k]);
-    pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
+  double xi[3] = {0.0, 0.0, 0.0};
+  if (pd->eqn[VELOCITY1]) { // VPS formulation
+    for (k=0; k<DIM; k++) {
+      pg_data->h[k] = sqrt(pg_data->hsquared[k]);
+      pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
+    }
+  } else { // PS formulation
+    for (k=0; k<DIM; k++) {
+      pg_data->v_avg[k] = 0.0;
+    }
+    for ( inode = 0; inode < ei->num_local_nodes; inode++) { 
+      find_nodal_stu (inode, ei->elem_type, xi[0], xi[1], xi[2]);
+      err = load_basis_functions(xi, bfd); // why oh why is the global var **bfd 
+                                           // passed into a function?
+      EH( err, "problem from load_basis_functions: called in tfmp_PG_elem in mm_shell_util.c");
+      err = beer_belly();
+      EH( err, "beer_belly: called in tfmp_PG_elem in mm_shell_util.c");
+      if( neg_elem_volume ) return -1;
+      if( zero_detJ ) return -1;
+      err = load_fv();
+      EH( err, "load_fv: called in tfmp_PG_elem in mm_shell_util.c");
+      err = load_bf_grad();
+      EH( err, "load_bf_grad: called in tfmp_PG_elem in mm_shell_util.c");
+      
+      err = load_fv_grads(); // because why do it the hard way
+      EH( err, "load_fv_grads: called in tfmp_PG_elem in mm_shell_util.c");
+
+      double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+      double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+      h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+				dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
+      dbl mu, dmu_dS;
+      tfmp_mu(fv->tfmp_sat, &mu, &dmu_dS);
+      for (k=0; k<DIM; k++) {
+	pg_data->v_avg[k] += h*h/12.0/mu*fv->grad_tfmp_pres[k];
+      }
+    }
+    for (k=0; k<DIM; k++) {
+      pg_data->v_avg[k] *= 1.0/ei->num_local_nodes;
+      pg_data->h[k] = sqrt(pg_data->hsquared[k]);
+      pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
+    }
+    if (pg_data->v_avg[2] != 0.0 && pg_data->h[2] == 0.0) {
+      EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the velocity before this point.");
+    }
   }
   pg_data->k *= 0.5;
 
-  // find a way to add average gradp and and average mu and average gap thickness
-
+  // find a way to add average gradp and and average mu and average 
   return;
 }
 
