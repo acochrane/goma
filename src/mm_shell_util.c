@@ -5262,7 +5262,7 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       Inn(fv->grad_tfmp_pres, gradII_P);
       tfmp_mu(fv->tfmp_sat, &mu, &dmu_dS);
       for (k=0; k<DIM; k++) {
-	pg_data->v_avg[k] += h*h/12.0/mu*gradII_P[k];
+	pg_data->v_avg[k] += -h*h/12.0/mu*gradII_P[k];
       }
     }
     for (k=0; k<DIM; k++) {
@@ -5270,8 +5270,8 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       pg_data->h[k] = sqrt(pg_data->hsquared[k]);
       pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
     }
-    if (pg_data->v_avg[2] >= 1e-20 && pg_data->h[2] == 0.0) {
-      printf("v_avg = %0.12f; h = %0.12f", pg_data->v_avg[2], pg_data->h[2]);
+    if (abs(pg_data->v_avg[0] - pg_data->v_avg[2]) >= 1e10 && pg_data->h[2] == 0.0) {
+      printf("v_avg = %0.22f; h = %0.22f", pg_data->v_avg[2], pg_data->h[2]);
       EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the velocity before this point.");
     }
   }
