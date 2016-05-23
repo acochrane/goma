@@ -807,7 +807,7 @@ matrix_fill(
   if (mp->tfmp_wt_model != GALERKIN) {
 	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
-	tfmp_PG_elem(&pg_data);
+	tfmp_PG_elem(&pg_data, time_value, delta_t);
   }
   
   if (cr->MassFluxModel == HYDRODYNAMIC)

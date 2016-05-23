@@ -181,7 +181,9 @@ PROTO((
 
 EXTERN void tfmp_PG_elem // compute pg_data once per element
 PROTO((
-       PG_DATA *pg_data
+       PG_DATA *pg_data,
+       double time,
+       double dt
        ));
 EXTERN void tfmp_PG_gausspt // compute pg_data once per gausspt (per element)
 PROTO((

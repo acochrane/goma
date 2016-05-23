@@ -5221,13 +5221,13 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
-tfmp_PG_elem(PG_DATA *pg_data) {
+tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
   int k, inode, err;
 
   // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
   pg_data->k = 0.0;
   double xi[3] = {0.0, 0.0, 0.0};
-  if (pd->eqn[VELOCITY1]) { // VPS formulation
+  if (pd->e[R_MOMENTUM1]) { // VPS formulation
     for (k=0; k<DIM; k++) {
       pg_data->h[k] = sqrt(pg_data->hsquared[k]);
       pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
@@ -5237,14 +5237,14 @@ tfmp_PG_elem(PG_DATA *pg_data) {
       pg_data->v_avg[k] = 0.0;
     }
     for ( inode = 0; inode < ei->num_local_nodes; inode++) { 
-      find_nodal_stu (inode, ei->elem_type, xi[0], xi[1], xi[2]);
+      find_nodal_stu (inode, ei->ielem_type, &(xi[0]), &(xi[1]), &(xi[2]));
       err = load_basis_functions(xi, bfd); // why oh why is the global var **bfd 
                                            // passed into a function?
       EH( err, "problem from load_basis_functions: called in tfmp_PG_elem in mm_shell_util.c");
       err = beer_belly();
       EH( err, "beer_belly: called in tfmp_PG_elem in mm_shell_util.c");
-      if( neg_elem_volume ) return -1;
-      if( zero_detJ ) return -1;
+      if( neg_elem_volume ) EH( err, "neg_elem_volume in tfmp_PG_elem in mm_shell_util.c");
+      if( zero_detJ ) EH( err, "zero_detJ in tfmp_PG_elem in mm_shell_util.c");
       err = load_fv();
       EH( err, "load_fv: called in tfmp_PG_elem in mm_shell_util.c");
       err = load_bf_grad();
@@ -5258,9 +5258,11 @@ tfmp_PG_elem(PG_DATA *pg_data) {
       h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
 				dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
       dbl mu, dmu_dS;
+      dbl gradII_P[DIM];
+      Inn(fv->grad_tfmp_pres, gradII_P);
       tfmp_mu(fv->tfmp_sat, &mu, &dmu_dS);
       for (k=0; k<DIM; k++) {
-	pg_data->v_avg[k] += h*h/12.0/mu*fv->grad_tfmp_pres[k];
+	pg_data->v_avg[k] += h*h/12.0/mu*gradII_P[k];
       }
     }
     for (k=0; k<DIM; k++) {
@@ -5268,7 +5270,8 @@ tfmp_PG_elem(PG_DATA *pg_data) {
       pg_data->h[k] = sqrt(pg_data->hsquared[k]);
       pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
     }
-    if (pg_data->v_avg[2] != 0.0 && pg_data->h[2] == 0.0) {
+    if (pg_data->v_avg[2] >= 1e-20 && pg_data->h[2] == 0.0) {
+      printf("v_avg = %0.12f; h = %0.12f", pg_data->v_avg[2], pg_data->h[2]);
       EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the velocity before this point.");
     }
   }
