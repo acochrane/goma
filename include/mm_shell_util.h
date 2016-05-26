@@ -199,7 +199,9 @@ EXTERN void tfmp_PG_dvarj // compute sensitivities of wt_func
 PROTO((
        double *phi_i,
        double gradII_phi_i[DIM],
+       int j,
        double *phi_j,
+       double gradII_phi_j[DIM],
        PG_DATA *pg_data,
        int var
        ));

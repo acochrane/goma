@@ -722,9 +722,13 @@ matrix_fill(
   memset( pg_data.dhv_dxnode, 0, sizeof(double)*MDE*DIM);
   memset( pg_data.v_avg,      0, sizeof(double)*DIM);
   memset( pg_data.dv_dnode,   0, sizeof(double)*MDE*DIM);
-  memset( pg_data.vII,        0, sizeof(double)*DIM);
-  memset( pg_data.dwt_func_dvarj,   0, sizeof(double)*5);
 
+  memset( pg_data.vII,              0, sizeof(double)*DIM);
+  memset( pg_data.dwt_func_dvarj,   0, sizeof(double)*5);
+  memset( pg_data.node_gradII_P,      0, sizeof(double)*MDE*DIM);
+  memset( pg_data.node_height,      0, sizeof(double)*MDE);
+  memset( pg_data.node_mu,          0, sizeof(double)*MDE);
+  
   pg_data.mu_avg = 0.;
   pg_data.rho_avg = 0.;
 

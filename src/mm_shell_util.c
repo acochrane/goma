@@ -5222,8 +5222,8 @@ ShellBF (
 
 void
 tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
-  int k, inode, err;
-
+  int k, inode, jnode, err, v;
+  v = TFMP_PRES;
   // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
   pg_data->k = 0.0;
   double xi[3] = {0.0, 0.0, 0.0};
@@ -5238,9 +5238,10 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
     }
     for ( inode = 0; inode < ei->num_local_nodes; inode++) { 
       find_nodal_stu (inode, ei->ielem_type, &(xi[0]), &(xi[1]), &(xi[2]));
-      err = load_basis_functions(xi, bfd); // why oh why is the global var **bfd 
-                                           // passed into a function?
-      EH( err, "problem from load_basis_functions: called in tfmp_PG_elem in mm_shell_util.c");
+      err = load_basis_functions(xi, bfd); // why oh why is the global var 
+                                           // **bfd passed into a function?
+
+      EH( err, "load_basis_functions: called in tfmp_PG_elem in mm_shell_util.c");
       err = beer_belly();
       EH( err, "beer_belly: called in tfmp_PG_elem in mm_shell_util.c");
       if( neg_elem_volume ) EH( err, "neg_elem_volume in tfmp_PG_elem in mm_shell_util.c");
@@ -5263,7 +5264,16 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       tfmp_mu(fv->tfmp_sat, &mu, &dmu_dS);
       for (k=0; k<DIM; k++) {
 	pg_data->v_avg[k] += -h*h/12.0/mu*gradII_P[k];
+	pg_data->node_gradII_P[inode][k] = gradII_P[k];
+	for (jnode = 0; jnode<ei->num_local_nodes; jnode++) {
+	  pg_data->elem_gradphi_i_at_node_j[inode][jnode][k] = bf[v]->grad_phi[jnode][k];
+	}
       }
+      // wanted for Jacobian construction
+      pg_data->node_height[inode] = h;
+      pg_data->node_mu[inode] = mu;
+      pg_data->node_dmu_dS[inode] = dmu_dS;
+
     }
     for (k=0; k<DIM; k++) {
       pg_data->v_avg[k] *= 1.0/ei->num_local_nodes;
@@ -5271,11 +5281,11 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
     }
     if (abs(pg_data->v_avg[0] - pg_data->v_avg[2]) >= 1e10 && pg_data->h[2] == 0.0) {
-      printf("v_avg = %0.22f; h = %0.22f", pg_data->v_avg[2], pg_data->h[2]);
-      EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the velocity before this point.");
+      printf("v_avg[2] = %0.22f; h[2] = %0.22f", pg_data->v_avg[2], pg_data->h[2]);
+      EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the grad_P before this point.");
     }
   }
-  pg_data->k *= 0.5;
+  pg_data->k *= 0.5*mp->tfmp_wt_const;
 
   // find a way to add average gradp and and average mu and average 
   return;
@@ -5288,8 +5298,16 @@ tfmp_PG_gausspt(PG_DATA *pg_data) {
   // Inn is expensive so perform once in assemble then set pg_data->vII in assemble
   // before calling this function in 
   pg_data->v_mag_squared = 0.0;
-  for (k=0; k<DIM; k++) {
-    pg_data->v_mag_squared += pg_data->vII[k]*pg_data->vII[k];
+  pg_data->gp_mag_gradP_squared = 0.0;
+  if (pd->e[R_MOMENTUM1]) { // VPS Formulation
+    for (k=0; k<DIM; k++) {
+
+      pg_data->v_mag_squared += pg_data->vII[k]*pg_data->vII[k];
+    } 
+  } else {
+    for (k=0; k<DIM; k++) { // PS Formulation
+      pg_data->gp_mag_gradP_squared += pg_data->gp_gradII_P[k]*pg_data->gp_gradII_P[k];
+    }
   }
   return;
 }
@@ -5303,22 +5321,44 @@ tfmp_PG_dof (double *phi_i,
   switch (mp->tfmp_wt_model) {
   case GALERKIN:
     pg_data->wt_func = *phi_i;
+    pg_data->dof_k_i = 0.0;
     break;
  
   case SUPG: // 1982 Alexander Brooks and Thomas Hughes
-    pg_data->vII_dot_gradII_phi_i = 0.0; 
-
-    for (k=0; k<DIM; k++) {
-      pg_data->vII_dot_gradII_phi_i += pg_data->vII[k]*gradII_phi_i[k];
+    if (pd->e[R_MOMENTUM1]) { // VPS FORMULATION
+      pg_data->vII_dot_gradII_phi_i = 0.0; 
+      
+      for (k=0; k<DIM; k++) {
+	pg_data->vII_dot_gradII_phi_i += pg_data->vII[k]*gradII_phi_i[k];
+      }
+      
+      pg_data->wt_func = *phi_i;
+      if (pg_data->v_mag_squared != 0.0) pg_data->wt_func += (mp->tfmp_wt_const
+							      *(pg_data->k)
+							      *(pg_data->vII_dot_gradII_phi_i)
+							      /(pg_data->v_mag_squared));
+    } else { // PS Formulation
+      pg_data->wt_func = 0.0;
+      pg_data->dof_k_i = 0.0;
+      pg_data->dof_gradP_dot_gradphi_i = 0.0;
+      
+      if (pg_data->gp_mag_gradP_squared != 0.0) {
+	for (k=0; k<DIM; k++) {
+	  pg_data->dof_gradP_dot_gradphi_i += pg_data->gp_gradII_P[k]*gradII_phi_i[k];
+	}
+	pg_data->dof_k_i += (-mp->tfmp_wt_const
+			     *pg_data->k
+			     *12.0
+			     *pg_data->gp_mu
+			     *pg_data->dof_gradP_dot_gradphi_i
+			     /pg_data->gp_h
+			     /pg_data->gp_h
+			     /pg_data->gp_mag_gradP_squared);
+      }
+      pg_data->wt_func += *phi_i + pg_data->dof_k_i;
     }
-    
-    pg_data->wt_func = *phi_i;
-    if (pg_data->v_mag_squared != 0.0) pg_data->wt_func += (mp->tfmp_wt_const
-							     *(pg_data->k)
-							     *(pg_data->vII_dot_gradII_phi_i)
-							     /(pg_data->v_mag_squared));
-  
     break;
+    
   case SUPG_SCHUNK: // Randy's SUPG from shell energy eqn
     
     break;
@@ -5329,46 +5369,139 @@ tfmp_PG_dof (double *phi_i,
 void
 tfmp_PG_dvarj(double *phi_i,
 	      double gradII_phi_i[DIM],
+	      int j,
 	      double *phi_j,
+	      double gradII_phi_j[DIM],
 	      PG_DATA *pg_data,
-	      int var){
+	      int var) {
   // var indicates which variable to set dvarj to: 0:vx, 1:vy, 2:vz, 3:tfmp_pres, 4:temp_sat
-  double dv_cent_dv;
-    if (pd->i[VELOCITY1]==I_Q1) {
-      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
-    } else if (pd->i[VELOCITY1]==I_Q2) {
-      dv_cent_dv = 1.0/ei->dof[VELOCITY1];
-    }
-    else {
-      EH(-1, "We only know how to use Q1 weighting functions so far");
-      dv_cent_dv = 1.0/4.0;
-    }
+  double dv_cent_dv, dk_squig_dPj, dk_squig_dSj, varj_gradphi_i_dot_gradphi_j;
+  int k, inode;
 
+  pg_data->dwt_func_dvarj[var] = 0.0;
+
+  if (pd->i[VELOCITY1]==I_Q1) {
+    dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+  } else if (pd->i[VELOCITY1]==I_Q2) {
+    dv_cent_dv = 1.0/ei->dof[VELOCITY1];
+  }
+  else if (!pd->e[R_MOMENTUM1]) {
+    // it's ok if there's not momentum/velocity
+  }
+  else {
+    EH(-1, "We only know how to use Q1 and Q2 weighting functions so far");
+    dv_cent_dv = 1.0/4.0;
+  }
+  
+  
   switch (mp->tfmp_wt_model) {
+    
   case GALERKIN:
     pg_data->dwt_func_dvarj[var] = 0.0;
     break;
   case SUPG:
-    // velocities
-    if (var < 3 && pg_data->v_mag_squared != 0.0) {
-      pg_data->dwt_func_dvarj[var] = (pg_data->k
-				      *( pg_data->vII_dot_gradII_phi_i
-					 *(-2.0*pg_data->vII[var]*(*phi_j)
-					   /pg_data->v_mag_squared
-					   /pg_data->v_mag_squared) 
-					 + (gradII_phi_i[var]
-					    *(*phi_j)
-					    /pg_data->v_mag_squared)));
-      pg_data->dwt_func_dvarj[var] += (pg_data->vII_dot_gradII_phi_i
-				       /pg_data->v_mag_squared
-				       /2.0
-				       *dv_cent_dv
-				       *pg_data->h[var]);
-      pg_data->dwt_func_dvarj[var] *= mp->tfmp_wt_const;
+    if (pd->e[R_MOMENTUM1]) { // VPS Formulation
+      // velocities
+      if (var < 3 && pg_data->v_mag_squared != 0.0) {
+	pg_data->dwt_func_dvarj[var] = (pg_data->k
+					*( pg_data->vII_dot_gradII_phi_i
+					   *(-2.0*pg_data->vII[var]*(*phi_j)
+					     /pg_data->v_mag_squared
+					     /pg_data->v_mag_squared) 
+					   + (gradII_phi_i[var]
+					      *(*phi_j)
+					      /pg_data->v_mag_squared)));
+	pg_data->dwt_func_dvarj[var] += (pg_data->vII_dot_gradII_phi_i
+					 /pg_data->v_mag_squared
+					 /2.0
+					 *dv_cent_dv
+					 *pg_data->h[var]);
+	pg_data->dwt_func_dvarj[var] *= mp->tfmp_wt_const;
+      }
+      else if (var > 2) { 
+	pg_data->dwt_func_dvarj[var] = 0.0;
+      }
+    } else {  // PS Formulation
+      if (var == 3 && pg_data->gp_mag_gradP_squared != 0.0) { // varj == Pj
+	dk_squig_dPj = 0.0;
+	pg_data->varj_gradP_dot_gradphi_j = 0.0;
+	varj_gradphi_i_dot_gradphi_j = 0.0;
+	for (k=0; k<DIM; k++) {
+	  pg_data->varj_gradP_dot_gradphi_j += (pg_data->gp_gradII_P[k]
+						*gradII_phi_j[k]);
+	  varj_gradphi_i_dot_gradphi_j += (gradII_phi_i[k]
+					   *gradII_phi_j[k]);
+	  
+	}
+	// prepare dk_squig_dPj - jamaican squid pajamas?
+	for (k = 0; k<DIM; k++) {
+	  for (inode = 0; inode<ei->num_local_nodes; inode++) {
+	    dk_squig_dPj += (pg_data->node_height[inode]
+			     *pg_data->node_height[inode]
+			     /12.0
+			     /pg_data->node_mu[inode]
+			     *pg_data->elem_gradphi_i_at_node_j[j][inode][k]
+			     *pg_data->h[k]);
+	  }
+	}
+	dk_squig_dPj *= mp->tfmp_wt_const/2.0/ei->num_local_nodes;
+	
+	pg_data->dwt_func_dvarj[var] = (-pg_data->k
+					*12.0
+					*pg_data->gp_mu
+					/pg_data->gp_h
+					/pg_data->gp_h
+					*( (pg_data->dof_gradP_dot_gradphi_i
+					    *-2.0
+					    /pg_data->gp_mag_gradP_squared
+					    /pg_data->gp_mag_gradP_squared
+					    *pg_data->varj_gradP_dot_gradphi_j)
+					   + (1.0
+					      /pg_data->gp_mag_gradP_squared
+					      *varj_gradphi_i_dot_gradphi_j)));
+	pg_data->dwt_func_dvarj[var] += (-12.0
+					 *pg_data->gp_mu
+					 /pg_data->gp_h
+					 /pg_data->gp_h
+					 *pg_data->dof_gradP_dot_gradphi_i
+					 /pg_data->gp_mag_gradP_squared
+					 *dk_squig_dPj);
+      }
+      if (var == 4 && pg_data->gp_mag_gradP_squared != 0.0) { // varj == Sj
+	
+	pg_data->dwt_func_dvarj[var] = 0.0;
+	dk_squig_dSj = 0.0;
+	for (k=0; k<DIM; k++) {
+	  dk_squig_dSj += (pg_data->node_gradII_P[j][k]
+			   *pg_data->h[k]);
+	}
+	dk_squig_dSj *= (mp->tfmp_wt_const
+			 /2.0
+			 /ei->num_local_nodes
+			 *-pg_data->node_height[j]
+			 *pg_data->node_height[j]
+			 /12.0
+			 /-pg_data->node_mu[j]
+			 /pg_data->node_mu[j]
+			 *pg_data->node_dmu_dS[j]);
+	
+	
+	pg_data->dwt_func_dvarj[var] += (-pg_data->dof_gradP_dot_gradphi_i
+					 /pg_data->gp_mag_gradP_squared
+					 *(pg_data->k
+					   *12.0
+					   /pg_data->gp_h
+					   /pg_data->gp_h
+					   *pg_data->gp_dmu_dS
+					   *(*phi_j)
+					   + (12.0
+					      *pg_data->gp_mu
+					      /pg_data->gp_h
+					      /pg_data->gp_h
+					      *dk_squig_dSj)));
+      }
     }
-    else if (var > 2) {
-      pg_data->dwt_func_dvarj[var] = 0.0;
-    }
+    
     break;
   }
   return;

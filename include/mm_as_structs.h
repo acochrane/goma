@@ -2935,8 +2935,20 @@ struct Petrov_Galerkin_Data {
   double dwt_func_dvarj[5]; /* derivative of wt_func w.r.t. varj - compute the var'th entry in every jacobian iteration
 			       so far only tfmp uses 5 variables max; 0:vx, 1:vy, 2:vz, 3:tfmp_pres, 4:tfmp_sat */
   // more variables for velocity-less (PS) formulation - do I need these?
-  double grad_P_avg[DIM];
-  
+  double elem_gradphi_i_at_node_j[MDE][MDE][DIM];
+  double node_gradII_P[MDE][DIM];
+  double node_height[MDE];
+  double node_mu[MDE];
+  double node_dmu_dS[MDE];
+  double node_gradphi_j[MDE][DIM];
+  double gp_gradII_P[DIM];
+  double gp_mag_gradP_squared;
+  double gp_h;
+  double gp_mu;
+  double gp_dmu_dS;
+  double dof_gradP_dot_gradphi_i;
+  double dof_k_i;
+  double varj_gradP_dot_gradphi_j;
 };
 
 typedef struct Petrov_Galerkin_Data PG_DATA;
