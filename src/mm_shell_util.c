@@ -5273,6 +5273,7 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       pg_data->node_height[inode] = h;
       pg_data->node_mu[inode] = mu;
       pg_data->node_dmu_dS[inode] = dmu_dS;
+      pg_data->node_P[inode] = fv->tfmp_pres;
 
     }
     for (k=0; k<DIM; k++) {
@@ -5471,10 +5472,29 @@ tfmp_PG_dvarj(double *phi_i,
 	
 	pg_data->dwt_func_dvarj[var] = 0.0;
 	dk_squig_dSj = 0.0;
+	dbl sum_dphi_dx = 0.0;
 	for (k=0; k<DIM; k++) {
 	  dk_squig_dSj += (pg_data->node_gradII_P[j][k]
 			   *pg_data->h[k]);
+	  /* Commented code was used to compare methods for calculating gradP at nodes, when hunting down jacobian bugs. It turns out that both methods work fine.
+	  for (inode = 0; inode<ei->num_local_nodes; inode++) {
+	    sum_dphi_dx += (pg_data->elem_gradphi_i_at_node_j[inode][j][k]
+			    *pg_data->node_P[inode]
+			    *pg_data->h[k]);
+			    }*/
 	}
+
+	/*sum_dphi_dx *= (mp->tfmp_wt_const
+			/2.0
+			/ei->num_local_nodes
+			*pg_data->node_height[j]
+			*pg_data->node_height[j]
+			/12.0
+			/pg_data->node_mu[j]
+			/pg_data->node_mu[j]
+			*pg_data->node_dmu_dS[j]);*/
+			  
+
 	dk_squig_dSj *= (mp->tfmp_wt_const
 			 /2.0
 			 /ei->num_local_nodes
@@ -5484,7 +5504,8 @@ tfmp_PG_dvarj(double *phi_i,
 			 /-pg_data->node_mu[j]
 			 /pg_data->node_mu[j]
 			 *pg_data->node_dmu_dS[j]);
-	
+
+	//dk_squig_dSj = sum_dphi_dx;
 	
 	pg_data->dwt_func_dvarj[var] += (-pg_data->dof_gradP_dot_gradphi_i
 					 /pg_data->gp_mag_gradP_squared

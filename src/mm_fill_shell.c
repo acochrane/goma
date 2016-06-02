@@ -16141,10 +16141,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	    for (k=0; k<DIM; k++) {
 	      gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
 	    }
-	    adv += phi_i*( h*h*h/12*(1./mu/mu*(d2mu_dS2*phi_j*gradS_dot_gradP
-					       +dmu_dS*gradP_dot_gradphi_j)
-				     + dmu_dS*gradS_dot_gradP*(-2./mu/mu/mu
-							     *dmu_dS*phi_j)));
+	    adv += phi_i*h*h*h/12.0*((-2.0/mu/mu/mu*dmu_dS*dmu_dS
+				      *phi_j*gradS_dot_gradP)
+				     + (1.0/mu/mu*dmu_dS*gradP_dot_gradphi_j));
+
 	    adv *= etm_adv_eqn;
 	  }
 	  // Assemble diffusion term
@@ -16299,7 +16299,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	      for (k = 0; k<DIM; k++) {
 		gradS_dot_gradphi_j += gradII_S[k]*gradII_phi_j[k];
 	      }
-	      adv += ((phi_i + pg_data->dof_k_i)
+	      adv += (pg_data->wt_func
 		      *-h*h/12.0/mu*gradS_dot_gradphi_j);
 	      adv += pg_data->dwt_func_dvarj[3]*-h*h/12.0/mu*gradS_dot_gradP;
 		
@@ -16330,14 +16330,14 @@ assemble_shell_tfmp(double time,   /* Time */
 	    // Assemble mass term
 	    mass = 0.0;
 	    if( T_MASS ) {
-	      mass += (phi_i + pg_data->dof_k_i)*(1+2*tt)/delta_t*phi_j;
-	      mass += (pg_data->dwt_func_dvarj[4]
-		       *(fv_dot->tfmp_sat
+	      mass += (pg_data->wt_func)*(1+2*tt)/delta_t*phi_j;
+	      mass += 1.*(pg_data->dwt_func_dvarj[4]
+		       *(fv_dot->tfmp_sat));/*
 			 - (h
 			    *h
 			    /12.0
 			    /mu
-			    *gradS_dot_gradP)));
+			    *gradS_dot_gradP)));*/
 	    }
 	    mass *= etm_mass_eqn;
 
@@ -16348,8 +16348,15 @@ assemble_shell_tfmp(double time,   /* Time */
 	      for (k=0; k<DIM; k++) {
 		gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
 	      }
-	      adv += phi_i*(-h*h/12.0*(-1./mu/mu*dmu_dS*phi_j*gradS_dot_gradP
-				       + 1./mu*gradP_dot_gradphi_j));
+	      adv += pg_data->wt_func*(-h*h/12.0
+				       *(-1./mu/mu*dmu_dS*phi_j*gradS_dot_gradP
+					 + 1./mu*gradP_dot_gradphi_j));
+	      adv += (pg_data->dwt_func_dvarj[4]
+		      *-h
+		      *h
+		      /12.0
+		      /mu
+		      *gradS_dot_gradP);
 	    }
 	    adv *= etm_adv_eqn;
 

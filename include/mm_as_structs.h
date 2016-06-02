@@ -2941,6 +2941,7 @@ struct Petrov_Galerkin_Data {
   double node_mu[MDE];
   double node_dmu_dS[MDE];
   double node_gradphi_j[MDE][DIM];
+  double node_P[MDE];
   double gp_gradII_P[DIM];
   double gp_mag_gradP_squared;
   double gp_h;
