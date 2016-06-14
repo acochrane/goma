@@ -15952,6 +15952,7 @@ assemble_shell_tfmp(double time,   /* Time */
       }
       pg_data->gp_h = h;
       pg_data->gp_mu = mu;
+      pg_data->gp_dmu_dS = dmu_dS;
     }
   }
 
@@ -15987,16 +15988,19 @@ assemble_shell_tfmp(double time,   /* Time */
     /* Loop over DOF (i) */   
     for(i = 0; i < ei->dof[eqn]; i++) {
       ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+      tfmp_PG_dof(&phi_i, gradII_phi_i, pg_data);
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
-	mass += phi_i*dh_dtime;
+	mass += pg_data->wt_func*dh_dtime;
+
       	mass *= dA * etm_mass_eqn;
       }
       /* Assemble advection term */
       adv = 0.0;
       if ( T_ADVECTION ) {
-      	adv += phi_i*h*h*h/12.0/mu/mu*dmu_dS*gradS_dot_gradP;
+	adv += pg_data->wt_func*h*h*h/12.0/mu/mu*dmu_dS*gradS_dot_gradP;
+
       	adv *= dA * etm_adv_eqn;
       }
       /* Assemble diffusion term */
@@ -16053,9 +16057,11 @@ assemble_shell_tfmp(double time,   /* Time */
 	  mass += pg_data->wt_func*fv_dot->tfmp_sat;
 	}
 	if ( T_ADVECTION ) {
+	  //	  adv += pg_data->k;
 	  adv += pg_data->wt_func*-h*h/12.0/mu*gradS_dot_gradP;
 	}
 	if( T_DIFFUSION ) {
+	  //	  diff += -h*h/12.0/mu*gradS_dot_gradP;
 	}
       }
       mass *= dA * etm_mass_eqn;
@@ -16078,6 +16084,7 @@ assemble_shell_tfmp(double time,   /* Time */
     for ( i = 0; i < ei->dof[eqn]; i++) { /* The sensitivities of R_TFMP_MASS to TFMP_PRES and TFMP_SAT */
       // Load basis functions
       ShellBF( eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      tfmp_PG_dof(&phi_i, gradII_phi_i, pg_data);
       // Assemble sensitivities for TFMP_PRES
       //for (l = 0; l<DIM; l++) {
       var = TFMP_PRES;
@@ -16087,9 +16094,14 @@ assemble_shell_tfmp(double time,   /* Time */
 	for ( j = 0; j < ei->dof[var]; j++) {
 	  // Load basis functions
 	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  tfmp_PG_dvarj(&phi_i, gradII_phi_i, j, &phi_j, gradII_phi_j, pg_data, 3);
+	  
 	  // Assemble mass term
 	  mass = 0.0;
-	  
+	  if ( T_MASS ) {
+	    mass += pg_data->dwt_func_dvarj[3]*dh_dtime;
+	    mass *= etm_mass_eqn;
+	  }
 	  //mass *= dA * etm_mass_eqn;
 	  // Assemble advection term
 	  adv = 0.0;
@@ -16099,7 +16111,10 @@ assemble_shell_tfmp(double time,   /* Time */
 	    for (k=0; k<DIM; k++) {
 	      gradS_dot_gradphi_j += gradII_S[k]*gradII_phi_j[k];
 	    }
-	    adv += phi_i*h*h*h/12./mu/mu*dmu_dS*gradS_dot_gradphi_j;
+	    //adv += pg_data->varj_db_dvarj;
+	    adv += pg_data->wt_func*h*h*h/12./mu/mu*dmu_dS*gradS_dot_gradphi_j;
+	    adv += (pg_data->dwt_func_dvarj[3]
+		    *h*h*h/12./mu/mu*dmu_dS*gradS_dot_gradP);
 	    adv *= etm_adv_eqn;
 	  }
 	  // Assemble diffusion term
@@ -16128,11 +16143,13 @@ assemble_shell_tfmp(double time,   /* Time */
       	for ( j = 0; j < ei->dof[var]; j++) {
 	  // Load basis functions
 	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	  tfmp_PG_dvarj(&phi_i, gradII_phi_i, j, &phi_j, gradII_phi_j, pg_data, 4);
 	  // Assemble mass term
 	  mass = 0.0;
 	  
 	  if( T_MASS ) {
-
+	    mass += pg_data->dwt_func_dvarj[4]*dh_dtime;
+	    mass *= etm_mass_eqn;
 	  }
 	  // Assemble advection term
 	  adv = 0.0;
@@ -16141,9 +16158,12 @@ assemble_shell_tfmp(double time,   /* Time */
 	    for (k=0; k<DIM; k++) {
 	      gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
 	    }
-	    adv += phi_i*h*h*h/12.0*((-2.0/mu/mu/mu*dmu_dS*dmu_dS
+	    adv += pg_data->wt_func*h*h*h/12.0*((-2.0/mu/mu/mu*dmu_dS*dmu_dS
 				      *phi_j*gradS_dot_gradP)
 				     + (1.0/mu/mu*dmu_dS*gradP_dot_gradphi_j));
+	    adv += (pg_data->dwt_func_dvarj[4]
+		    *h*h*h/12./mu/mu*dmu_dS*gradS_dot_gradP);
+	    //adv += pg_data->varj_db_dvarj;
 
 	    adv *= etm_adv_eqn;
 	  }
@@ -16302,14 +16322,19 @@ assemble_shell_tfmp(double time,   /* Time */
 	      adv += (pg_data->wt_func
 		      *-h*h/12.0/mu*gradS_dot_gradphi_j);
 	      adv += pg_data->dwt_func_dvarj[3]*-h*h/12.0/mu*gradS_dot_gradP;
+	      //adv +=pg_data->dwt_func_dvarj[3];
 		
 	    }
 
 
 	    // Assemble diffusion term
 	    diff = 0.0;
+	    gradS_dot_gradphi_j = 0.0;
 	    if ( T_DIFFUSION ) {
-
+	      for (k = 0; k<DIM; k++) {
+		gradS_dot_gradphi_j += gradII_S[k]*gradII_phi_j[k];
+	      }
+	      //	      diff += -h*h/12.0/mu*gradS_dot_gradphi_j;
 	    }
 
 	    mass *= etm_mass_eqn;
@@ -16318,7 +16343,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	    // Assemble full Jacobian
 	    lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
 	  } // End of loop over DOF (j)
-	} // End of sensitivities to TFMP_SAT
+	} // End of sensitivities to TFMP_PRES
 	var = TFMP_SAT;
 	if (pd->v[var]) {
 	  pvar = upd->vp[var];
@@ -16331,8 +16356,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	    mass = 0.0;
 	    if( T_MASS ) {
 	      mass += (pg_data->wt_func)*(1+2*tt)/delta_t*phi_j;
-	      mass += 1.*(pg_data->dwt_func_dvarj[4]
-		       *(fv_dot->tfmp_sat));/*
+	      mass += (pg_data->dwt_func_dvarj[4]
+		       *(fv_dot->tfmp_sat));
+/*
 			 - (h
 			    *h
 			    /12.0
@@ -16357,13 +16383,22 @@ assemble_shell_tfmp(double time,   /* Time */
 		      /12.0
 		      /mu
 		      *gradS_dot_gradP);
+	      //	      adv += pg_data->dwt_func_dvarj[4];
+
 	    }
 	    adv *= etm_adv_eqn;
 
 	    // Assemble diffusion term
 	    diff = 0.0;
+	    gradP_dot_gradphi_j = 0.0;
 	    if ( T_DIFFUSION ) {
-
+	      for (k=0; k<DIM; k++) {
+		gradP_dot_gradphi_j += gradII_P[k]*gradII_phi_j[k];
+	      }
+	      /*
+	      diff += (-h*h/12.0
+		       *(-1./mu/mu*dmu_dS*phi_j*gradS_dot_gradP
+		       + 1./mu*gradP_dot_gradphi_j)); */
 	    }
 	    diff *= etm_diff_eqn;	    
 

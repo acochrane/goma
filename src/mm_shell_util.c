@@ -5221,8 +5221,9 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
-tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
-  int k, inode, jnode, err, v;
+tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t, const Exo_DB *exo) {
+  int k, inode, jnode, jdof, err, v;
+  double phi_i, grad_phi_i[DIM], gradII_phi_i[DIM], d_gradII_phi_i_dmesh[DIM][DIM][MDE];
   v = TFMP_PRES;
   // pg_data must contain v_avg and hsquared before this is called in mm_fill.c
   pg_data->k = 0.0;
@@ -5240,7 +5241,12 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       find_nodal_stu (inode, ei->ielem_type, &(xi[0]), &(xi[1]), &(xi[2]));
       err = load_basis_functions(xi, bfd); // why oh why is the global var 
                                            // **bfd passed into a function?
-
+      /* Setup Lubrication */
+      int *n_dof = NULL;
+      int dof_map[MDE];
+      n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+      lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+      
       EH( err, "load_basis_functions: called in tfmp_PG_elem in mm_shell_util.c");
       err = beer_belly();
       EH( err, "beer_belly: called in tfmp_PG_elem in mm_shell_util.c");
@@ -5265,8 +5271,11 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       for (k=0; k<DIM; k++) {
 	pg_data->v_avg[k] += -h*h/12.0/mu*gradII_P[k];
 	pg_data->node_gradII_P[inode][k] = gradII_P[k];
-	for (jnode = 0; jnode<ei->num_local_nodes; jnode++) {
-	  pg_data->elem_gradphi_i_at_node_j[inode][jnode][k] = bf[v]->grad_phi[jnode][k];
+      }
+      for (jdof = 0; jdof<ei->num_local_nodes; jdof++) {
+	ShellBF( v, jdof, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+	for (k=0; k<DIM; k++) {
+	  pg_data->elem_gradphi_i_at_node_j[jdof][inode][k] = gradII_phi_i[k];
 	}
       }
       // wanted for Jacobian construction
@@ -5281,7 +5290,8 @@ tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t) {
       pg_data->h[k] = sqrt(pg_data->hsquared[k]);
       pg_data->k += pg_data->v_avg[k]*pg_data->h[k];
     }
-    if (abs(pg_data->v_avg[0] - pg_data->v_avg[2]) >= 1e10 && pg_data->h[2] == 0.0) {
+    //    if (abs(pg_data->v_avg[0] - pg_data->v_avg[2]) >= 1e10 && pg_data->h[2] == 0.0) {
+    if (pg_data->h[2] != 0.0) {
       printf("v_avg[2] = %0.22f; h[2] = %0.22f", pg_data->v_avg[2], pg_data->h[2]);
       EH(-1, "you might be losing something in the third dimension, not Buckminster Fuller's third dimension, mind you. You should probably Inn the grad_P before this point.");
     }
@@ -5342,21 +5352,25 @@ tfmp_PG_dof (double *phi_i,
       pg_data->wt_func = 0.0;
       pg_data->dof_k_i = 0.0;
       pg_data->dof_gradP_dot_gradphi_i = 0.0;
-      
+
       if (pg_data->gp_mag_gradP_squared != 0.0) {
 	for (k=0; k<DIM; k++) {
 	  pg_data->dof_gradP_dot_gradphi_i += pg_data->gp_gradII_P[k]*gradII_phi_i[k];
 	}
-	pg_data->dof_k_i += (-mp->tfmp_wt_const
-			     *pg_data->k
-			     *12.0
+	pg_data->dof_b_i = 0.0;
+	pg_data->dof_b_i += (12.0
 			     *pg_data->gp_mu
+			     /pg_data->gp_h
+			     /pg_data->gp_h
 			     *pg_data->dof_gradP_dot_gradphi_i
-			     /pg_data->gp_h
-			     /pg_data->gp_h
 			     /pg_data->gp_mag_gradP_squared);
+	//pg_data->dof_b_i += 1.0/pg_data->gp_mag_gradP_squared;
+
+	pg_data->dof_k_i += (-pg_data->k
+			     *pg_data->dof_b_i);
       }
       pg_data->wt_func += *phi_i + pg_data->dof_k_i;
+
     }
     break;
     
@@ -5424,6 +5438,7 @@ tfmp_PG_dvarj(double *phi_i,
       }
     } else {  // PS Formulation
       if (var == 3 && pg_data->gp_mag_gradP_squared != 0.0) { // varj == Pj
+      //      if (var == 3 ) { // varj == Pj
 	dk_squig_dPj = 0.0;
 	pg_data->varj_gradP_dot_gradphi_j = 0.0;
 	varj_gradphi_i_dot_gradphi_j = 0.0;
@@ -5437,7 +5452,7 @@ tfmp_PG_dvarj(double *phi_i,
 	// prepare dk_squig_dPj - jamaican squid pajamas?
 	for (k = 0; k<DIM; k++) {
 	  for (inode = 0; inode<ei->num_local_nodes; inode++) {
-	    dk_squig_dPj += (pg_data->node_height[inode]
+	    dk_squig_dPj += (-pg_data->node_height[inode]
 			     *pg_data->node_height[inode]
 			     /12.0
 			     /pg_data->node_mu[inode]
@@ -5446,8 +5461,29 @@ tfmp_PG_dvarj(double *phi_i,
 	  }
 	}
 	dk_squig_dPj *= mp->tfmp_wt_const/2.0/ei->num_local_nodes;
+
+	pg_data->varj_db_dvarj = 0.0;
+	if (pg_data->gp_mag_gradP_squared != 0.0) {	
+	  pg_data->varj_db_dvarj = (12.0
+				    *pg_data->gp_mu
+				    /pg_data->gp_h
+				    /pg_data->gp_h
+				    * ( varj_gradphi_i_dot_gradphi_j
+					/pg_data->gp_mag_gradP_squared
+				      - pg_data->dof_gradP_dot_gradphi_i
+					/pg_data->gp_mag_gradP_squared
+					/pg_data->gp_mag_gradP_squared
+					*2.0
+					*pg_data->varj_gradP_dot_gradphi_j));
+	}
+
+	pg_data->dwt_func_dvarj[var] += -(pg_data->dof_b_i
+					  *dk_squig_dPj
+					  + pg_data->k
+					  *pg_data->varj_db_dvarj);
 	
-	pg_data->dwt_func_dvarj[var] = (-pg_data->k
+	/*
+	pg_data->dwt_func_dvarj[var] = -(pg_data->k
 					*12.0
 					*pg_data->gp_mu
 					/pg_data->gp_h
@@ -5460,13 +5496,20 @@ tfmp_PG_dvarj(double *phi_i,
 					   + (1.0
 					      /pg_data->gp_mag_gradP_squared
 					      *varj_gradphi_i_dot_gradphi_j)));
-	pg_data->dwt_func_dvarj[var] += (-12.0
+	pg_data->dwt_func_dvarj[var] += -(12.0
 					 *pg_data->gp_mu
 					 /pg_data->gp_h
 					 /pg_data->gp_h
 					 *pg_data->dof_gradP_dot_gradphi_i
 					 /pg_data->gp_mag_gradP_squared
 					 *dk_squig_dPj);
+	 */
+	  /*pg_data->varj_db_dvarj = -2.0
+	    /pg_data->gp_mag_gradP_squared
+	    /pg_data->gp_mag_gradP_squared
+	    *pg_data->varj_gradP_dot_gradphi_j;*/
+
+	//pg_data->dwt_func_dvarj[var] = dk_squig_dPj;
       }
       if (var == 4 && pg_data->gp_mag_gradP_squared != 0.0) { // varj == Sj
 	
@@ -5476,7 +5519,7 @@ tfmp_PG_dvarj(double *phi_i,
 	for (k=0; k<DIM; k++) {
 	  dk_squig_dSj += (pg_data->node_gradII_P[j][k]
 			   *pg_data->h[k]);
-	  /* Commented code was used to compare methods for calculating gradP at nodes, when hunting down jacobian bugs. It turns out that both methods work fine.
+	  /* Commented code was used to compare methods for calculating gradP at nodes, when hunting down jacobian bugs. 
 	  for (inode = 0; inode<ei->num_local_nodes; inode++) {
 	    sum_dphi_dx += (pg_data->elem_gradphi_i_at_node_j[inode][j][k]
 			    *pg_data->node_P[inode]
@@ -5506,8 +5549,20 @@ tfmp_PG_dvarj(double *phi_i,
 			 *pg_data->node_dmu_dS[j]);
 
 	//dk_squig_dSj = sum_dphi_dx;
-	
-	pg_data->dwt_func_dvarj[var] += (-pg_data->dof_gradP_dot_gradphi_i
+	pg_data->varj_db_dvarj = 0.0;
+	if (pg_data->gp_mag_gradP_squared != 0.0) {
+	  pg_data->varj_db_dvarj = pg_data->dof_b_i
+	    /pg_data->gp_mu
+	    *pg_data->gp_dmu_dS
+	    *(*phi_j);
+	}
+
+	pg_data->dwt_func_dvarj[var] += -(pg_data->dof_b_i
+					  *dk_squig_dSj
+					  + pg_data->k
+					  *pg_data->varj_db_dvarj);
+
+	/*	pg_data->dwt_func_dvarj[var] += (-pg_data->dof_gradP_dot_gradphi_i
 					 /pg_data->gp_mag_gradP_squared
 					 *(pg_data->k
 					   *12.0
@@ -5519,7 +5574,9 @@ tfmp_PG_dvarj(double *phi_i,
 					      *pg_data->gp_mu
 					      /pg_data->gp_h
 					      /pg_data->gp_h
-					      *dk_squig_dSj)));
+					      *dk_squig_dSj)));*/
+	//	pg_data->dwt_func_dvarj[var] = dk_squig_dSj;
+
       }
     }
     

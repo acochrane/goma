@@ -808,10 +808,10 @@ matrix_fill(
 	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
   }
-  if (mp->tfmp_wt_model != GALERKIN) {
+  if (pde[R_TFMP_BOUND] && mp->tfmp_wt_model != GALERKIN) {
 	h_elem_siz(pg_data.hsquared, pg_data.hhv, pg_data.dhv_dxnode, pde[R_MESH1]);
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
-	tfmp_PG_elem(&pg_data, time_value, delta_t);
+	tfmp_PG_elem(&pg_data, time_value, delta_t, exo);
   }
   
   if (cr->MassFluxModel == HYDRODYNAMIC)

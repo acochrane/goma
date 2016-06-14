@@ -2949,7 +2949,9 @@ struct Petrov_Galerkin_Data {
   double gp_dmu_dS;
   double dof_gradP_dot_gradphi_i;
   double dof_k_i;
+  double dof_b_i; // for debugging dwt_func_dvarJ
   double varj_gradP_dot_gradphi_j;
+  double varj_db_dvarj;
 };
 
 typedef struct Petrov_Galerkin_Data PG_DATA;
