@@ -5221,6 +5221,68 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
+tfmp_ML_glob(double x[],
+	     double x_old[],
+	     double xdot[],
+	     double xdot_old[],
+	     double resid_vector[],
+	     Exo_DB *exo) {
+  int i, err, ip, ip_total, I, k, node;
+  double xi[DIM];
+  if (!mass_lumped_prop->allocated) {
+    
+    mass_lumped_prop->gradP = malloc(sizeof(double *) * DIM);
+    mass_lumped_prop->gradP_mass = malloc(sizeof(double *) * DIM);
+    for (i = 0; i<DIM; i++) {
+      mass_lumped_prop->gradP[i] = malloc(dpi->num_universe_nodes*sizeof(double));
+      mass_lumped_prop->gradP_mass[i] = malloc(dpi->num_universe_nodes*sizeof(double));
+    }
+  }
+
+  for (i = 0; i<DIM; i++) {
+    memset(mass_lumped_prop->gradP[i], 0.0, dpi->num_universe_nodes*sizeof(double));
+    memset(mass_lumped_prop->gradP_mass[i], 0.0, dpi->num_universe_nodes*sizeof(double));
+  }
+
+  // Loop over all gauss points and sum contributions to mass lumped matrix
+  int e_start, e_end, ielem;
+  e_start = exo->eb_ptr[0];
+  e_end   = exo->eb_ptr[exo->num_elem_blocks];
+
+  for (ielem = e_start; ielem < e_end; ielem ++) {
+    err = load_elem_dofptr(ielem, exo, x, x_old, xdot, xdot_old, 
+			   resid_vector, 0);
+    err = bf_mp_init(pd);
+    ip_total = elem_info(SHELL4, ei->ielem_type);
+    for (ip = 0; ip<ip_total; ip++) {
+      I = Proc_Elem_Connect[ei->iconnect_ptr + ip];
+
+      fv->wt = Gq_weight(ip, ei->ielem_type); 
+      
+      find_nodal_stu(ip, ei->ielem_type, xi, xi+1, xi+2);
+      
+      err = load_basis_functions(xi, bfd);
+      err = beer_belly();
+      err = load_fv();
+      err = load_bf_grad();
+      err = load_fv_grads();
+      
+      for (k = 0; k<DIM; k++) {
+	mass_lumped_prop->gradP[k] += fv->grad_tfmp_pres[k] * bf[TFMP_PRES]->phi[ip] * fv->wt *bf->[TFMP_PRES]->detJ;
+	mass_lumped_prop->gradP_mass[k] += 1.0 * bf[TFMP_PRES]->phi[ip] * fv->wt *bf->[TFMP_PRES]->detJ;
+      }
+    }
+  }
+  // loop through all rows in mass lumped matrix and normalize
+  for (k = 0; k<DIM; k++) {
+    for (node = 0; node < dpi->num_universe_nodes; node++) {
+      mass_lumped_prop->gradP[k][node] /= mass_lumped_prop->gradP_mass[k][node];
+    }
+  }
+
+}
+
+void
 tfmp_PG_elem(PG_DATA *pg_data, double time, double delta_t, const Exo_DB *exo) {
   int k, inode, jnode, jdof, err, v;
   double phi_i, grad_phi_i[DIM], gradII_phi_i[DIM], d_gradII_phi_i_dmesh[DIM][DIM][MDE];

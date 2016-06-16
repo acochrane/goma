@@ -1963,6 +1963,8 @@ typedef struct {
   double ***Gnodal;
   double ***Gnodal_mass;
 
+  double gradP[DIM][DIM];
+
 } Mass_Lumped_Properties;
 extern Mass_Lumped_Properties *mass_lumped_prop;
 
