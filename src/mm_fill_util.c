@@ -2191,6 +2191,7 @@ load_bf_grad(void)
  *
  * Created:	Mon Feb 20 15:47 MST 1995 pasacki@sandia.gov
  */
+
 int 
 load_bf_mesh_derivs(void)
 {
@@ -2261,7 +2262,7 @@ load_bf_mesh_derivs(void)
   }
 
   for (p = 0; p < VIM; p++) {
-    g[p] = 1.0 / fv->h[p];  
+    g[p] = 1.0 / fv->h[p];
     g2[p] = g[p]*g[p];
   }
 
@@ -2889,6 +2890,172 @@ load_basis_functions(const double xi[],             /*  [DIM]               */
   }
   return (0);
 } /* END of routine load_basis_functions */
+
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+/* load_bf_2nd_derivatives() -- 
+ *
+ * Description: Compute second derivatives of basis functions
+ * Return: void
+ *
+ * Created: 2016/06/16 15:07 MST acochrane@gmail.com
+ */
+
+int 
+load_bf_2nd_derivatives(const double xi[],             /*  [DIM]               */
+                     struct Basis_Functions **bfa) /* ptr to basis function *
+						    * array of interest     */
+{
+  double a = 0.0; // dx/ds
+  double b = 0.0; // dy/ds
+  double c = 0.0; // dx/dt
+  double d = 0.0; // dy/dt
+  double e = 0.0; // d2x/dsdt = d2x/dtds
+  double f = 0.0; // d2y/dsdt = d2y/dtds
+  double x[DIM][MDE]; // element node coordinates
+  double alpha1, alpha2, alpha3, beta1, beta2; // symbols
+
+  double dphi_ds[MDE], dphi_dt[MDE], d2phi_ds_dt[MDE];
+
+  // matrix for dgemm
+  double A_inv[6][6]; // dphi_dxn = A_inv x dphi_dstu
+  double dphi_dstu[6]; // load like this [d2phi_ds2; d2phi_dt_ds; d2phi_ds_dt; d2phi_dt2; dphi_ds; dphi_dt]
+  double dphi_dxn[6]; // comes back from degv with  [d2phi_dx2; d2phi_dy_dx; d2phi_dx_dy; d2phi_dy2; dphi_dx; dphi_dy]
+  int k, i, v, jdof, ledof, mdof, node, index, IntIndex;
+  int mn = ei->mn;
+  int elem_type = ei->ielem_type;
+  int elem_shape = type2shape(elem_type);
+  ShapeVar = pd->ShapeVar;
+  mdof = ei->dof[ShapeVar];
+  BASIS_FUNCTIONS_STRUCT *bf_ptr;
+
+  // gather nodal positions for dx/ds etc
+  for ( i=0; i<mdof; i++) {
+    node = ei->dof_list[ShapeVar][i];
+    
+    index = Proc_Elem_Connect[ Proc_Connect_Ptr[ei->ielem] + node ];
+    for ( k=0; k<DIM; k++) {
+      x[k][i] = 0.0;
+      x[k][i] +=  Coor[k][index];
+      
+    }
+    
+    
+  }
+
+  /*
+   * Load basis functions and derivatives in the unit elements for each
+   * kind of unique basis function that we have...
+   */
+  for (IntIndex = 0; IntIndex < Num_Basis_Functions; IntIndex++) {
+    bf_ptr = bfa[IntIndex];
+    
+    /*
+     * Look up the variable "v" that has the the right interpolation
+     * in the current material as the current basis function 
+     */
+
+    v = bf_ptr->Var_Type_MatID[mn];
+    
+    /*
+     * don't calculate basis function if interpolation doesn't
+     *  correspond to any variable in the current material
+     *  OR if element shape doesn't match the current element block.
+     */
+    
+    if (v != -1 && bf_ptr->element_shape == ei->ielem_shape) {
+      for (i = 0; i < ei->dof[v]; i++) {
+	ledof = ei->lvdof_to_ledof[v][i];
+	// get a,b,c,d,e,f
+	if (ei->active_interp_ledof[ledof]) {
+	  dphi_ds[i] = newshape(xi, ei->ielem_type, DPSI_S, 
+				ei->dof_list[v][i], bf_ptr->element_shape,
+				bf_ptr->interpolation, ledof);
+	  dphi_dt[i] = newshape(xi, ei->ielem_type, DPSI_T, 
+				ei->dof_list[v][i], bf_ptr->element_shape,
+				bf_ptr->interpolation, ledof);
+
+	  // for now: bilinear 2d elements
+	  if (i == 0 || i == 3) {
+	    d2phi_ds_dt[i] = 0.25;
+	  } else {
+	    d2phi_ds_dt[i] = -0.25;
+	  }
+	  a += dphi_ds[i]*x[0][i];
+	  b += dphi_ds[i]*x[1][i];
+	  c += dphi_dt[i]*x[0][i];
+	  d += dphi_dt[i]*x[1][i];
+	  e += d2phi_ds_dt[i]*x[0][i];
+	  f += d2phi_ds_dt[i]*x[1][i];
+	}
+      }
+    } else {
+      return;
+    }
+    alpha1 = a*a*d*d - 2.0*a*b*c*d + b*b*c*c;
+    alpha2 = a*a*a*d*d*d - 3.0*a*a*b*c*d*d + 3.0*a*b*b*c*c*d - b*b*b*c*c*c;
+    alpha3 = a*d-b*c;
+    beta1 = -(a*d*d*e - b*c*c*f - a*c*d*f + b*c*d*e);
+    beta2 = b*b*c*e - a*a*d*f - a*b*c*f + a*b*d*e;
+
+    memset (A_inv, 0.0 sizeof(double)*6*6);
+
+    A_inv[0][0] =  d*d/alpha1;
+    A_inv[0][1] = -b*d/alpha1;
+    A_inv[0][2] = -b*d/alpha1;
+    A_inv[0][3] =  b*b/alpha1;
+    A_inv[1][0] = -c*d/alpha1;
+    A_inv[1][1] =  a*d/alpha1;
+    A_inv[1][2] =  b*d/alpha1;
+    A_inv[1][3] = -a*b/alpha1;
+    A_inv[2][0] = -c*d/alpha1;
+    A_inv[2][1] =  b*c/alpha1;
+    A_inv[2][2] =  a*d/alpha1;
+    A_inv[2][3] = -a*b/alpha1;
+    A_inv[3][0] =  c*c/alpha1;
+    A_inv[3][1] = -a*c/alpha1;
+    A_inv[3][2] = -a*c/alpha1;
+    A_inv[3][3] =  a*a/alpha1;
+    
+    A_inv[0][4] =   2.0*(b*e*d*d - b*c*f*d)/alpha2;
+    A_inv[0][5] =  -2.0*(d*e*b*b - a*d*f*b)/alpha2;
+    A_inv[1][4] =  beta1/alpha2;
+    A_inv[1][5] =  beta2/alpha2;
+    A_inv[2][4] =  beta1/alpha2;
+    A_inv[2][5] =  beta2/alpha2;
+    A_inv[3][4] =  -2.0*(a*f*c*c - a*d*e*c)/alpha2;
+    A_inv[3][5] =   2.0*(c*f*a*a - b*c*e*a)/alpha2;
+    
+    A_inv[3][3] =   d/alpha3;
+    A_inv[3][3] =  -b/alpha3;
+    A_inv[3][3] =  -c/alpha3;
+    A_inv[3][3] =   a/alpha3;
+    
+    for (i = 0; i < ei->dof[v]; i++) {
+      // load like this [d2phi_ds2; d2phi_dt_ds; d2phi_ds_dt; d2phi_dt2; dphi_ds; dphi_dt]
+      dphi_dstu[0] = 0.0;
+      dphi_dstu[1] = d2phi_ds_dt[i];
+      dphi_dstu[2] = d2phi_ds_dt[i];
+      dphi_dstu[3] = 0.0;
+      dphi_dstu[4] = dphi_ds[i];
+      dphi_dstu[5] = dphi_dt[i];
+      
+      EpetraGEMV('N', 6, 6, 1.0, A_inv, 1, dphi_dstu, 1, 0.0, dphi_dstu, dphi_dxn);
+      
+      bf_ptr->d2phi_dxn[i][0][0] = dphi_dxn[0];
+      bf_ptr->d2phi_dxn[i][0][1] = dphi_dxn[1];
+      bf_ptr->d2phi_dxn[i][1][0] = dphi_dxn[2];
+      bf_ptr->d2phi_dxn[i][1][1] = dphi_dxn[3];
+
+    
+    }
+
+  }
+
+}
+
+
 /******************************************************************************/
 /******************************************************************************/
 /******************************************************************************/

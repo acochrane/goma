@@ -19,6 +19,16 @@ void EpetraRowSumScale(struct Aztec_Linear_Solver_System *ams, double *b, double
 
 void EpetraSetDiagonalOnly(struct Aztec_Linear_Solver_System *ams, int GlobalRow);
 
+void EpetraGEMV(const char TRANS, 
+		const int M, 
+		const int N, 
+		const double ALPHA,
+		const double *A,
+		const int LDA,
+		const double *X,
+		const double BETA,
+		double *Y);
+
 #ifdef __cplusplus
 } // end of extern "C"
 #endif

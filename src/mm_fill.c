@@ -1135,6 +1135,9 @@ matrix_fill(
 	      EH( err, "load_fv_mesh_derivs");
 	    }
 
+	  
+	  err = load_bf_2nd_derivatives(xi, bfd);
+	  EH( err, "load_bf_2nd_derivatives");
 	  /*
 	   * Presumably, we have all the pieces we need.
 	   */

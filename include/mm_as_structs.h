@@ -1467,6 +1467,16 @@ struct Basis_Functions
    *
    */
   dbl d_grad_phi_e_dmesh[MDE][DIM] [DIM][DIM] [DIM][MDE];
+
+  /*
+   * d2_phi_dxn = d2(phi[i])
+   *              -------------------
+   *              (dx2|dxdy|dydx|dy2)
+   *
+   * could be expanded to three-dimensional basis functions
+   * i.e. derivatives wrt z (x[3])
+   */
+  dbl d2_phi_dxn[MDE][(DIM-1)][(DIM-1)];
 };
 typedef struct Basis_Functions BASIS_FUNCTIONS_STRUCT;
 
@@ -1963,7 +1973,8 @@ typedef struct {
   double ***Gnodal;
   double ***Gnodal_mass;
 
-  double gradP[DIM][DIM];
+  double **gradP;
+  int allocated;
 
 } Mass_Lumped_Properties;
 extern Mass_Lumped_Properties *mass_lumped_prop;

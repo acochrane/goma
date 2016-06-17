@@ -15,6 +15,7 @@
 #include "Epetra_RowMatrix.h"
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_Vector.h"
+#include "Epetra_BLAS.h"
 
 #ifdef EPETRA_MPI
 #include "Epetra_MpiComm.h"
@@ -497,6 +498,23 @@ void EpetraSetDiagonalOnly(struct Aztec_Linear_Solver_System *ams, int GlobalRow
   CrsMatrix->ReplaceGlobalValues(GlobalRow, NumEntries, values, indices);
   delete [] indices;
   delete [] values;
+}
+
+void EpetraGEMV(const char TRANS, 
+		const int M, 
+		const int N, 
+		const double ALPHA,
+		const double *A,
+		const int LDA,
+		const double *X,
+		const double BETA,
+		double *Y) 
+{
+  Epetra_BLAS::Epetra_BLAS eBLAS;
+
+  eBLAS.GEMV(TRANS, M, N, ALPHA, A, LDA, X, BETA, Y);
+
+  return;
 }
 
 }
