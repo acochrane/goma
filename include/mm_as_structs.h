@@ -1476,7 +1476,7 @@ struct Basis_Functions
    * could be expanded to three-dimensional basis functions
    * i.e. derivatives wrt z (x[3])
    */
-  dbl d2_phi_dxn[MDE][(DIM-1)][(DIM-1)];
+  dbl d2phi_dxn[MDE][(DIM-1)][(DIM-1)];
 };
 typedef struct Basis_Functions BASIS_FUNCTIONS_STRUCT;
 
@@ -1974,6 +1974,7 @@ typedef struct {
   double ***Gnodal_mass;
 
   double **gradP;
+  double **gradP_mass;
   int allocated;
 
 } Mass_Lumped_Properties;

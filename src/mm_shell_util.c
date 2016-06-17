@@ -5226,7 +5226,8 @@ tfmp_ML_glob(double x[],
 	     double xdot[],
 	     double xdot_old[],
 	     double resid_vector[],
-	     Exo_DB *exo) {
+	     Exo_DB *exo,
+	     Dpi *dpi) {
   int i, err, ip, ip_total, I, k, node;
   double xi[DIM];
   if (!mass_lumped_prop->allocated) {
@@ -5253,7 +5254,7 @@ tfmp_ML_glob(double x[],
     err = load_elem_dofptr(ielem, exo, x, x_old, xdot, xdot_old, 
 			   resid_vector, 0);
     err = bf_mp_init(pd);
-    ip_total = elem_info(SHELL4, ei->ielem_type);
+    ip_total = elem_info(SHELL, ei->ielem_type);
     for (ip = 0; ip<ip_total; ip++) {
       I = Proc_Elem_Connect[ei->iconnect_ptr + ip];
 
@@ -5268,8 +5269,8 @@ tfmp_ML_glob(double x[],
       err = load_fv_grads();
       
       for (k = 0; k<DIM; k++) {
-	mass_lumped_prop->gradP[k] += fv->grad_tfmp_pres[k] * bf[TFMP_PRES]->phi[ip] * fv->wt *bf->[TFMP_PRES]->detJ;
-	mass_lumped_prop->gradP_mass[k] += 1.0 * bf[TFMP_PRES]->phi[ip] * fv->wt *bf->[TFMP_PRES]->detJ;
+	mass_lumped_prop->gradP[k][I] += fv->grad_tfmp_pres[k]*(bf[TFMP_PRES]->phi[ip]) * fv->wt * bf[TFMP_PRES]->detJ;
+	mass_lumped_prop->gradP_mass[k][I] += 1.0 * bf[TFMP_PRES]->phi[ip] * fv->wt *bf[TFMP_PRES]->detJ;
       }
     }
   }

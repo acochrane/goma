@@ -2926,7 +2926,7 @@ load_bf_2nd_derivatives(const double xi[],             /*  [DIM]               *
   int mn = ei->mn;
   int elem_type = ei->ielem_type;
   int elem_shape = type2shape(elem_type);
-  ShapeVar = pd->ShapeVar;
+  int ShapeVar = pd->ShapeVar;
   mdof = ei->dof[ShapeVar];
   BASIS_FUNCTIONS_STRUCT *bf_ptr;
 
@@ -2999,7 +2999,7 @@ load_bf_2nd_derivatives(const double xi[],             /*  [DIM]               *
     beta1 = -(a*d*d*e - b*c*c*f - a*c*d*f + b*c*d*e);
     beta2 = b*b*c*e - a*a*d*f - a*b*c*f + a*b*d*e;
 
-    memset (A_inv, 0.0 sizeof(double)*6*6);
+    memset (A_inv, 0.0, sizeof(double)*6*6);
 
     A_inv[0][0] =  d*d/alpha1;
     A_inv[0][1] = -b*d/alpha1;

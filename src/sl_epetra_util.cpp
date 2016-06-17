@@ -510,7 +510,7 @@ void EpetraGEMV(const char TRANS,
 		const double BETA,
 		double *Y) 
 {
-  Epetra_BLAS::Epetra_BLAS eBLAS;
+  Epetra_BLAS eBLAS;
 
   eBLAS.GEMV(TRANS, M, N, ALPHA, A, LDA, X, BETA, Y);
 

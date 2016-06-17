@@ -109,6 +109,10 @@ EXTERN int load_basis_functions
 PROTO((const double [],		/*  xi - local element coordinates [DIM]     */
        struct Basis_Functions **)); /* bfa - pointer to basis function       */
 
+EXTERN int load_bf_2nd_derivatives
+PROTO((const double [],
+       struct Basis_Functions **));
+
 EXTERN void asdv
 PROTO((double **,		/* v - vector to be allocated */
        const int ));		/* n - number of elements in vector */
