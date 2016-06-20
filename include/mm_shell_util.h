@@ -179,6 +179,23 @@ PROTO((
        int *dof_map         // Map of DOFs
        ));
 
+EXTERN void tfmp_ML_alloc // allocate ML memory
+PROTO((Dpi *dpi));
+
+EXTERN void tfmp_ML_glob // compute ML gradP everywhere
+PROTO((
+       double x[],
+       double x_old[],
+       double xdot[],
+       double xdot_old[],
+       double resid_vector[],
+       Exo_DB *exo,
+       Dpi *dpi       
+       ));
+
+EXTERN void tfmp_ML_gp // fill gauss point data for mass lumped gradP
+PROTO (());
+
 EXTERN void tfmp_PG_elem // compute pg_data once per element
 PROTO((
        PG_DATA *pg_data,

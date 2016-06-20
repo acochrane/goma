@@ -846,6 +846,9 @@ struct Material_Properties
   int tfmp_wt_len;
   dbl tfmp_wt_const;
 
+  // TFMP flag for masslumping pressure gradient
+  int tfmp_gradP_ML;
+
   int table_index;
 
   

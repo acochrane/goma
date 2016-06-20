@@ -1975,6 +1975,7 @@ typedef struct {
 
   double **gradP;
   double **gradP_mass;
+  double fv_gradP[DIM];
   int allocated;
 
 } Mass_Lumped_Properties;

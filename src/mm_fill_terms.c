@@ -8733,6 +8733,7 @@ load_fv()
       }
     }
   }
+  
 
   
   /*
@@ -10851,26 +10852,27 @@ load_fv_grads(void)
     for (p=0; p<VIM; p++) fv->grad_poynt[2][p] = 0.0;
   } 
 
-  if ( pd->v[TFMP_PRES] )
-    {
-      v = TFMP_PRES;
-      dofs  = ei->dof[v];
+  if ( pd->v[TFMP_PRES] ) {
+    v = TFMP_PRES;
+    dofs  = ei->dof[v];
 #ifdef DO_NO_UNROLL
-      for ( p=0; p<VIM; p++)
-	{
-	  fv->grad_tfmp_pres[p] = 0.0;
-		  
-	  for ( i=0; i<dofs; i++)
-	    {
-	      fv->grad_tfmp_pres[p] += *esp->tfmp_pres[i] * bf[v]->grad_phi[i] [p];
-	      fv_old->grad_tfmp_pres[p] += *esp_old->tfmp_pres[i] * bf[v]->grad_phi[i] [p]
-	    }
-	}
-#else
-      grad_scalar_fv_fill( esp->tfmp_pres, bf[v]->grad_phi, dofs, fv->grad_tfmp_pres);
-    } else if ( zero_unused_grads &&  upd->vp[TFMP_PRES] == -1 ) {
-      for (p=0; p<VIM; p++) fv->grad_tfmp_pres[p] = 0.0;
+    for ( p=0; p<VIM; p++) {
+      fv->grad_tfmp_pres[p] = 0.0;
+      for ( i=0; i<dofs; i++) {
+	fv->grad_tfmp_pres[p] += *esp->tfmp_pres[i] * bf[v]->grad_phi[i] [p];
+	fv_old->grad_tfmp_pres[p] += *esp_old->tfmp_pres[i] * bf[v]->grad_phi[i] [p];
+      }
     }
+#else
+    grad_scalar_fv_fill( esp->tfmp_pres, bf[v]->grad_phi, dofs, fv->grad_tfmp_pres);
+    if (mp_glob[ei->mn]->tfmp_gradP_ML) {
+      tfmp_ML_gp();
+    }
+  } else if ( zero_unused_grads &&  upd->vp[TFMP_PRES] == -1 ) {
+    for (p=0; p<VIM; p++) fv->grad_tfmp_pres[p] = 0.0;
+  }
+  
+  
 
 #endif
 
@@ -10937,6 +10939,7 @@ load_fv_grads(void)
 /*******************************************************************************/
 /*******************************************************************************/
 /*******************************************************************************/
+
 
 int 
 load_fv_mesh_derivs(int okToZero)

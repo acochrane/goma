@@ -15884,7 +15884,7 @@ assemble_shell_tfmp(double time,   /* Time */
   /*  if (ei->ielem == 287) {
     dbl derp = 12;
     }*/
-
+  //  fprintf(stdout, "The number %d\n", ei->ielem);
   //Artificial diffusion constant
   double D;
   //D = .00001;
@@ -15989,10 +15989,12 @@ assemble_shell_tfmp(double time,   /* Time */
     for(i = 0; i < ei->dof[eqn]; i++) {
       ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
       tfmp_PG_dof(&phi_i, gradII_phi_i, pg_data);
+      
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
-	mass += pg_data->wt_func*dh_dtime;
+	//mass += pg_data->wt_func*dh_dtime;
+	mass += mass_lumped_prop->fv_gradP[0];
 
       	mass *= dA * etm_mass_eqn;
       }
@@ -16099,7 +16101,9 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Assemble mass term
 	  mass = 0.0;
 	  if ( T_MASS ) {
-	    mass += pg_data->dwt_func_dvarj[3]*dh_dtime;
+	    mass += 0.25*gradII_phi_j[0];
+
+	    //	    mass += pg_data->dwt_func_dvarj[3]*dh_dtime;
 	    mass *= etm_mass_eqn;
 	  }
 	  //mass *= dA * etm_mass_eqn;

@@ -9576,6 +9576,26 @@ ECHO("\n----Acoustic Properties\n", echo_file);
     
   }
   ECHO(es, echo_file);
+
+  strcpy(search_string,"Pressure Gradient Mass Lumping");
+  if (look_forward_optional(imp, search_string, input, '=') == 1) {
+    if ( fscanf(imp,"%s", model_name) != 1 ) {
+      EH(-1, "Need option for Pressure Gradient Mass Lumping");
+    }
+    
+    if (!strcasecmp(model_name, "yes") || 
+	!strcasecmp(model_name, "true")) {
+      mat_ptr->tfmp_gradP_ML = TRUE;
+    } else if (!strcasecmp(model_name, "no") ||
+	       !strcasecmp(model_name, "false")) {
+      mat_ptr->tfmp_gradP_ML = FALSE;
+    } else {
+      EH(-1,"Pressure Gradient Mass Lumping must be set to TRUE, YES, FALSE, or NO!");
+    }
+    SPF(es,"\t(%s = %d)", search_string, mat_ptr->tfmp_gradP_ML);
+    ECHO(es,echo_file);
+  }
+
   
   /*********************************************************************/
 

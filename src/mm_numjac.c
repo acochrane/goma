@@ -505,6 +505,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
 	zeroCA = -1;
 	if (i == 0) zeroCA = 1; 
 	load_ei(elem_list[i], exo, 0);
+#if TRUE
 	matrix_fill(ams, x_1, resid_vector_1, 
 		    x_old, x_older,  xdot, xdot_old, x_update,
 		    &delta_t, &theta, 
@@ -512,6 +513,17 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
 		    &time_value, exo, dpi,
 		    &elem_list[i], &num_total_nodes,
 		    h_elem_avg, U_norm, NULL, zeroCA);
+#else
+	matrix_fill_full(ams, x_1, resid_vector_1, 
+		    x_old, x_older,  xdot, xdot_old, x_update,
+		    &delta_t, &theta, 
+		    first_elem_side_BC_array,
+		    &time_value, exo, dpi,
+		    &num_total_nodes,
+		    h_elem_avg, U_norm, NULL);
+#endif
+
+
 	if( neg_elem_volume ) break;
 	if( neg_lub_height ) break;
 	if( zero_detJ ) break;

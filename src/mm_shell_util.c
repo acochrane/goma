@@ -5221,6 +5221,37 @@ ShellBF (
 }  /*** END OF ShellBF ***/
 
 void
+tfmp_ML_alloc(Dpi *dpi) {
+  int i;
+  if (!mass_lumped_prop->allocated) {
+    
+    mass_lumped_prop->gradP = malloc(sizeof(double *) * DIM);
+    mass_lumped_prop->gradP_mass = malloc(sizeof(double *) * DIM);
+    for (i = 0; i<DIM; i++) {
+
+      mass_lumped_prop->gradP[i] = 
+	malloc(dpi->num_universe_nodes*sizeof(double));
+
+      mass_lumped_prop->gradP_mass[i] = 
+	malloc(dpi->num_universe_nodes*sizeof(double));
+    }
+  }
+
+  mass_lumped_prop->allocated = TRUE;
+
+  for (i = 0; i<DIM; i++) {
+
+    memset(mass_lumped_prop->gradP[i], 0.0, 
+	   dpi->num_universe_nodes*sizeof(double));
+
+    memset(mass_lumped_prop->gradP_mass[i], 0.0, 
+	   dpi->num_universe_nodes*sizeof(double));
+  }
+  
+  return;
+}
+
+void
 tfmp_ML_glob(double x[],
 	     double x_old[],
 	     double xdot[],
@@ -5230,20 +5261,6 @@ tfmp_ML_glob(double x[],
 	     Dpi *dpi) {
   int i, err, ip, ip_total, I, k, node;
   double xi[DIM];
-  if (!mass_lumped_prop->allocated) {
-    
-    mass_lumped_prop->gradP = malloc(sizeof(double *) * DIM);
-    mass_lumped_prop->gradP_mass = malloc(sizeof(double *) * DIM);
-    for (i = 0; i<DIM; i++) {
-      mass_lumped_prop->gradP[i] = malloc(dpi->num_universe_nodes*sizeof(double));
-      mass_lumped_prop->gradP_mass[i] = malloc(dpi->num_universe_nodes*sizeof(double));
-    }
-  }
-
-  for (i = 0; i<DIM; i++) {
-    memset(mass_lumped_prop->gradP[i], 0.0, dpi->num_universe_nodes*sizeof(double));
-    memset(mass_lumped_prop->gradP_mass[i], 0.0, dpi->num_universe_nodes*sizeof(double));
-  }
 
   // Loop over all gauss points and sum contributions to mass lumped matrix
   int e_start, e_end, ielem;
@@ -5254,7 +5271,7 @@ tfmp_ML_glob(double x[],
     err = load_elem_dofptr(ielem, exo, x, x_old, xdot, xdot_old, 
 			   resid_vector, 0);
     err = bf_mp_init(pd);
-    ip_total = elem_info(SHELL, ei->ielem_type);
+    ip_total = elem_info(NNODES, ei->ielem_type);
     for (ip = 0; ip<ip_total; ip++) {
       I = Proc_Elem_Connect[ei->iconnect_ptr + ip];
 
@@ -5281,6 +5298,23 @@ tfmp_ML_glob(double x[],
     }
   }
 
+}
+
+void tfmp_ML_gp () {
+  int I, i, k;
+
+  for (k=0; k<DIM-1; k++) {
+    mass_lumped_prop->fv_gradP[k] = 0.0;
+  }
+
+  for (i=0; i<elem_info(NNODES, ei->ielem_type); i++) {
+    I = Proc_Elem_Connect[ei->iconnect_ptr + i];
+    for (k=0; k<DIM-1; k++) {
+      mass_lumped_prop->fv_gradP[k] += mass_lumped_prop->gradP[k][I];
+    }
+  }
+
+  return;
 }
 
 void

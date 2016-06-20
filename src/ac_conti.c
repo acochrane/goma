@@ -337,7 +337,7 @@ continue_problem (Comm_Ex *cx,	/* array of communications structures */
       }
     }
   }
-  
+
 #ifdef MPI
   AZ_set_proc_config( ams[0]->proc_config, MPI_COMM_WORLD );
 #ifndef COUPLED_FILL

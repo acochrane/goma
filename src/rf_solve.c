@@ -788,6 +788,11 @@ solve_problem(Exo_DB *exo,	 /* ptr to the finite element mesh database  */
       }
     }
   }
+  // allocated masslumped gradp 
+  if (mp_glob[ei->mn]->tfmp_gradP_ML) {
+    tfmp_ML_alloc(dpi);
+  }
+
 
   /***************************************************************************
    *            STEADY STATE SOLUTION PROCEDURE
