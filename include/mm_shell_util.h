@@ -193,6 +193,9 @@ PROTO((
        Dpi *dpi       
        ));
 
+EXTERN void tfmp_ML_elem // gather gauss pt grads
+PROTO(());
+
 EXTERN void tfmp_ML_gp // fill gauss point data for mass lumped gradP
 PROTO (());
 

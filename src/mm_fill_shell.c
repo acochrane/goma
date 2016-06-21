@@ -15868,7 +15868,7 @@ assemble_shell_tfmp(double time,   /* Time */
 		 PG_DATA *pg_data, /* Upwinding data struct */
                  const Exo_DB *exo)
 {
-  int i, j, k, l, peqn, var, pvar;
+  int i, j, k, l, peqn, var, pvar, I, J, num_gauss_points;
   dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
   dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
   dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
@@ -15993,8 +15993,9 @@ assemble_shell_tfmp(double time,   /* Time */
       /* Assemble mass term */
       mass = 0.0;
       if( T_MASS ) {
+	I = Proc_Elem_Connect[ei->iconnect_ptr + i];
 	//mass += pg_data->wt_func*dh_dtime;
-	mass += mass_lumped_prop->fv_gradP[0];
+	mass += mass_lumped_prop->gradP[0][I];
 
       	mass *= dA * etm_mass_eqn;
       }
@@ -16097,15 +16098,21 @@ assemble_shell_tfmp(double time,   /* Time */
 	  // Load basis functions
 	  ShellBF( var, j, &phi_j, grad_phi_j, gradII_phi_j, d_gradII_phi_j_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
 	  tfmp_PG_dvarj(&phi_i, gradII_phi_i, j, &phi_j, gradII_phi_j, pg_data, 3);
-	  
+	  I = Proc_Elem_Connect[ei->iconnect_ptr + i];
+	  J = Proc_Elem_Connect[ei->iconnect_ptr + j];
 	  // Assemble mass term
 	  mass = 0.0;
 	  if ( T_MASS ) {
-	    mass += 0.25*gradII_phi_j[0];
-
-	    //	    mass += pg_data->dwt_func_dvarj[3]*dh_dtime;
-	    mass *= etm_mass_eqn;
+	    num_gauss_points = elem_info(NQUAD, ei->ielem_type);
+	    for (l=0; l<num_gauss_points; l++) {
+	      mass += mass_lumped_prop->dphi_dx_gp[0][j][l]
+		*mass_lumped_prop->gauss_wt[l];
+	    }
+	    mass *= phi_i/mass_lumped_prop->gradP_mass[0][I];
 	  }
+	  //	    mass += pg_data->dwt_func_dvarj[3]*dh_dtime;
+	  mass *= etm_mass_eqn;
+	  
 	  //mass *= dA * etm_mass_eqn;
 	  // Assemble advection term
 	  adv = 0.0;
@@ -16133,7 +16140,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  diff *= etm_diff_eqn;
 	  
 	  // Assemble full Jacobian
-	  lec->J[peqn][pvar][i][j] += dA*(mass + adv + diff);
+	  lec->J[peqn][pvar][i][j] += dA*(adv + diff) + det_J*h3*mass;
 	  
 	} // End of loop over DOF (j)
 	  
@@ -16152,7 +16159,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  mass = 0.0;
 	  
 	  if( T_MASS ) {
-	    mass += pg_data->dwt_func_dvarj[4]*dh_dtime;
+	    //mass += pg_data->dwt_func_dvarj[4]*dh_dtime;
 	    mass *= etm_mass_eqn;
 	  }
 	  // Assemble advection term

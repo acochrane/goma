@@ -1975,8 +1975,11 @@ typedef struct {
 
   double **gradP;
   double **gradP_mass;
+  double ***dgradP_dPj;
   double fv_gradP[DIM];
   int allocated;
+  double dphi_dx_gp[DIM][MDE][MDE];
+  double gauss_wt[MDE];
 
 } Mass_Lumped_Properties;
 extern Mass_Lumped_Properties *mass_lumped_prop;

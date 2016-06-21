@@ -5222,11 +5222,13 @@ ShellBF (
 
 void
 tfmp_ML_alloc(Dpi *dpi) {
-  int i;
+  int i,j;
   if (!mass_lumped_prop->allocated) {
     
     mass_lumped_prop->gradP = malloc(sizeof(double *) * DIM);
     mass_lumped_prop->gradP_mass = malloc(sizeof(double *) * DIM);
+    mass_lumped_prop->dgradP_dPj = malloc(sizeof(double **) * DIM);
+
     for (i = 0; i<DIM; i++) {
 
       mass_lumped_prop->gradP[i] = 
@@ -5234,20 +5236,20 @@ tfmp_ML_alloc(Dpi *dpi) {
 
       mass_lumped_prop->gradP_mass[i] = 
 	malloc(dpi->num_universe_nodes*sizeof(double));
+
+      mass_lumped_prop->dgradP_dPj[i] =
+	malloc(dpi->num_universe_nodes*sizeof(double*));
+
+      for(j=0; j<dpi->num_universe_nodes; j++) {
+	mass_lumped_prop->dgradP_dPj[i][j] =
+	  malloc(dpi->num_universe_nodes*sizeof(double));
+
+      }
     }
   }
 
   mass_lumped_prop->allocated = TRUE;
 
-  for (i = 0; i<DIM; i++) {
-
-    memset(mass_lumped_prop->gradP[i], 0.0, 
-	   dpi->num_universe_nodes*sizeof(double));
-
-    memset(mass_lumped_prop->gradP_mass[i], 0.0, 
-	   dpi->num_universe_nodes*sizeof(double));
-  }
-  
   return;
 }
 
@@ -5259,13 +5261,29 @@ tfmp_ML_glob(double x[],
 	     double resid_vector[],
 	     Exo_DB *exo,
 	     Dpi *dpi) {
-  int i, err, ip, ip_total, I, k, node;
+  int i, err, ip, ip_total, I, j, k, node;
   double xi[DIM];
 
   // Loop over all gauss points and sum contributions to mass lumped matrix
   int e_start, e_end, ielem;
   e_start = exo->eb_ptr[0];
   e_end   = exo->eb_ptr[exo->num_elem_blocks];
+
+  // zero the arrays before summing into them
+  for (k=0; k<DIM; k++) {
+
+    memset(mass_lumped_prop->gradP[k], 0.0, 
+	   dpi->num_universe_nodes*sizeof(double));
+
+    memset(mass_lumped_prop->gradP_mass[k], 0.0, 
+	   dpi->num_universe_nodes*sizeof(double));
+
+    for (j=0; j<dpi->num_universe_nodes; j++) {
+      memset(mass_lumped_prop->dgradP_dPj[k][j], 0.0,
+	   dpi->num_universe_nodes*sizeof(double));
+    }
+
+  }
 
   for (ielem = e_start; ielem < e_end; ielem ++) {
     err = load_elem_dofptr(ielem, exo, x, x_old, xdot, xdot_old, 
@@ -5288,6 +5306,9 @@ tfmp_ML_glob(double x[],
       for (k = 0; k<DIM; k++) {
 	mass_lumped_prop->gradP[k][I] += fv->grad_tfmp_pres[k]*(bf[TFMP_PRES]->phi[ip]) * fv->wt * bf[TFMP_PRES]->detJ;
 	mass_lumped_prop->gradP_mass[k][I] += 1.0 * bf[TFMP_PRES]->phi[ip] * fv->wt *bf[TFMP_PRES]->detJ;
+	for (j=0; j<dpi->num_universe_nodes; j++) {
+	  mass_lumped_prop->dgradP_dPj[k][ielem][j] += bf[TFMP_PRES]->grad_phi[k][j] * bf[TFMP_PRES]->phi[ip] * fv->wt * bf[TFMP_PRES]->detJ;
+	}
       }
     }
   }
@@ -5295,6 +5316,9 @@ tfmp_ML_glob(double x[],
   for (k = 0; k<DIM; k++) {
     for (node = 0; node < dpi->num_universe_nodes; node++) {
       mass_lumped_prop->gradP[k][node] /= mass_lumped_prop->gradP_mass[k][node];
+      for (j=0; j<dpi->num_universe_nodes; j++) {
+	mass_lumped_prop->dgradP_dPj[k][node][j] /= mass_lumped_prop->gradP_mass[k][node];
+      }
     }
   }
 
@@ -5314,6 +5338,41 @@ void tfmp_ML_gp () {
     }
   }
 
+  return;
+}
+
+void tfmp_ML_elem() {
+  int num_nodes, num_gauss_points, v, bf_i, gauss_pt_i, k, err;
+  double wt, phi_i, grad_phi_i[DIM], gradII_phi_i[DIM], d_gradII_phi_i_dmesh[DIM][DIM][MDE], xgpi[DIM];
+  // find dP~dPj
+  num_nodes = elem_info(NNODES, ei->ielem_type);
+  num_gauss_points = elem_info(NQUAD, ei->ielem_type);
+  int *n_dof = NULL;
+  int dof_map[MDE];
+  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int)); 
+  v = TFMP_PRES;
+  // for each basis function
+  for (bf_i=0; bf_i<num_nodes; bf_i++) {
+    // sum over gauss points
+    for (gauss_pt_i=0; gauss_pt_i<num_gauss_points; gauss_pt_i++) {
+      // get basis functions and bf_gradients at this gauss point 
+      find_stu(gauss_pt_i, ei->ielem_type, &xgpi[0], &xgpi[1], &xgpi[2]);
+      wt = Gq_weight(gauss_pt_i, ei->ielem_type);
+      err = load_basis_functions(xgpi, bfd);
+      err = beer_belly();
+      err = load_bf_grad();
+      phi_i = bf[TFMP_PRES]->phi[bf_i];
+      // for each dimension
+      for (k = 0; k<DIM; k++) {
+	grad_phi_i[k] = bf[TFMP_PRES]->grad_phi[k][bf_i];
+      }
+      ShellBF( v, bf_i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
+      for (k = 0; k<DIM; k++) {
+	mass_lumped_prop->dphi_dx_gp[k][bf_i][gauss_pt_i] = gradII_phi_i[k];
+	mass_lumped_prop->gauss_wt[gauss_pt_i] = wt;
+      }
+    }
+  }
   return;
 }
 

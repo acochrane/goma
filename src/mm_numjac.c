@@ -501,10 +501,17 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
       if ( xfem != NULL )
         clear_xfem_contribution( ams->npu );
       
+      // Mass lumped variable get computed in matrix fill full, so it's not recomputed with the
+      // 
+      if (mp_glob[ei->mn]->tfmp_gradP_ML) {
+	tfmp_ML_glob(x_1, x_old, xdot, xdot_old, resid_vector_1, exo, dpi);
+      }
+
       for (i = 0; i < num_elems; i++) {
 	zeroCA = -1;
 	if (i == 0) zeroCA = 1; 
 	load_ei(elem_list[i], exo, 0);
+	
 #if TRUE
 	matrix_fill(ams, x_1, resid_vector_1, 
 		    x_old, x_older,  xdot, xdot_old, x_update,
