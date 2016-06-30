@@ -203,11 +203,10 @@ int matrix_fill_full(struct Aztec_Linear_Solver_System *ams,
       }       
     }
   }
-
   // Call function to compute mass lumped grad_tfmp_pres
-  //  if (mp_glob[ei->mn]->tfmp_gradP_ML) {
-  // tfmp_ML_glob(x, x_old, xdot, xdot_old, resid_vector, exo, dpi);
-  //}
+  if (mp_glob[ei->mn]->tfmp_gradP_ML) {
+    tfmp_ML_glob(x, x_old, xdot, xdot_old, resid_vector, exo, dpi);
+  }
 
   for (ielem = e_start, ebn = 0; ielem < e_end && !neg_elem_volume && !neg_lub_height && !zero_detJ; ielem++) {
 
@@ -462,10 +461,6 @@ matrix_fill(
    * BEGINNING OF EXECUTABLE STATEMENTS 
    */
 
-  //if (mp_glob[ei->mn]->tfmp_gradP_ML) {
-  //  tfmp_ML_glob(x, x_old, xdot, xdot_old, resid_vector, exo, dpi);
-  //}
-
   mm_fill_start = ut();
 
   /*
@@ -528,9 +523,7 @@ matrix_fill(
    * checked accordingly to avoid problems in case exo->elem_order_map is NULL
    *
    */
-  //if (mp_glob[ei->mn]->tfmp_gradP_ML) {
-    //  tfmp_ML_glob(x, x_old, xdot, xdot_old, resid_vector, exo, dpi);
-    //  }
+
   if (Proc_NS_List_Length > 0 && ((zeroCA == 1) || ((Linear_Solver != FRONT && ielem == exo->eb_ptr[0]) ||
                                                     (Linear_Solver == FRONT && ielem == exo->elem_order_map[0]-1))))
     {
@@ -845,6 +838,9 @@ matrix_fill(
 	element_velocity(pg_data.v_avg, pg_data.dv_dnode, exo);
 	tfmp_PG_elem(&pg_data, time_value, delta_t, exo);
   }
+  if (pde[R_TFMP_MASS] && mp_glob[ei->mn]->tfmp_gradP_ML) {
+    tfmp_ML_elem(exo);
+    }
   
   if (cr->MassFluxModel == HYDRODYNAMIC)
     {

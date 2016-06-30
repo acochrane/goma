@@ -16140,7 +16140,7 @@ assemble_shell_tfmp(double time,   /* Time */
 	  diff *= etm_diff_eqn;
 	  
 	  // Assemble full Jacobian
-	  lec->J[peqn][pvar][i][j] += dA*(adv + diff) + det_J*h3*mass;
+	  lec->J[peqn][pvar][i][j] += dA*(adv + diff) + det_J*h3*mass*wt;
 	  
 	} // End of loop over DOF (j)
 	  

@@ -5277,12 +5277,12 @@ tfmp_ML_glob(double x[],
 
     memset(mass_lumped_prop->gradP_mass[k], 0.0, 
 	   dpi->num_universe_nodes*sizeof(double));
-
+    /*
     for (j=0; j<dpi->num_universe_nodes; j++) {
       memset(mass_lumped_prop->dgradP_dPj[k][j], 0.0,
 	   dpi->num_universe_nodes*sizeof(double));
     }
-
+    */
   }
 
   for (ielem = e_start; ielem < e_end; ielem ++) {
@@ -5295,7 +5295,7 @@ tfmp_ML_glob(double x[],
 
       fv->wt = Gq_weight(ip, ei->ielem_type); 
       
-      find_nodal_stu(ip, ei->ielem_type, xi, xi+1, xi+2);
+      find_stu(ip, ei->ielem_type, xi, xi+1, xi+2);
       
       err = load_basis_functions(xi, bfd);
       err = beer_belly();
@@ -5306,9 +5306,7 @@ tfmp_ML_glob(double x[],
       for (k = 0; k<DIM; k++) {
 	mass_lumped_prop->gradP[k][I] += fv->grad_tfmp_pres[k]*(bf[TFMP_PRES]->phi[ip]) * fv->wt * bf[TFMP_PRES]->detJ;
 	mass_lumped_prop->gradP_mass[k][I] += 1.0 * bf[TFMP_PRES]->phi[ip] * fv->wt *bf[TFMP_PRES]->detJ;
-	for (j=0; j<dpi->num_universe_nodes; j++) {
-	  mass_lumped_prop->dgradP_dPj[k][ielem][j] += bf[TFMP_PRES]->grad_phi[k][j] * bf[TFMP_PRES]->phi[ip] * fv->wt * bf[TFMP_PRES]->detJ;
-	}
+      
       }
     }
   }
@@ -5316,9 +5314,9 @@ tfmp_ML_glob(double x[],
   for (k = 0; k<DIM; k++) {
     for (node = 0; node < dpi->num_universe_nodes; node++) {
       mass_lumped_prop->gradP[k][node] /= mass_lumped_prop->gradP_mass[k][node];
-      for (j=0; j<dpi->num_universe_nodes; j++) {
+      /*      for (j=0; j<dpi->num_universe_nodes; j++) {
 	mass_lumped_prop->dgradP_dPj[k][node][j] /= mass_lumped_prop->gradP_mass[k][node];
-      }
+	}*/
     }
   }
 
@@ -5341,34 +5339,41 @@ void tfmp_ML_gp () {
   return;
 }
 
-void tfmp_ML_elem() {
+void tfmp_ML_elem(Exo_DB *exo) {
   int num_nodes, num_gauss_points, v, bf_i, gauss_pt_i, k, err;
-  double wt, phi_i, grad_phi_i[DIM], gradII_phi_i[DIM], d_gradII_phi_i_dmesh[DIM][DIM][MDE], xgpi[DIM];
+  double wt, phi_i, grad_phi_i[DIM], gradII_phi_i[DIM], d_gradII_phi_i_dmesh[DIM][DIM][MDE];
+  double xgpi[3] = {0.0, 0.0, 0.0};
   // find dP~dPj
   num_nodes = elem_info(NNODES, ei->ielem_type);
   num_gauss_points = elem_info(NQUAD, ei->ielem_type);
   int *n_dof = NULL;
   int dof_map[MDE];
   n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int)); 
+  lubrication_shell_initialize(n_dof, dof_map, -1, xgpi, exo, 0);
+
   v = TFMP_PRES;
   // for each basis function
   for (bf_i=0; bf_i<num_nodes; bf_i++) {
     // sum over gauss points
     for (gauss_pt_i=0; gauss_pt_i<num_gauss_points; gauss_pt_i++) {
       // get basis functions and bf_gradients at this gauss point 
-      find_stu(gauss_pt_i, ei->ielem_type, &xgpi[0], &xgpi[1], &xgpi[2]);
+      find_stu(gauss_pt_i, ei->ielem_type, &(xgpi[0]), &(xgpi[1]), &(xgpi[2]));
       wt = Gq_weight(gauss_pt_i, ei->ielem_type);
       err = load_basis_functions(xgpi, bfd);
       err = beer_belly();
       err = load_bf_grad();
-      phi_i = bf[TFMP_PRES]->phi[bf_i];
+      //phi_i = bfd[TFMP_PRES]->phi[bf_i];
       // for each dimension
-      for (k = 0; k<DIM; k++) {
-	grad_phi_i[k] = bf[TFMP_PRES]->grad_phi[k][bf_i];
-      }
+      //for (k = 0; k<DIM; k++) {
+      //grad_phi_i[k] = bf[TFMP_PRES]->grad_phi[k][bf_i];
+      //}
       ShellBF( v, bf_i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map );
       for (k = 0; k<DIM; k++) {
-	mass_lumped_prop->dphi_dx_gp[k][bf_i][gauss_pt_i] = gradII_phi_i[k];
+	if (k != 2) {
+	  mass_lumped_prop->dphi_dx_gp[k][bf_i][gauss_pt_i] = grad_phi_i[k];
+	} else {
+	  mass_lumped_prop->dphi_dx_gp[k][bf_i][gauss_pt_i] = 0.0;
+	}
 	mass_lumped_prop->gauss_wt[gauss_pt_i] = wt;
       }
     }

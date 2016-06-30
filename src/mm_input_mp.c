@@ -2547,7 +2547,7 @@ rd_mp_specs(FILE *imp, char input[], int mn, char *echo_file)
 
       ECHO(es,echo_file);
 
-
+      vn_glob[mn]->G_lumped = FALSE;
       strcpy(search_string,"Gradient Mass Lumping");
       if (look_forward_optional(imp, search_string, input, '=') == 1) {
 	if ( fscanf(imp,"%s", model_name) != 1 ) {

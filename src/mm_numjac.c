@@ -111,7 +111,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
 		   Exo_DB *exo,	    /* ptr to whole fe mesh */
 		   Dpi *dpi,        /* any distributed processing info */
 		   double *h_elem_avg,
-		   double *U_norm)
+		   double *U_norm) {
 
 /******************************************************************************
   This function compares the analytical jacobian entries calculated in 
@@ -142,7 +142,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
   false positives when there is a change in the sign of the second derivative
   between the two solution points.
 ******************************************************************************/
-{
+
   int i, j, k, l, m, ii, nn, kount, nnonzero, index;
   int zeroCA;
   double *a = ams->val;
@@ -359,7 +359,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
 	  kount=kount+1;
 	}
     } 
-  
+
   DPRINTF(stderr, "Sorting nonzeros ...");
   piksr2(nn, jcolumn, irow, aj_off_diag);  /* arrange coefficient matrix columnwise,*/
                                             /* in ascending column number order */   
@@ -497,7 +497,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
       if (pd_glob[0]->TimeIntegration != STEADY) {
 	xdot[j] += (x_1[j] - x[j])  * (1.0 + 2 * theta) / delta_t;
       }
-      
+     
       if ( xfem != NULL )
         clear_xfem_contribution( ams->npu );
       
@@ -511,6 +511,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
 	zeroCA = -1;
 	if (i == 0) zeroCA = 1; 
 	load_ei(elem_list[i], exo, 0);
+      
 	
 #if TRUE
 	matrix_fill(ams, x_1, resid_vector_1, 
@@ -911,6 +912,7 @@ numerical_jacobian(struct Aztec_Linear_Solver_System *ams,
   safe_free( (void *) aj_1) ;
 #endif
   
+
 }                             /*   End of function numerical_jacobian  */
 /*****************************************************************************/
 /*****************************************************************************/

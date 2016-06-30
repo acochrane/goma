@@ -368,6 +368,7 @@ int ve_alloc(void)
     {
       vn_glob[mn] = (struct Viscoelastic_Nonmodal *) smalloc(sz);
       init_Viscoelastic_Nonmodal(vn_glob[mn]);
+      vn_glob[mn]->G_lumped = FALSE;
     }
 
   sz = sizeof(struct Viscoelastic_Constitutive *);

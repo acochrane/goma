@@ -194,7 +194,8 @@ PROTO((
        ));
 
 EXTERN void tfmp_ML_elem // gather gauss pt grads
-PROTO(());
+PROTO((Exo_DB *exo
+       ));
 
 EXTERN void tfmp_ML_gp // fill gauss point data for mass lumped gradP
 PROTO (());
