@@ -16419,4 +16419,164 @@ assemble_shell_tfmp(double time,   /* Time */
 /* End of assemble_shell_tfmp() */
 
 
+/******************************************************************************
+ * assemble_shell_tfmp_alt - Assembles the residual and Jacobian equations for a
+ *                           thin-film multi-phase flow without advection. Two-phase would be 
+ *                           more accurate
+ *                      
+ *
+ *  The following equation is assembled
+ *
+ *    0 = d/dt(h) + divII(v*h)  [Total Volume Conservation]
+ *
+ * The following equations is substituted into the previous
+ *
+ *    v = -h*h/12/mu*grad(P)
+ *
+ * where mu is determined by a functions of S
+ * see "Thin Film Multiphase Properties" in mm_input_mp.c
+ *
+ *  The following relationship is "post-processed"
+ *  
+ *    S = V_l/V_t = V_l/A/h
+ *
+ *         h = height from height function model (to be coupled with mesh
+ *             deflection later..)
+ *         S = Saturation, ratio of liquid volume to total volume
+ *     V_l/A = is taken as constant for now, can put in efv later maybe?
+ *
+ * Input
+ * =====
+ * time_value = The current time.
+ * tt         = Time stepping parameter, 0.0 or 0.5 BE or CN, respectively.
+ * delta_t    = The current step size.
+ * xi         = local stu coordinates
+ * pg_data    = struct for data that is computed once per element,
+ *              also holds Petrov Galerkin pertinent data
+ * 
+ * Output
+ * ======
+ * (none)
+ * 
+ * Returns
+ * ======
+ * 0  = Success
+ * -1 = Failure
+ *
+ * Revision History
+ * ================
+ * 7 May 2002 - Patrick Notz - Creation.
+ * 5 November 2014 - Andrew Cochrane - initiated thin-film multiphase flow
+ * 11 July 2016 - AC - have need of much infrastructure with only one equation
+ *
+
+ ******************************************************************************/
+
+int
+assemble_shell_tfmp_alt(double time,   /* Time */
+		 double tt,        /* Time stepping parameter */
+		 double delta_t,      /* Time step size */
+		 double xi[DIM],      /* Local stu coordinates */
+		 PG_DATA *pg_data, /* Upwinding data struct */
+                 const Exo_DB *exo)
+{
+  int i, j, k, l, peqn, var, pvar;
+  dbl phi_i, wt_func, grad_phi_i[DIM], gradII_phi_i[DIM]; // Basis funcitons (i)
+  dbl d_gradII_phi_i_dmesh[DIM][DIM][MDE];
+  dbl phi_j, grad_phi_j[DIM], gradII_phi_j[DIM]; // Basis funcitons (j)
+  dbl d_gradII_phi_j_dmesh[DIM][DIM][MDE];
+  dbl mass, adv, adv1, diff; // Residual terms
+  dbl etm_mass_eqn, etm_adv_eqn, etm_diff_eqn;
+  int eqn;
+  dbl supg = 0.;
+  double wt    = fv->wt;
+  double h3    = fv->h3;
+
+  // set liquid inventory
+  dbl liq_inv = 75e-7; // [cm], also, the final thickness
+
+  /* Setup Lubrication */
+  int *n_dof = NULL;
+  int dof_map[MDE];
+  n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
+  lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
+  double det_J = fv->sdet; 
+  double dA = det_J * wt * h3;
+
+  /* Use the height_function_model */
+  double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+  double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+  h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+			    dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh,
+			    time, delta_t);
+
+  double dh_dtime = dH_U_dtime - dH_L_dtime;
+  /* Need gradII_(Sh) */
+  double grad_h[DIM], gradII_h[DIM];
+  for (k=0; k<DIM; k++) {
+    grad_h[k] = dH_U_dX[k] - dH_L_dX[k];
+  }
+  
+  Inn(grad_h, gradII_h);
+
+  
+  // get pressure
+  double P = fv->tfmp_pres;
+  dbl grad_P[DIM], gradII_P[DIM];
+  for (k = 0; k<DIM; k++) {
+    grad_P[k] = fv->grad_tfmp_pres[k];
+  }
+  Inn(grad_P, gradII_P);
+
+  double mu, dmu_dS, d2mu_dS2;
+  tfmp_mu(S, &mu, &dmu_dS);
+
+  // with a lever rule anyway //
+  d2mu_dS2 = 0.0;
+  
+  if ( af->Assemble_Residual ) {
+    /* Assemble total volume conservation residual */
+    eqn = R_TFMP_MASS;
+    peqn = upd->ep[eqn];
+    etm_mass_eqn = pd->etm[eqn][(LOG2_MASS)];      // phi_i*dh/dt
+    etm_adv_eqn = pd->etm[eqn][(LOG2_ADVECTION)];  // phi_i*h^3/(12*mu^2)*dmu_dS
+                                                   // *gradIIS_dot_gradIIP
+    etm_diff_eqn = pd->etm[eqn][(LOG2_DIFFUSION)]; // phi_i*h^3/(12*mu)
+                                                   // *gradIIphi_i_dot_gradIIP
+    /* Loop over DOF (i) */
+    for(i = 0; i < ei->dof[eqn]; i++) {
+      ShellBF(eqn, i, &phi_i, grad_phi_i, gradII_phi_i, d_gradII_phi_i_dmesh, n_dof[MESH_DISPLACEMENT1], dof_map);
+
+      /* Assemble mass term */
+      mass = 0.0;
+      if( T_MASS ) {
+	mass += dh_dtime;
+
+      	mass *= dA * etm_mass_eqn;
+      }
+      /* Assemble advection term */
+      adv = 0.0;
+      if ( T_ADVECTION ) {
+	adv += pg_data->wt_func*h*h*h/12.0/mu/mu*dmu_dS*gradS_dot_gradP;
+
+      	adv *= dA * etm_adv_eqn;
+      }
+      /* Assemble diffusion term */
+      diff = 0.0;
+      gradP_dot_gradphi_i = 0.0;
+      if( T_DIFFUSION ) {
+      	for ( k = 0; k<DIM; k++) {
+	  gradP_dot_gradphi_i += gradII_P[k]*gradII_phi_i[k];
+      	}
+      	diff += h*h*h/12.0/mu*gradP_dot_gradphi_i ;
+      	diff *= dA * etm_diff_eqn;
+      }      
+      lec->R[peqn][i] += mass + adv + diff;
+    }
+
+  
+
+} /* End of assemble_shell_tfmp_alt */
+ 
+
 /* End of mm_fill_shell.c */
