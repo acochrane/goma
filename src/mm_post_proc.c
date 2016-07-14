@@ -261,6 +261,7 @@ int UNTRACKED_SPEC = -1;
 int TFMP_RHO = -1;
 int TFMP_MU = -1;
 int TFMP_RHO_MU = -1;
+int TFMP_SATU = -1;
 
 int len_u_post_proc = 0;	/* size of dynamically allocated u_post_proc
 				 * actually is */
@@ -1524,16 +1525,27 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
 
     if (TFMP_RHO != -1) {
       local_post[TFMP_RHO] = rho;
-      local_lumped[TFMP_RHO] = 1;
+      local_lumped[TFMP_RHO] += 1;
     }
     if (TFMP_MU != -1) {
       local_post[TFMP_MU] = mu;
-      local_lumped[TFMP_MU] = 1;
+      local_lumped[TFMP_MU] += 1;
     }
     if (TFMP_RHO_MU != -1) {
       local_post[TFMP_RHO_MU] = rho/mu;
-      local_lumped[TFMP_RHO_MU] = 1;
+      local_lumped[TFMP_RHO_MU] += 1;
     }
+  }
+  if (TFMP_SATU != -1 && pd->e[R_TFMP_MASS] && !pd->e[R_TFMP_BOUND]) {
+    dbl liq_inv = 75e-7; // [cm]
+     /* Use the height_function_model */
+    double h, H_U, dH_U_dtime, H_L, dH_L_dtime;
+    double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
+    h = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
+			      dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh,
+			      time, delta_t);
+    local_post[TFMP_SATU] = liq_inv/h;
+    local_lumped[TFMP_SATU] += 1.0;
   }
 
 /*  EXTERNAL tables	*/
@@ -1822,7 +1834,7 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
         local_lumped[PRINCIPAL_REAL_STRESS+2] = 1.;
     } /* end of PRINCIPAL_REAL_STRESS */
 
-  if ( LUB_HEIGHT != -1 && (pd->e[R_LUBP] || pd->e[R_SHELL_FILMP] ) ) {
+  if ( LUB_HEIGHT != -1 && (pd->e[R_LUBP] || pd->e[R_SHELL_FILMP] || pd->e[R_TFMP_MASS] ) ) {
     double H_U, dH_U_dtime, H_L, dH_L_dtime;
     double dH_U_dX[DIM],dH_L_dX[DIM], dH_U_dp, dH_U_ddh;
     
@@ -1833,7 +1845,7 @@ calc_standard_fields(double **post_proc_vect, /* rhs vector now called
     n_dof = (int *)array_alloc (1, MAX_VARIABLE_TYPES, sizeof(int));
     lubrication_shell_initialize(n_dof, dof_map, -1, xi, exo, 0);
     
-    if (pd->e[R_LUBP])
+    if (pd->e[R_LUBP] || pd->e[R_TFMP_MASS])
       {	 
 	local_post[LUB_HEIGHT] = height_function_model(&H_U, &dH_U_dtime, &H_L, &dH_L_dtime,
 						       dH_U_dX, dH_L_dX, &dH_U_dp, &dH_U_ddh, time, delta_t);
@@ -6359,7 +6371,8 @@ rd_post_process_specs(FILE *ifp,
   iread = look_for_post_proc(ifp, "TFMP_rho", &TFMP_RHO);
   iread = look_for_post_proc(ifp, "TFMP_mu", &TFMP_MU);
   iread = look_for_post_proc(ifp, "TFMP_rho_mu", &TFMP_RHO_MU);
-
+  iread = look_for_post_proc(ifp, "TFMP_satu", &TFMP_SATU);
+  
   /* Report count of post-proc vars to be exported */
   /*
     fprintf(stderr, "Goma will export %d post-processing variables.\n", Num_Export_XP);
@@ -9375,7 +9388,7 @@ index_post, index_post_export);
       PRINCIPAL_REAL_STRESS = -1;
     }
 
-  if (LUB_HEIGHT != -1  && (Num_Var_In_Type[R_LUBP] || Num_Var_In_Type[R_SHELL_FILMP]) )
+  if (LUB_HEIGHT != -1  && (Num_Var_In_Type[R_LUBP] || Num_Var_In_Type[R_SHELL_FILMP] || Num_Var_In_Type[R_TFMP_MASS]) )
     {
       if (LUB_HEIGHT == 2)
         {
@@ -9742,6 +9755,19 @@ index_post, index_post_export);
     index_post++;
   } else {
     TFMP_RHO_MU = -1;
+  } 
+  if (TFMP_SATU != -1 && Num_Var_In_Type[R_TFMP_MASS] ) {
+    set_nv_tkud(rd, index, 0, 0, -2, "SAT", "[1]", "Post Processed Saturation", FALSE);
+    index++;
+    if (TFMP_SATU == 2)
+      {
+        Export_XP_ID[index_post_export] = index_post;
+        index_post_export++;
+      }
+    TFMP_SATU = index_post;
+    index_post++;
+  } else {
+    TFMP_SATU = -1;
   } 
 
   

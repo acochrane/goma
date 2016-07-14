@@ -2087,12 +2087,20 @@ matrix_fill(
 
       	}
 
-      if(pde[R_TFMP_MASS] ||pde[R_TFMP_BOUND])
+      if(pde[R_TFMP_MASS] && pde[R_TFMP_BOUND])
 	{
 	  err = assemble_shell_tfmp( time_value, theta, delta_t, xi, &pg_data, exo );
 	  EH( err, "assemble_shell_tfmp");
 #ifdef CHECK_FINITE
 	  CHECKFINITE("assemble_shell_tfmp");
+#endif
+	}
+      if(pde[R_TFMP_MASS] && !pde[R_TFMP_BOUND])
+	{
+	  err = assemble_shell_tfmp_alt( time_value, theta, delta_t, xi, &pg_data, exo );
+	  EH( err, "assemble_shell_tfmp_alt");
+#ifdef CHECK_FINITE
+	  CHECKFINITE("assemble_shell_tfmp_alt");
 #endif
 	}
 

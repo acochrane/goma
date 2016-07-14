@@ -9441,7 +9441,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
   /*
    * Inputs specific to thin film multiphase flow density and viscosity calculations
    */
-  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+  if(pd_glob[mn]->e[R_TFMP_MASS]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Density", 
 				   &(mat_ptr->tfmp_density_model), 
 				   mat_ptr->tfmp_density_const, 
@@ -9486,7 +9486,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       mat_ptr->len_tfmp_density_const = num_const;
     }
   }
-  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+  if(pd_glob[mn]->e[R_TFMP_MASS]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Viscosity", 
 				   &(mat_ptr->tfmp_viscosity_model), 
 				   mat_ptr->tfmp_viscosity_const, 
@@ -9531,7 +9531,7 @@ ECHO("\n----Acoustic Properties\n", echo_file);
       mat_ptr->len_tfmp_viscosity_const = num_const;
     }
   }
-  if(pd_glob[mn]->e[R_TFMP_BOUND]) {
+  if(pd_glob[mn]->e[R_TFMP_MASS]) {
     model_read = look_for_mat_prop(imp, "Thin Film Multiphase Backwards Diffusivity", 
 				   &(mat_ptr->tfmp_diff_model), 
 				   &(mat_ptr->tfmp_diff_const), 
