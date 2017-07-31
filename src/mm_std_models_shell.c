@@ -402,7 +402,21 @@ height_function_model (double *H_U,
      *dH_U_dp = 0.;
      *dH_U_ddh = 1.0;
    }
+ else if(mp->HeightUFunctionModel == TABLE) {
+   struct Data_Table *table_local;
+   table_local = MP_Tables[mp->heightU_function_constants_tableid];
 
+
+   if ( !strcmp(table_local->t_name[0], "LINEAR_TIME") ) {
+     dbl time_local[1];
+     time_local[0] = time;
+
+     *H_U = interpolate_table( table_local, time_local, dH_U_dtime, NULL);
+     dH_U_dX[0] = dH_U_dX[1] = dH_U_dX[2] = 0.0;
+
+
+   }
+ }
  else
    {
      EH(-1,"Not a supported height-function model");
@@ -1526,5 +1540,53 @@ void dynamic_contact_angle_model(
   return;
 }
 /*** END OF dynamic_contact_angle_model ***/
+
+/* function to compute apply roller pressure
+   so far roller axis is parallel to y axis and translates in x direction
+
+   Author: Andrew Cochrane <acochrane@gmail.com>
+ */
+
+double
+rolling_pressure(double gap,
+		 double *offset,
+		 double time)
+{
+  // input from material file
+  double initialRollerCenterX,
+    rollerVelocity,
+    rollerCenter_templateSeparation,
+    rollerSpringConstant,
+    rollerRadius;
+
+  double offsetRollerCenter,
+    rollerPressure;
+
+
+  initialRollerCenterX = mp->ctpm_def_roll_const[0];
+  rollerVelocity = mp->ctpm_def_roll_const[1];
+  rollerCenter_templateSeparation = mp->ctpm_def_roll_const[2];
+  rollerSpringConstant = mp->ctpm_def_roll_const[3];
+  rollerRadius = mp->ctpm_def_roll_const[4];
+
+  offsetRollerCenter = rollerVelocity*time + initialRollerCenterX;
+
+  *offset = offsetRollerCenter;
+
+  rollerPressure = rollerSpringConstant
+    *(gap
+      - (rollerCenter_templateSeparation
+	 - sqrt(rollerRadius*rollerRadius
+		- (fv->x[0] - offsetRollerCenter)*(fv->x[0] - offsetRollerCenter)
+		)
+	 )
+      );
+
+  if (rollerPressure < 0.0 ) {
+    rollerPressure = 0.0;
+  }
+  return rollerPressure;
+}
+
 
 /* END of file mm_std_models_shell.c */
