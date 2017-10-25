@@ -14206,7 +14206,7 @@ calculate_laser_flux ( const double p[],
 }  /* END of routine calculate_laser_flux */
 /*****************************************************************************/
 
-void 
+void
 qrad_surf(double func[DIM],
 	  double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
 	  double heat_tran_coeff, /* Heat transfer coefficient (cgs units)   */
@@ -14220,24 +14220,23 @@ qrad_surf(double func[DIM],
 *  heat transfer.
 *
 ******************************************************************************/
-     
+
 {
-  
 /* Local variables */
-  
+
   int j_id;
   int var;
   double phi_j;
-  
+
 /***************************** EXECUTION BEGINS *******************************/
-  
+
   if(af->Assemble_LSA_Mass_Matrix)
     return;
 
   if (af->Assemble_Jacobian) {
-    
+
  /* sum the contributions to the global stiffness matrix */
-  
+
     var=TEMPERATURE;
     for (j_id = 0; j_id < ei->dof[var]; j_id++) {
       phi_j = bf[var]->phi[j_id];
@@ -14247,12 +14246,71 @@ qrad_surf(double func[DIM],
   }
 
 /* Calculate the residual contribution					     */
-  
-  *func += heat_tran_coeff * (T_c - fv->T) + 
+
+  *func += heat_tran_coeff * (T_c - fv->T) +
            epsilon*sigma * (pow(T_c,4.0) - pow(fv->T,4.0));
 
   return;
 } /* END of routine qrad_surf                                                */
+void
+qconv_heater(double func[DIM],
+	     double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
+	     double heat_tran_coeff, /* Heat transfer coefficient (cgs units)   */
+	     double T_o,             /* Far-field temperature (Kelvin)	             */
+	     double z_o,             /* initial position offset  */
+	     double t_o,             /* initial time offset  */
+	     double dT_dz,           /* position sensitivity       */
+	     double dT_dt )           /*temporal sensitivity         */
+
+/******************************************************************************
+*
+*  Function which calculates the surface integral for convective
+*  heat transfer.
+*
+******************************************************************************/
+
+{
+
+/* Local variables */
+
+  int j_id;
+  int var;
+  int k;
+  double phi_j;
+
+/***************************** EXECUTION BEGINS *******************************/
+
+  if(af->Assemble_LSA_Mass_Matrix)
+    return;
+
+  if (af->Assemble_Jacobian) {
+
+ /* sum the contributions to the global stiffness matrix */
+
+    var=TEMPERATURE;
+    for (j_id = 0; j_id < ei->dof[var]; j_id++) {
+      phi_j = bf[var]->phi[j_id];
+      d_func[0][var][j_id] -= heat_tran_coeff * phi_j;
+
+    }
+    var = MESH_DISPLACEMENT1;
+    for (j_id = 0; j_id < ei->dof[var]; j_id++) {
+      phi_j = bf[var]->phi[j_id];
+      d_func[0][var][j_id] -= heat_tran_coeff*dT_dz*phi_j;
+    }
+
+  }
+
+/* Calculate the residual contribution					     */
+  double Toftandz;
+  Toftandz = T_o
+    + dT_dt * (tran->time_value - t_o)
+    + dT_dz * (fv->x[0] - z_o);
+
+  *func += heat_tran_coeff * (fv->T - Toftandz) ;
+
+  return;
+} /* END of routine qconv_heater                                                */
 
 /*****************************************************************************/
 void 

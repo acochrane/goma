@@ -1361,6 +1361,7 @@ rd_bc_specs(FILE *ifp,
 	case SHARP_BLAKE_VELOCITY_BC:
 	case SHARP_COX_VELOCITY_BC:
 	case SHARP_SHIK_VELOCITY_BC:
+	case LINEAR_HEATER_BC:
 	  if ( fscanf(ifp, "%lf %lf %lf %lf %lf %lf ", 
 		      &BC_Types[ibc].BC_Data_Float[0],
 		      &BC_Types[ibc].BC_Data_Float[1],

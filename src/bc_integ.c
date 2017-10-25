@@ -1599,6 +1599,16 @@ apply_integrated_bc(double x[],           /* Solution vector for the current pro
 		     BC_Types[bc_input_id].BC_Data_Float[1],
 		     0.,0.);
 	  break;
+	case LINEAR_HEATER_BC:
+	  qconv_heater (func, d_func,
+			BC_Types[bc_input_id].BC_Data_Float[0],
+			BC_Types[bc_input_id].BC_Data_Float[1],
+			BC_Types[bc_input_id].BC_Data_Float[2],
+			BC_Types[bc_input_id].BC_Data_Float[3],
+			BC_Types[bc_input_id].BC_Data_Float[4],
+			BC_Types[bc_input_id].BC_Data_Float[5]
+			);
+	  break;
 
 	case QRAD_REPULSE_ROLL_BC:
 	  qrad_surf_repulse (func, d_func,
