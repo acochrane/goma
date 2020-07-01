@@ -52,15 +52,15 @@ EXTERN int apply_em_farfield_direct_vec/* mm_fill_em.c                          
 (double [DIM],     // func
   double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
   double [DIM] ,   // xi
-  const int,
-  double*);// bc_name
+  const int, // bc_name
+  double*);
 
 EXTERN int apply_em_sommerfeld_vec/* mm_fill_em.c                           */
 (double [DIM],     // func
   double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
   double [DIM] ,   // xi
-  const int,
-  double*);// bc_name
+  const int, // bc_name
+  double*);
 
 EXTERN int apply_em_free_vec/* mm_fill_em.c                           */
 (double [DIM],     // func
@@ -68,6 +68,18 @@ EXTERN int apply_em_free_vec/* mm_fill_em.c                           */
   double [DIM] ,   // xi
   const int);// bc_name
 
+EXTERN int apply_ewave_planewave_vec/* mm_fill_em.c                           */
+(double [DIM],     // func
+  double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
+  double [DIM] ,   // xi
+  const int, // bc_name
+  double*);
+
+EXTERN int apply_ewave_2D/* mm_fill_em.c                           */
+(double [DIM],     // func
+  double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
+  double [DIM] ,   // xi
+  const int); // bc_name
 
 EXTERN void calc_emwave_stabilization_term
 (struct emwave_stabilization*,
