@@ -963,7 +963,6 @@ int assemble_ewave_tensor_bf(double time, // present time
           for (int q = 0; q < DIM; q++) {
             //diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * fv->curl_em_er[q];
             //diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * fv->curl_em_ei[q];
-
             //diffusion_real += bf->[eqn_real]->phi_e[i][a][q] * fv->em_er[q];
             //diffusion_imag += bf->[eqn_imag]->phi_e[i][a][q] * fv->em_ei[q];
 
@@ -974,9 +973,6 @@ int assemble_ewave_tensor_bf(double time, // present time
           // R = E
           //diffusion_real = bf[eqn_real]->phi[i]*fv->em_er[a];
           //diffusion_imag = bf[eqn_imag]->phi[i]*fv->em_ei[a];
-
-
-
           double stab_real = 0.0;
           double stab_imag = 0.0;
           double lagr_term_real = 0.0;
@@ -991,12 +987,10 @@ int assemble_ewave_tensor_bf(double time, // present time
             //stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_er[0][0] + fv->grad_em_er[1][1] + fv->grad_em_er[2][2]);
             //stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_ei[0][0] + fv->grad_em_ei[1][1] + fv->grad_em_ei[2][2]);
           }
-
           double advection_real = 0.0;
           double advection_imag = 0.0;
           //double advection_real = -bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
           //double advection_imag = -bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
-
           double src_term = 0.0;
           switch(a) {
           case 0:
@@ -1052,8 +1046,6 @@ int assemble_ewave_tensor_bf(double time, // present time
                 double diffusion_imag = 0;
                 for (int q = 0; q < DIM; q++) {
                   //diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * bf[eqn_real]->curl_phi_e[j][b][q];
-
-
 
 
                 }
@@ -1158,6 +1150,296 @@ int assemble_ewave_tensor_bf(double time, // present time
   return(0);
 } // end of assemble_ewave_tensor_bf
 
+/* assemble_ewave_tensor_bf -- assemble terms (Residual &| Jacobian) for EM harmonic
+ *                    wave equations
+ *                   Substitue H for curl(E) so that goma solves
+ *                   1 complex vector equation and 1 complex vector primitive
+ *
+ * in:
+ *     ei -- pointer to Element Indecesstructure
+ *     pd -- pointer to Problem Descriptionstructure
+ *     af -- pointer to Action Flagstructure
+ *     bf -- pointer to Basis Functionstructure
+ *     fv -- pointer to Field Variablestructure
+ *       fv_old -- pointer to old Diet Field Variablestructure
+ *       fv_dot -- pointer to dot Diet Field Variablestructure
+ *     cr -- pointer to Constitutive Relationstructure
+ *     md -- pointer to Mesh Derivativestructure
+ *     me -- pointer to Material Entitystructure
+ *
+ * out:
+ *     a   -- gets loaded up with proper contribution
+ *     lec -- gets loaded up with local contributions to resid, Jacobian
+ *     r   -- residual RHS vector
+ *
+ * Created: Wednesday April 22, 2020 - Andrew Cochrane
+ *
+ *
+ */
+
+int assemble_ewave_laplacian(double time, // present time
+                   double tt,   // time integration method parameter
+                   double dt,   // current time step size
+                   const int em_eqn, // eqn id
+                   const int em_var //  variable id - should match me_eqn
+                   ) {
+  int eqn, var, dim, peqn,  i;
+  dbl mag_permeability=mp->magnetic_permeability;
+  double omega, re_coeff, im_coeff;
+  struct emwave_stabilization em_stab;
+  em_stab.em_eqn = em_eqn;
+  em_stab.em_var = em_var;
+  em_stab.type = EM_STAB_NONE; // enum supports phi_div, dphi_div,
+                           // divphi_div, phi_divsquared and
+                           // dphi_divsquared
+
+  dim   = pd->Num_Dim;
+  eqn   = em_eqn;
+  /*
+   * Bail out fast if there's nothing to do...
+   * But we might have the wrong eqn
+   */
+  for (int a=0; a<DIM; a++){
+    if (pd->e[R_EM_E1_REAL+a]) {
+      eqn = R_EM_E1_REAL+a;
+      break;
+    }
+  }
+  if ( ! pd->e[eqn] )
+    {
+      return(1);
+    }
+
+  omega = upd->Acoustic_Frequency;
+  dbl n;				/* Refractive index. */
+  CONDUCTIVITY_DEPENDENCE_STRUCT d_n_struct;
+  CONDUCTIVITY_DEPENDENCE_STRUCT *d_n = &d_n_struct;
+
+  dbl k;				/* Acoustic wave number. */
+  CONDUCTIVITY_DEPENDENCE_STRUCT d_k_struct;
+  CONDUCTIVITY_DEPENDENCE_STRUCT *d_k = &d_k_struct;
+
+  n = refractive_index( d_n, time );
+  k = extinction_index( d_k, time );
+
+  // Compute complex material properties
+  complex double cpx_refractive_index, cpx_rel_permittivity,
+      cpx_permittivity;//, impedance;
+  double r_elperm, i_elperm;
+
+  cpx_refractive_index = n + _Complex_I*k; // k > 0 is extinction
+  cpx_rel_permittivity = SQUARE(cpx_refractive_index);
+  cpx_permittivity = cpx_rel_permittivity*mp->permittivity;
+
+  // assumed to be constant in an element block
+  r_elperm = creal(cpx_permittivity);
+  i_elperm = cimag(cpx_permittivity);
+  re_coeff = -omega*omega*mag_permeability*r_elperm;
+  im_coeff =  omega*omega*mag_permeability*i_elperm;
+
+  double stab_scale = 100000.0;
+  if ( af->Assemble_Residual ) {
+    for (int i = 0; i < ei->dof[eqn]; i++) {
+      for (int a = 0; a < DIM; a++) {
+        if ( pd->e[R_EM_E1_REAL+a] ) {
+          int eqn_real = EM_E1_REAL+a;
+          int eqn_imag = EM_E1_IMAG+a;
+          int peqn_real = upd->ep[eqn_real];
+          int peqn_imag = upd->ep[eqn_imag];
+
+          double diffusion_real = 0.0;
+          double diffusion_imag = 0.0;
+          for (int q = 0; q < DIM; q++) {
+            // R = - (gradphi)_a dot (gradE)_a
+            diffusion_real += -bf[eqn_real]->grad_phi[i][q]*fv->grad_em_er[q][a];
+            diffusion_imag += -bf[eqn_imag]->grad_phi[i][q]*fv->grad_em_ei[q][a];
+          }
+          //diffusion_real = -fv->grad_em_er[a][0];
+          // R = E
+          //diffusion_real = bf[eqn_real]->phi[i]*fv->em_er[a];
+          //diffusion_imag = bf[eqn_imag]->phi[i]*fv->em_ei[a];
+          double stab_real = 0.0;
+          double stab_imag = 0.0;
+          double lagr_term_real = 0.0;
+          double lagr_term_imag = 0.0;
+
+          if (pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG]) {
+            //lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epr + i_elperm * fv->epi);
+            //lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epi + i_elperm * fv->epr);
+            //lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (fv->epr);
+            //lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (fv->epi);
+          } else {
+            stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_er[0][0] + fv->grad_em_er[1][1] + fv->grad_em_er[2][2]);
+            stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_ei[0][0] + fv->grad_em_ei[1][1] + fv->grad_em_ei[2][2]);
+          }
+
+          double advection_real = 0.0;
+          double advection_imag = 0.0;
+          advection_real = bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
+          advection_imag = bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
+
+          double src_term = 0.0;
+          switch(a) {
+          case 0:
+            //src_term = bf[eqn_real]->phi[i] * (-fv->x[1]*fv->x[1]*r_elperm*r_elperm - 3);
+                //- stab_scale * bf[eqn_real]->grad_phi[i][a] * ( -fv->x[0]);
+
+            // src term for R = E
+            //src_term = -bf[eqn_real]->phi[i] * (fv->x[1]*fv->x[1]);
+
+            // src term for R = curl(E)
+
+            break;
+          case 1:
+            //src_term = bf[eqn_real]->phi[i] * (fv->x[0]*fv->x[1]*r_elperm*r_elperm);
+                //- stab_scale * bf[eqn_real]->grad_phi[i][a] * ( -fv->x[0]);
+
+            // src term for R = E
+            //src_term = bf[eqn_real]->phi[i] * (fv->x[0]*fv->x[1]);
+
+            // src term for R = curl(E)
+
+            break;
+          case 2:
+            //src_term = - stab_scale * bf[eqn_real]->grad_phi[i][a] * ( -fv->x[0]);
+
+            // src term for R = curl(E)
+            //src_term = bf[eqn_real]->phi[i]*3.0*fv->x[1];
+
+            break;
+          }
+          lec->R[peqn_real][i] += (advection_real + diffusion_real + stab_real + src_term + lagr_term_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+          lec->R[peqn_imag][i] += (advection_imag + diffusion_imag + stab_imag + lagr_term_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+        }
+      }
+    }
+  }
+  if ( af->Assemble_Jacobian ) {
+    for (int i = 0; i < ei->dof[eqn]; i++) {
+      for (int a = 0; a < DIM; a++) {
+        if ( pd->e[R_EM_E1_REAL+a] ) {
+          int eqn_real = EM_E1_REAL+a;
+          int eqn_imag = EM_E1_IMAG+a;
+          int peqn_real = upd->ep[eqn_real];
+          int peqn_imag = upd->ep[eqn_imag];
+
+          // Sensitivity to real parts of electric field
+          for (int b = 0; b < DIM; b++) {
+            if ( pd->e[R_EM_E1_REAL+b] ) {
+              int var = EM_E1_REAL + b;
+              int pvar_real = upd->vp[var];
+              for (int j = 0; j < ei->dof[var]; j++) {
+                double diffusion_real = 0;
+                double diffusion_imag = 0;
+                for (int q = 0; q < DIM; q++) {
+                  //diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * bf[eqn_real]->curl_phi_e[j][b][q];
+                  diffusion_real += -delta(a,b)*bf[eqn_real]->grad_phi[i][q]*bf[eqn_real]->grad_phi[j][q];
+                }
+
+                //diffusion_real += -bf[eqn_real]->grad_phi[j][b];
+
+                // R = curl(E)
+                //diffusion_real += bf[eqn_real]->phi[i]*bf[eqn_real]->curl_phi_e[j][b][a];
+
+                // Jacobian contribution for R = E
+                //diffusion_real += delta(a,b)*bf[eqn_real]->phi[i]*bf[eqn_real]->phi[j];
+
+                double stab_real = 0;
+                double stab_imag = 0;
+                if (!(pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG])) {
+                  stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
+                      bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
+                }
+
+                double advection_real = 0;
+                double advection_imag = 0;
+
+                advection_real = bf[eqn_real]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
+                advection_imag = bf[eqn_imag]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
+
+                lec->J[peqn_real][pvar_real][i][j] += (diffusion_real + advection_real + stab_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+                lec->J[peqn_imag][pvar_real][i][j] += (diffusion_imag + advection_imag + stab_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+              }
+            }
+          }
+
+          // Sensitivity to imaginary parts of electric field
+          for (int b = 0; b < DIM; b++) {
+            if ( pd->e[R_EM_E1_REAL+b] ) {
+              int var = EM_E1_IMAG + b;
+              int pvar_imag = upd->vp[var];
+              for (int j = 0; j < ei->dof[var]; j++) {
+                double diffusion_real = 0;
+                double diffusion_imag = 0;
+                for (int q = 0; q < DIM; q++) {
+                  diffusion_imag += -delta(a,b)*bf[eqn_imag]->grad_phi[i][q]*bf[eqn_imag]->grad_phi[j][q];
+
+                }
+
+                // R = curl(E)
+                //diffusion_imag += bf[eqn_imag]->phi[i]*bf[eqn_imag]->curl_phi_e[j][b][a];
+
+                // Jacobian Contribution for R = E
+                //diffusion_imag += delta(a,b)*bf[eqn_imag]->phi[i]*bf[eqn_imag]->phi[j];
+
+                // Jacobian Contribution for R = curl(E)
+                //diffusion_real += bf[eqn_real]->phi[i]*bf[eqn_real]->curl_phi_e[j][b][a];
+
+                double stab_real = 0;
+                double stab_imag = 0;
+                if (!(pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG])) {
+                  stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
+                      bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
+                }
+
+                double advection_real = 0;
+                double advection_imag = 0;
+
+                advection_real = bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
+                advection_imag = bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
+                lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real + advection_real + stab_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+                lec->J[peqn_imag][pvar_imag][i][j] += (diffusion_imag + advection_imag + stab_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+              }
+            }
+          }
+
+          {
+            int var = EM_CONT_REAL;
+            if (pd->e[var]) {
+              int pvar = upd->vp[var];
+              for (int j = 0; j < ei->dof[var]; j++) {
+                //dbl lagr_term_real = bf[eqn]->grad_phi[i][a] * r_elperm * bf[var]->phi[j];
+                //dbl lagr_term_imag = bf[eqn]->grad_phi[i][a] * i_elperm * bf[var]->phi[j];
+                dbl lagr_term_real = bf[eqn]->grad_phi[i][a] * bf[var]->phi[j];
+                dbl lagr_term_imag = 0;
+                lec->J[peqn_real][pvar][i][j] += (lagr_term_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+                lec->J[peqn_imag][pvar][i][j] += (lagr_term_imag) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+              }
+            }
+          }
+
+          {
+            int var = EM_CONT_IMAG;
+            if (pd->e[var]) {
+              int pvar = upd->vp[var];
+              for (int j = 0; j < ei->dof[var]; j++) {
+                //dbl lagr_term_real = bf[eqn]->grad_phi[i][a] * i_elperm * bf[var]->phi[j];
+                //dbl lagr_term_imag = bf[eqn]->grad_phi[i][a] * r_elperm * bf[var]->phi[j];
+                dbl lagr_term_real = 0;
+                dbl lagr_term_imag = bf[eqn]->grad_phi[i][a] * bf[var]->phi[j];
+                lec->J[peqn_real][pvar][i][j] += (lagr_term_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+                lec->J[peqn_imag][pvar][i][j] += (lagr_term_imag) * bf[eqn_real]->detJ * fv->wt * fv->h3;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return(0);
+} // end of assemble_ewave_laplacian
+
+
 int assemble_em_continuity() {
   if (! (pd->e[R_EM_CONT_REAL] && pd->e[R_EM_CONT_IMAG])) {
     return -1;
@@ -1253,7 +1535,9 @@ int assemble_em_continuity() {
     }
   }
   return(0);
-} // end of assemble_ewave_tensor_bf
+} // end of assemble_em_continuity
+
+
 
 int apply_em_farfield_direct_vec(double func[DIM],
                 double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
