@@ -71,7 +71,15 @@ EXTERN int apply_em_free_vec/* mm_fill_em.c                           */
 EXTERN int apply_ewave_planewave_vec/* mm_fill_em.c                           */
 (double [DIM],     // func
   double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
-  double [DIM] ,   // xi
+  double [DIM],   // xi
+  const int, // bc_name
+  double*);
+
+EXTERN int apply_ewave_curlcurl_farfield_vec/* mm_fill_em.c                           */
+(double [DIM],     // func
+  double [DIM][MAX_VARIABLE_TYPES+MAX_CONC][MDE] , // d_func
+  double [DIM],   // xi
+  double time,    // present time
   const int, // bc_name
   double*);
 
@@ -85,7 +93,7 @@ EXTERN void calc_emwave_stabilization_term
 (struct emwave_stabilization*,
  double);
 
-int assemble_ewave_tensor_bf(double time, // present time
+int assemble_ewave_curlcurl(double time, // present time
                    double tt,   // time integration method parameter
                    double dt,   // current time step size
                    const int em_eqn, // eqn id

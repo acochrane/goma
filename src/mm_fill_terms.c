@@ -9858,7 +9858,7 @@ load_fv_grads(void)
 	}
     }
 
-    if (pd->v[EM_E1_REAL]) {
+    if (pd->v[EM_E1_REAL] && pd->v[EM_E2_REAL]) {
       v = EM_E1_REAL;
       dofs = ei->dof[v];
       bfn = bf[v];
@@ -9872,7 +9872,7 @@ load_fv_grads(void)
         }
       }
     }
-    if (pd->v[EM_E1_IMAG]) {
+    if (pd->v[EM_E1_IMAG] && pd->v[EM_E2_IMAG]) {
       v = EM_E1_REAL;
       dofs = ei->dof[v];
       bfn = bf[v];
@@ -10911,7 +10911,7 @@ load_fv_grads(void)
   /*
    * EM Wave Vector Gradients
    */
-  if (pd->v[EM_E1_REAL] || pd->v[EM_E2_REAL] || pd->v[EM_E3_REAL]) 
+  if (pd->v[EM_E1_REAL] && pd->v[EM_E2_REAL] && pd->v[EM_E3_REAL])
     {
       dofs = ei->dof[EM_E1_REAL];
       v = EM_E1_REAL;
@@ -10943,7 +10943,7 @@ load_fv_grads(void)
 	}
 
     }
-  if (pd->v[EM_E1_IMAG] || pd->v[EM_E2_IMAG] || pd->v[EM_E3_IMAG]) 
+  if (pd->v[EM_E1_IMAG] && pd->v[EM_E2_IMAG] && pd->v[EM_E3_IMAG])
     {
       dofs = ei->dof[EM_E1_IMAG];
       v = EM_E1_IMAG;

@@ -1506,6 +1506,8 @@ rd_bc_specs(FILE *ifp,
         case EM_EI_FARFIELD_DIRECT_BC:
         case EM_HR_FARFIELD_DIRECT_BC:
         case EM_HI_FARFIELD_DIRECT_BC:
+        case E_ER_FARFIELD_BC:
+        case E_EI_FARFIELD_BC:
 
 	  if ( fscanf(ifp, "%lf %lf %lf %lf %lf %lf %lf %lf", 
 		      &BC_Types[ibc].BC_Data_Float[0],   

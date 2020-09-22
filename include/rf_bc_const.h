@@ -576,6 +576,9 @@
 #define E_ER_2D_BC 1204
 #define E_EI_2D_BC 1205
 
+#define E_ER_FARFIELD_BC 1210
+#define E_EI_FARFIELD_BC 1211
+
 /* pressure */
 
 #define P_BC 100000

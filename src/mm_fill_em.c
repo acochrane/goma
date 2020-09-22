@@ -861,10 +861,15 @@ int assemble_ewave(double time, // present time
 } // end of assemble_ewave
 
 
-/* assemble_ewave_tensor_bf -- assemble terms (Residual &| Jacobian) for EM harmonic
+/* assemble_ewave_curlcurl -- assemble terms (Residual &| Jacobian) for EM harmonic
  *                    wave equations
  *                   Substitue H for curl(E) so that goma solves
  *                   1 complex vector equation and 1 complex vector primitive
+ *
+ * Note: The product rule for cross products is used for the integration by parts
+ *       div(A cross B) = curl(A) dot B - A dot curl(B)
+ *       div[phi cross curl(E)] = curl(phi) dot curl(E) - phi dot curl(curl(E))
+ *
  *
  * in:
  *     ei -- pointer to Element Indecesstructure
@@ -884,11 +889,12 @@ int assemble_ewave(double time, // present time
  *     r   -- residual RHS vector
  *
  * Created: Wednesday April 22, 2020 - Andrew Cochrane
- *
+ * Re-written: June 16, 2020 - Weston Ortiz
+ * Modified for testing with method of manufactured solutions: Jun 30, 2020 - Andrew Cochrane
  *
  */
 
-int assemble_ewave_tensor_bf(double time, // present time
+int assemble_ewave_curlcurl(double time, // present time
                    double tt,   // time integration method parameter
                    double dt,   // current time step size
                    const int em_eqn, // eqn id
@@ -900,7 +906,7 @@ int assemble_ewave_tensor_bf(double time, // present time
   struct emwave_stabilization em_stab;
   em_stab.em_eqn = em_eqn;
   em_stab.em_var = em_var;
-  em_stab.type = EM_STAB_NONE; // enum supports phi_div, dphi_div,
+  em_stab.type = EM_STAB_DPHI_DIV; // enum supports phi_div, dphi_div,
                            // divphi_div, phi_divsquared and
                            // dphi_divsquared
 
@@ -945,13 +951,28 @@ int assemble_ewave_tensor_bf(double time, // present time
   // assumed to be constant in an element block
   r_elperm = creal(cpx_permittivity);
   i_elperm = cimag(cpx_permittivity);
-  re_coeff = -omega*omega*mag_permeability*r_elperm;
+  re_coeff =  omega*omega*mag_permeability*r_elperm;
   im_coeff =  omega*omega*mag_permeability*i_elperm;
 
-  double stab_scale = 1000.0;
+  int reqn, ieqn;
+  double rmass_etm, radvection_etm, rdiffusion_etm, rsource_etm;
+  double imass_etm, iadvection_etm, idiffusion_etm, isource_etm;
+
+  double stab_scale = 0.0;
   if ( af->Assemble_Residual ) {
     for (int i = 0; i < ei->dof[eqn]; i++) {
       for (int a = 0; a < DIM; a++) {
+        reqn = R_EM_E1_REAL + a;
+        ieqn = R_EM_E1_IMAG + a;
+        rmass_etm = pd->etm[reqn][(LOG2_MASS)];
+        radvection_etm = pd->etm[reqn][(LOG2_ADVECTION)];
+        rdiffusion_etm = pd->etm[reqn][(LOG2_DIFFUSION)];
+        rsource_etm = pd->etm[reqn][(LOG2_SOURCE)];
+        imass_etm = pd->etm[ieqn][(LOG2_MASS)];
+        iadvection_etm = pd->etm[ieqn][(LOG2_ADVECTION)];
+        idiffusion_etm = pd->etm[ieqn][(LOG2_DIFFUSION)];
+        isource_etm = pd->etm[ieqn][(LOG2_SOURCE)];
+
         if ( pd->e[R_EM_E1_REAL+a] ) {
           int eqn_real = EM_E1_REAL+a;
           int eqn_imag = EM_E1_IMAG+a;
@@ -961,14 +982,14 @@ int assemble_ewave_tensor_bf(double time, // present time
           double diffusion_real = 0.0;
           double diffusion_imag = 0.0;
           for (int q = 0; q < DIM; q++) {
-            //diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * fv->curl_em_er[q];
-            //diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * fv->curl_em_ei[q];
+            diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * fv->curl_em_er[q];
+            diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * fv->curl_em_ei[q];
             //diffusion_real += bf->[eqn_real]->phi_e[i][a][q] * fv->em_er[q];
             //diffusion_imag += bf->[eqn_imag]->phi_e[i][a][q] * fv->em_ei[q];
 
             // R = curl(E)
-            diffusion_real += delta(a,q)*bf[eqn_real]->phi[i]*fv->curl_em_er[a];
-            diffusion_imag += delta(a,q)*bf[eqn_imag]->phi[i]*fv->curl_em_ei[a];
+            //diffusion_real += delta(a,q)*bf[eqn_real]->phi[i]*fv->curl_em_er[a];
+            //diffusion_imag += delta(a,q)*bf[eqn_imag]->phi[i]*fv->curl_em_ei[a];
           }
           // R = E
           //diffusion_real = bf[eqn_real]->phi[i]*fv->em_er[a];
@@ -979,19 +1000,20 @@ int assemble_ewave_tensor_bf(double time, // present time
           double lagr_term_imag = 0.0;
 
           if (pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG]) {
-            //lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epr + i_elperm * fv->epi);
-            //lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epi + i_elperm * fv->epr);
-            //lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (fv->epr);
-            //lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (fv->epi);
+            lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epr - i_elperm * fv->epi);
+            lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (r_elperm * fv->epi + i_elperm * fv->epr);
+            lagr_term_real = bf[eqn_real]->grad_phi[i][a] * (fv->epr);
+            lagr_term_imag = bf[eqn_real]->grad_phi[i][a] * (fv->epi);
           } else {
-            //stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_er[0][0] + fv->grad_em_er[1][1] + fv->grad_em_er[2][2]);
-            //stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_ei[0][0] + fv->grad_em_ei[1][1] + fv->grad_em_ei[2][2]);
+            stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_er[0][0] + fv->grad_em_er[1][1] + fv->grad_em_er[2][2]);
+            stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (fv->grad_em_ei[0][0] + fv->grad_em_ei[1][1] + fv->grad_em_ei[2][2]);
           }
-          double advection_real = 0.0;
-          double advection_imag = 0.0;
-          //double advection_real = -bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
-          //double advection_imag = -bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
-          double src_term = 0.0;
+          //double advection_real = 0.0;
+          //double advection_imag = 0.0;
+          double advection_real = -bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
+          double advection_imag = -bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
+          double src_real = 0.0;
+          double src_imag = 0.0;
           switch(a) {
           case 0:
             //src_term = bf[eqn_real]->phi[i] * (-fv->x[1]*fv->x[1]*r_elperm*r_elperm - 3);
@@ -1017,12 +1039,23 @@ int assemble_ewave_tensor_bf(double time, // present time
             //src_term = - stab_scale * bf[eqn_real]->grad_phi[i][a] * ( -fv->x[0]);
 
             // src term for R = curl(E)
-            src_term = bf[eqn_real]->phi[i]*3.0*fv->x[1];
+            //src_term = bf[eqn_real]->phi[i]*3.0*fv->x[1];
 
             break;
           }
-          lec->R[peqn_real][i] += (advection_real + diffusion_real + stab_real + src_term + lagr_term_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
-          lec->R[peqn_imag][i] += (advection_imag + diffusion_imag + stab_imag + lagr_term_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+          lec->R[peqn_real][i] += (advection_real*radvection_etm
+                                   + diffusion_real*rdiffusion_etm
+                                   + stab_real
+                                   + src_real*rsource_etm
+                                   + lagr_term_real)
+              * bf[eqn_real]->detJ * fv->wt * fv->h3;
+
+          lec->R[peqn_imag][i] += (advection_imag*iadvection_etm
+                                   + diffusion_imag*idiffusion_etm
+                                   + stab_imag
+                                   + src_imag*isource_etm
+                                   + lagr_term_imag)
+              * bf[eqn_imag]->detJ * fv->wt * fv->h3;
         }
       }
     }
@@ -1030,6 +1063,16 @@ int assemble_ewave_tensor_bf(double time, // present time
   if ( af->Assemble_Jacobian ) {
     for (int i = 0; i < ei->dof[eqn]; i++) {
       for (int a = 0; a < DIM; a++) {
+        reqn = R_EM_E1_REAL + a;
+        ieqn = R_EM_E1_IMAG + a;
+        rmass_etm = pd->etm[reqn][(LOG2_MASS)];
+        radvection_etm = pd->etm[reqn][(LOG2_ADVECTION)];
+        rdiffusion_etm = pd->etm[reqn][(LOG2_DIFFUSION)];
+        rsource_etm = pd->etm[reqn][(LOG2_SOURCE)];
+        imass_etm = pd->etm[ieqn][(LOG2_MASS)];
+        iadvection_etm = pd->etm[ieqn][(LOG2_ADVECTION)];
+        idiffusion_etm = pd->etm[ieqn][(LOG2_DIFFUSION)];
+        isource_etm = pd->etm[ieqn][(LOG2_SOURCE)];
         if ( pd->e[R_EM_E1_REAL+a] ) {
           int eqn_real = EM_E1_REAL+a;
           int eqn_imag = EM_E1_IMAG+a;
@@ -1045,12 +1088,12 @@ int assemble_ewave_tensor_bf(double time, // present time
                 double diffusion_real = 0;
                 double diffusion_imag = 0;
                 for (int q = 0; q < DIM; q++) {
-                  //diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * bf[eqn_real]->curl_phi_e[j][b][q];
+                  diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * bf[eqn_real]->curl_phi_e[j][b][q];
 
 
                 }
                 // R = curl(E)
-                diffusion_real += bf[eqn_real]->phi[i]*bf[eqn_real]->curl_phi_e[j][b][a];
+                //diffusion_real += bf[eqn_real]->phi[i]*bf[eqn_real]->curl_phi_e[j][b][a];
 
                 // Jacobian contribution for R = E
                 //diffusion_real += delta(a,b)*bf[eqn_real]->phi[i]*bf[eqn_real]->phi[j];
@@ -1058,17 +1101,24 @@ int assemble_ewave_tensor_bf(double time, // present time
                 double stab_real = 0;
                 double stab_imag = 0;
                 if (!(pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG])) {
-                  //stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
-                  //    bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
+                  stab_real = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
+                      bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
                 }
 
-                double advection_real = 0;
-                double advection_imag = 0;
-                //double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
-                //double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
+                //double advection_real = 0;
+                //double advection_imag = 0;
+                double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
+                double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
 
-                lec->J[peqn_real][pvar_real][i][j] += (diffusion_real + advection_real + stab_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
-                lec->J[peqn_imag][pvar_real][i][j] += (diffusion_imag + advection_imag + stab_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+                lec->J[peqn_real][pvar_real][i][j] += (diffusion_real*rdiffusion_etm
+                                                       + advection_real*radvection_etm
+                                                       + stab_real)
+                    * bf[eqn_real]->detJ * fv->wt * fv->h3;
+
+                lec->J[peqn_imag][pvar_real][i][j] += (diffusion_imag*idiffusion_etm
+                                                       + advection_imag*iadvection_etm
+                                                       + stab_imag)
+                    * bf[eqn_imag]->detJ * fv->wt * fv->h3;
               }
             }
           }
@@ -1082,14 +1132,14 @@ int assemble_ewave_tensor_bf(double time, // present time
                 double diffusion_real = 0;
                 double diffusion_imag = 0;
                 for (int q = 0; q < DIM; q++) {
-                  //diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * bf[var]->curl_phi_e[j][b][q];
+                  diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * bf[var]->curl_phi_e[j][b][q];
 
 
 
                 }
 
                 // R = curl(E)
-                diffusion_imag += bf[eqn_imag]->phi[i]*bf[eqn_imag]->curl_phi_e[j][b][a];
+                //diffusion_imag += bf[eqn_imag]->phi[i]*bf[eqn_imag]->curl_phi_e[j][b][a];
 
                 // Jacobian Contribution for R = E
                 //diffusion_imag += delta(a,b)*bf[eqn_imag]->phi[i]*bf[eqn_imag]->phi[j];
@@ -1100,16 +1150,23 @@ int assemble_ewave_tensor_bf(double time, // present time
                 double stab_real = 0;
                 double stab_imag = 0;
                 if (!(pd->v[R_EM_CONT_REAL] && pd->v[R_EM_CONT_IMAG])) {
-                  //stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
-                  //    bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
+                  stab_imag = stab_scale * bf[eqn_real]->grad_phi[i][a] * (bf[var]->grad_phi_e[j][b][0][0] +
+                      bf[var]->grad_phi_e[j][b][1][1]  + bf[var]->grad_phi_e[j][b][2][2]);
                 }
 
-                double advection_real = 0;
-                double advection_imag = 0;
-                //double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
-                //double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
-                lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real + advection_real + stab_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
-                lec->J[peqn_imag][pvar_imag][i][j] += (diffusion_imag + advection_imag + stab_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
+                //double advection_real = 0;
+                //double advection_imag = 0;
+                double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * -im_coeff * bf[var]->phi[j]);
+                double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
+                lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real*rdiffusion_etm
+                                                       + advection_real*radvection_etm
+                                                       + stab_real)
+                    * bf[eqn_real]->detJ * fv->wt * fv->h3;
+
+                lec->J[peqn_imag][pvar_imag][i][j] += (diffusion_imag*idiffusion_etm
+                                                       + advection_imag*iadvection_etm
+                                                       + stab_imag)
+                    * bf[eqn_imag]->detJ * fv->wt * fv->h3;
               }
             }
           }
@@ -1148,11 +1205,12 @@ int assemble_ewave_tensor_bf(double time, // present time
     }
   }
   return(0);
-} // end of assemble_ewave_tensor_bf
+} // end of assemble_ewave_curlcurl
 
-/* assemble_ewave_tensor_bf -- assemble terms (Residual &| Jacobian) for EM harmonic
- *                    wave equations
+/* assemble_ewave_laplacian -- assemble terms (Residual &| Jacobian) for EM harmonic
+ *                   wave equations
  *                   Substitue H for curl(E) so that goma solves
+ *                   Assume div(E) = 0 and use identity curl(curl(A) = grad(div(A)) - Laplacian(A)
  *                   1 complex vector equation and 1 complex vector primitive
  *
  * in:
@@ -1234,10 +1292,10 @@ int assemble_ewave_laplacian(double time, // present time
   // assumed to be constant in an element block
   r_elperm = creal(cpx_permittivity);
   i_elperm = cimag(cpx_permittivity);
-  re_coeff = -omega*omega*mag_permeability*r_elperm;
+  re_coeff =  omega*omega*mag_permeability*r_elperm;
   im_coeff =  omega*omega*mag_permeability*i_elperm;
 
-  double stab_scale = 100000.0;
+  double stab_scale = 0.0;
   if ( af->Assemble_Residual ) {
     for (int i = 0; i < ei->dof[eqn]; i++) {
       for (int a = 0; a < DIM; a++) {
@@ -1249,6 +1307,7 @@ int assemble_ewave_laplacian(double time, // present time
 
           double diffusion_real = 0.0;
           double diffusion_imag = 0.0;
+
           for (int q = 0; q < DIM; q++) {
             // R = - (gradphi)_a dot (gradE)_a
             diffusion_real += -bf[eqn_real]->grad_phi[i][q]*fv->grad_em_er[q][a];
@@ -1275,7 +1334,7 @@ int assemble_ewave_laplacian(double time, // present time
 
           double advection_real = 0.0;
           double advection_imag = 0.0;
-          advection_real = bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
+          advection_real = bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] - im_coeff * fv->em_ei[a]);
           advection_imag = bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
 
           double src_term = 0.0;
@@ -1395,7 +1454,7 @@ int assemble_ewave_laplacian(double time, // present time
                 double advection_real = 0;
                 double advection_imag = 0;
 
-                advection_real = bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
+                advection_real = bf[eqn_real]->phi[i] * (delta(a,b) *  -im_coeff * bf[var]->phi[j]);
                 advection_imag = bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
                 lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real + advection_real + stab_real) * bf[eqn_real]->detJ * fv->wt * fv->h3;
                 lec->J[peqn_imag][pvar_imag][i][j] += (diffusion_imag + advection_imag + stab_imag) * bf[eqn_imag]->detJ * fv->wt * fv->h3;
@@ -1537,7 +1596,9 @@ int assemble_em_continuity() {
   return(0);
 } // end of assemble_em_continuity
 
-
+////////////////////////////////////////////////////////////////////////////////
+/// Boundary Conditions ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 int apply_em_farfield_direct_vec(double func[DIM],
                 double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
@@ -1867,6 +1928,8 @@ int apply_em_farfield_direct_vec(double func[DIM],
   }
   return 0;
 } // end of apply_em_direct_vec
+
+
 
 
 
@@ -2349,6 +2412,220 @@ int apply_ewave_planewave_vec(double func[DIM],
   }
   return 0;
 } // end of apply_ewave_planewave_vec
+
+int apply_ewave_curlcurl_farfield_vec(double func[DIM],
+                double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],
+                double xi[DIM],        /* Local stu coordinates */
+                double time,           // present time
+                const int bc_name,
+                double *bc_data) {
+  /***********************************************************************
+   * TODO AMC: rewrite this description + add Jacobians
+   * apply_ewave_curlcurl_farfield_vec():
+   *
+   *  Function for specifying surface integral terms for curlcurlE eqn.
+   *
+   *  Surface Integral = phi dot n_bound CROSS Curl E_1 dS
+   *
+   *   Derived Expression hasn't accounted for difference in polarization
+   *   between E1 and thefarfield incident wave - for now assume they're
+   *   the same and in the direction of the farfield incident wave
+   *
+   *
+   *
+   *   func = psi dot [ -i kappa_1 (E_1 - 2*E_f) eta_1/eta_2 ]
+   *
+   *
+   *  The boundary condition E_FARFIELD employs this
+   *  function.
+   *
+   *
+   * Input:
+   *
+   *  em_eqn   = which equation is this applied to
+   *  em_var   = which variable is this value sensitive to
+   *
+   * Output:
+   *
+   *  func[0] = value of the function mentioned above
+   *  d_func[0][varType][lvardof] =
+   *              Derivate of func[0] wrt
+   *              the variable type, varType, and the local variable
+   *              degree of freedom, lvardof, corresponding to that
+   *              variable type.
+   *
+   *   Author: Andrew Cochrane (9/21/2020)
+   *
+   ********************************************************************/
+
+  // need Surface Normal vector
+/* maybe not
+  double n_surf[DIM]; // surface normal vector
+  for (int p=0; p<DIM; p++) {
+    n_surf[p] = fv->snormal[p];
+  }
+*/
+  // setup wave and material properties
+  double omega = upd->Acoustic_Frequency;
+  dbl n_1;				/* Refractive index. */
+  CONDUCTIVITY_DEPENDENCE_STRUCT d_n_struct;
+  CONDUCTIVITY_DEPENDENCE_STRUCT *d_n = &d_n_struct;
+
+  dbl k_1;				/* extinction coefficient. */
+  CONDUCTIVITY_DEPENDENCE_STRUCT d_k_struct;
+  CONDUCTIVITY_DEPENDENCE_STRUCT *d_k = &d_k_struct;
+
+  n_1 = refractive_index( d_n, time );
+  k_1 = extinction_index( d_k, time );
+
+  // Compute complex material properties
+  complex double cpx_refractive_index_1, cpx_rel_permittivity_1,
+      cpx_permittivity_1;//, impedance;
+  double r_elperm_1, i_elperm_1;
+
+  cpx_refractive_index_1 = n_1 + _Complex_I*k_1; // k > 0 is extinction
+  cpx_rel_permittivity_1 = SQUARE(cpx_refractive_index_1);
+  cpx_permittivity_1 = cpx_rel_permittivity_1*mp->permittivity; // better set permittivity to vacuum in input deck?
+
+  double complex E_1[DIM]; // complex field inside domain
+
+  for (int p=0; p<DIM; p++) {
+    E_1[p] = fv->em_er[p] + _Complex_I*fv->em_ei[p];
+  }
+
+  // Need the wave number
+  complex double kappa_1 = omega*csqrt(cpx_permittivity_1*mp->magnetic_permeability);
+  // Need the impedance
+  complex double eta_1 = csqrt(mp->magnetic_permeability/cpx_permittivity_1);
+
+  // polarization P of incident plane wave
+  complex double P[DIM];
+
+  // permittivity of the far-field medium
+  double n_2, k_2;
+
+  P[0] = bc_data[0] + _Complex_I*bc_data[3];
+  P[1] = bc_data[1] + _Complex_I*bc_data[4];
+  P[2] = bc_data[2] + _Complex_I*bc_data[5];
+
+  // Need the impedance of the far-field material (superstrate)
+  // use refractive index and extinction coefficient
+  n_2 = bc_data[6];
+  k_2 = bc_data[7];
+
+  // Compute complex material properties
+  complex double cpx_rel_permittivity_2, cpx_refractive_index_2,
+      cpx_permittivity_2;
+  double r_elperm_2, i_elperm_2;
+
+  cpx_refractive_index_2 = n_2 + _Complex_I*k_2; // k > 0 is extinction
+  cpx_rel_permittivity_2 = SQUARE(cpx_refractive_index_2);
+  cpx_permittivity_2 = cpx_rel_permittivity_2*mp->permittivity; // better set permittivity to vacuum in input deck?
+  // Need the impedance
+  complex double eta_2 = csqrt(mp->magnetic_permeability/cpx_permittivity_2);
+
+  complex double cpx_coeff = -_Complex_I*kappa_1*eta_1/eta_2;
+
+  double x[DIM];
+  x[0] = fv->x[0];
+  x[1] = fv->x[1];
+  x[2] = fv->x[2];
+
+  // Residual Components
+
+  switch (bc_name) {
+    case E_ER_FARFIELD_BC:
+
+    for (int p=0; p<pd->Num_Dim; p++) {
+        func[p] = creal(cpx_coeff*(E_1[p] - 2*P[p]));
+        for (int q=0; q<pd->Num_Dim; q++) {
+          int qRvar = EM_E1_REAL + q;
+          int qIvar = EM_E1_IMAG + q;
+          for (int j=0; j<ei->dof[EM_E1_REAL]; j++) {
+            double Rphi_j = bf[EM_E1_REAL+q]->phi[j];
+            double Iphi_j = bf[EM_E1_IMAG+q]->phi[j];
+            // d(Re[f{z}])/d(Re[z]) = Re(f'(z))
+            d_func[p][qRvar][j] = delta(p,q)
+                *creal(cpx_coeff*Rphi_j);
+
+            // d(Re[f{z}])/d(Im[z]) = -Im(f'(z))
+            d_func[p][qIvar][j] = -delta(p,q)
+                *cimag(cpx_coeff*Iphi_j);
+          }
+        }
+      }
+      /*/
+    for (int p=0; p<DIM; p++) {
+        //func[p] += creal((E_1[p]));
+      //func[p] = fv->em_er[p];
+      func[p] = 1.0;
+        for (int q=0; q<pd->Num_Dim; q++) {
+          int qRvar = EM_E1_REAL + q;
+          int qIvar = EM_E1_IMAG + q;
+          for (int j=0; j<ei->dof[EM_E1R_BC]; j++) {
+            double Rphi_j = bf[EM_E1_REAL+q]->phi[j];
+            double Iphi_j = bf[EM_E1_IMAG+q]->phi[j];
+            // d(Re[f{z}])/d(Re[z]) = Re(f'(z))
+            //d_func[p][qRvar][j] = delta(p,q)*Rphi_j;
+            d_func[p][qRvar][j] = 0.0;
+                //*creal(Rphi_j);
+
+            // d(Re[f{z}])/d(Im[z]) = -Im(f'(z))
+            d_func[p][qIvar][j] += -delta(p,q)
+                *0.0;
+                //*cimag(Iphi_j);
+          }
+        }
+      }
+    */
+      break;
+    case E_EI_FARFIELD_BC:
+
+    for (int p=0; p<DIM; p++) {
+      func[p] += cimag(cpx_coeff*(E_1[p] - 2*P[p]));
+        for (int q=0; q<pd->Num_Dim; q++) {
+          int qRvar = EM_E1_REAL + q;
+          int qIvar = EM_E1_IMAG + q;
+          for (int j=0; j<ei->dof[EM_E1_IMAG]; j++) {
+            double Rphi_j = bf[EM_E1_REAL+q]->phi[j];
+            double Iphi_j = bf[EM_E1_IMAG+q]->phi[j];
+
+            // d(Im[f{z}])/d(Re[z]) = Im(f'(z))
+            d_func[p][qRvar][j] = delta(p,q)
+                *cimag(cpx_coeff*Rphi_j);
+
+            // d(Im[f{z}])/d(Im[z]) = Re(f'(z))
+            d_func[p][qIvar][j] = delta(p,q)
+                *creal(cpx_coeff*Iphi_j);
+          }
+        }
+      }
+      /*/
+      for (int p=0; p<pd->Num_Dim; p++) {
+        func[p] += cimag(cpx_coeff*(E_1[p]));
+        //func[p] = fv->em_ei[p];
+          for (int q=0; q<pd->Num_Dim; q++) {
+            int qRvar = EM_E1_REAL + q;
+            int qIvar = EM_E1_IMAG + q;
+            for (int j=0; j<ei->dof[EM_E1_IMAG]; j++) {
+              double Rphi_j = bf[EM_E1_REAL+q]->phi[j];
+              double Iphi_j = bf[EM_E1_IMAG+q]->phi[j];
+              // d(Im[f{z}])/d(Re[z]) = Im(f'(z))
+              d_func[p][qRvar][j] = delta(p,q)
+                  *cimag(cpx_coeff*Rphi_j);
+
+              // d(Im[f{z}])/d(Im[z]) = Re(f'(z))
+              d_func[p][qIvar][j] = delta(p,q)
+                  *creal(cpx_coeff*Iphi_j);
+            }
+          }
+        }
+*/
+    break;
+  }
+
+  return 0;
+} // end of apply_ewave_farfield_vec
 
 int apply_ewave_mms_vec(double func[DIM],
                 double d_func[DIM][MAX_VARIABLE_TYPES + MAX_CONC][MDE],

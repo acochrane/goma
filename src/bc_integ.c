@@ -1795,6 +1795,17 @@ apply_integrated_bc(double x[],           /* Solution vector for the current pro
                  bc->BC_Data_Float
                 );
             break;
+        case E_ER_FARFIELD_BC:
+        case E_EI_FARFIELD_BC:
+            apply_ewave_curlcurl_farfield_vec
+                (func,
+                 d_func,
+                 xi,
+                 time_value,
+                 (int) bc->BC_Name,
+                 bc->BC_Data_Float
+                );
+            break;
         case E_ER_2D_BC:
         case E_EI_2D_BC:
           apply_ewave_2D(func,

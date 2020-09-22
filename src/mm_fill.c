@@ -1735,7 +1735,7 @@ matrix_fill(
          || (pde[R_EM_E2_REAL] && !pde[R_EM_H2_REAL])
          || (pde[R_EM_E3_REAL] && !pde[R_EM_H3_REAL])
          ) {
-        err = assemble_ewave_laplacian(time_value, theta, delta_t,
+        err = assemble_ewave_curlcurl(time_value, theta, delta_t,
                                 R_EM_E1_REAL, EM_E1_REAL);
         EH( err, "assemble_ewave");
 #ifdef CHECK_FINITE
