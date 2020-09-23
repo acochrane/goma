@@ -932,7 +932,7 @@ int assemble_ewave_curlcurl(double time, // present time
   CONDUCTIVITY_DEPENDENCE_STRUCT d_n_struct;
   CONDUCTIVITY_DEPENDENCE_STRUCT *d_n = &d_n_struct;
 
-  dbl k;				/* Acoustic wave number. */
+  dbl k;				/* Extinction coefficient */
   CONDUCTIVITY_DEPENDENCE_STRUCT d_k_struct;
   CONDUCTIVITY_DEPENDENCE_STRUCT *d_k = &d_k_struct;
 
@@ -958,7 +958,7 @@ int assemble_ewave_curlcurl(double time, // present time
   double rmass_etm, radvection_etm, rdiffusion_etm, rsource_etm;
   double imass_etm, iadvection_etm, idiffusion_etm, isource_etm;
 
-  double stab_scale = 0.0;
+  double stab_scale = 1.0;
   if ( af->Assemble_Residual ) {
     for (int i = 0; i < ei->dof[eqn]; i++) {
       for (int a = 0; a < DIM; a++) {
@@ -1133,8 +1133,6 @@ int assemble_ewave_curlcurl(double time, // present time
                 double diffusion_imag = 0;
                 for (int q = 0; q < DIM; q++) {
                   diffusion_imag += bf[eqn_imag]->curl_phi_e[i][a][q] * bf[var]->curl_phi_e[j][b][q];
-
-
 
                 }
 
