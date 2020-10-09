@@ -958,7 +958,7 @@ int assemble_ewave_curlcurl(double time, // present time
   double rmass_etm, radvection_etm, rdiffusion_etm, rsource_etm;
   double imass_etm, iadvection_etm, idiffusion_etm, isource_etm;
 
-  double stab_scale = 1.0;
+  double stab_scale = 4.0;
   if ( af->Assemble_Residual ) {
     for (int i = 0; i < ei->dof[eqn]; i++) {
       for (int a = 0; a < DIM; a++) {
@@ -1154,7 +1154,7 @@ int assemble_ewave_curlcurl(double time, // present time
 
                 //double advection_real = 0;
                 //double advection_imag = 0;
-                double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * -im_coeff * bf[var]->phi[j]);
+                double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
                 double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
                 lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real*rdiffusion_etm
                                                        + advection_real*radvection_etm
