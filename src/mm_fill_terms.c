@@ -34525,8 +34525,6 @@ em_diss_e_curlcurl_source(HEAT_SOURCE_DEPENDENCE_STRUCT *d_h,
     mag_E_sq += SQUARE(fv->em_er[p]) + SQUARE(fv->em_ei[p]);
   }
 
-
-
   h = h_factor*mag_E_sq;
   h *= param[0];
 

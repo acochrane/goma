@@ -1010,7 +1010,7 @@ int assemble_ewave_curlcurl(double time, // present time
           }
           //double advection_real = 0.0;
           //double advection_imag = 0.0;
-          double advection_real = -bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] + im_coeff * fv->em_ei[a]);
+          double advection_real = -bf[eqn_real]->phi[i] * (re_coeff * fv->em_er[a] - im_coeff * fv->em_ei[a]);
           double advection_imag = -bf[eqn_imag]->phi[i] * (re_coeff * fv->em_ei[a] + im_coeff * fv->em_er[a]);
           double src_real = 0.0;
           double src_imag = 0.0;
@@ -1089,8 +1089,6 @@ int assemble_ewave_curlcurl(double time, // present time
                 double diffusion_imag = 0;
                 for (int q = 0; q < DIM; q++) {
                   diffusion_real += bf[eqn_real]->curl_phi_e[i][a][q] * bf[eqn_real]->curl_phi_e[j][b][q];
-
-
                 }
                 // R = curl(E)
                 //diffusion_real += bf[eqn_real]->phi[i]*bf[eqn_real]->curl_phi_e[j][b][a];
@@ -1154,7 +1152,7 @@ int assemble_ewave_curlcurl(double time, // present time
 
                 //double advection_real = 0;
                 //double advection_imag = 0;
-                double advection_real = -bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
+                double advection_real = bf[eqn_real]->phi[i] * (delta(a,b) * im_coeff * bf[var]->phi[j]);
                 double advection_imag = -bf[eqn_imag]->phi[i] * (delta(a,b) * re_coeff * bf[var]->phi[j]);
                 lec->J[peqn_real][pvar_imag][i][j] += (diffusion_real*rdiffusion_etm
                                                        + advection_real*radvection_etm
